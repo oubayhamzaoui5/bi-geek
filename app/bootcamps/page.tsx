@@ -3,44 +3,29 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import PocketBase from "pocketbase"
 import { motion, useInView } from "framer-motion"
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/badge"
 import { CheckCircle2, TrendingUp, Clock } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 
-type Course = {
-  id: string
-  title: string
-  tags?: string[]
-}
-
-// align with new PB structure (and keep hours optional as legacy fallback)
-type Bootcamp = {
+type BootcampCard = {
   id: string
   title: string
   shortDescription?: string
   durationLabel?: string
   levelLabel?: string
   hours?: number
-}
-
-type BootcampCourse = {
-  id: string
-  bootcamp: string
-  course: string
-  order: number
-  expand?: {
-    course?: Course
-  }
-}
-
-type BootcampCard = Bootcamp & {
-  steps: string[] // ordered course titles
-  tags: string[]  // derived from child courses tags
+  steps: string[]
+  tags: string[]
 }
 
 const levelColors: Record<string, string> = {
@@ -54,7 +39,6 @@ function BootcampCardView({ bootcamp }: { bootcamp: BootcampCard }) {
   const levelLabel = bootcamp.levelLabel || "Tous niveaux"
   const levelClass =
     levelColors[levelLabel] ?? "bg-slate-500/10 text-slate-700 dark:text-slate-300"
-
   const duration =
     bootcamp.durationLabel ??
     (typeof bootcamp.hours === "number" ? `${bootcamp.hours}h` : "--")
@@ -63,12 +47,8 @@ function BootcampCardView({ bootcamp }: { bootcamp: BootcampCard }) {
     <Card className="hover:shadow-lg transition-shadow h-full flex flex-col">
       <CardHeader>
         <div className="flex items-start justify-between gap-2 mb-2">
-         
-
-          {/* Level badge */}
           <Badge className={levelClass}>{levelLabel}</Badge>
         </div>
-
         <CardTitle className="text-md md:text-xl">{bootcamp.title}</CardTitle>
         <p className="text-sm text-muted-foreground text-pretty mt-0 md:mt-1 mb-0">
           {bootcamp.shortDescription}
@@ -120,84 +100,23 @@ export default function BootcampsPage() {
     if (inView) setStarted(true)
   }, [inView])
 
+  /* ✅ Fetch bootcamps from API route */
   useEffect(() => {
-    const pb = new PocketBase(process.env.NEXT_PUBLIC_PB_URL ?? "http://127.0.0.1:8090")
-
-    const load = async () => {
+    const fetchBootcamps = async () => {
       try {
-        // 1) Bootcamps
-        const boots = await pb.collection("bootcamps").getFullList<Bootcamp>({
-          filter: "isPublished = true",
-          sort: "-created",
-        })
-
-        if (!boots.length) {
-          setBootcamps([])
-          return
-        }
-
-        // 2) Pivot rows with expanded course (needs course.title + course.tags)
-        const filter = boots.map((b) => `bootcamp="${b.id}"`).join(" || ")
-        const pivots = await pb.collection("bootcamp_courses").getFullList<BootcampCourse>({
-          filter,
-          sort: "bootcamp,order",
-          expand: "course",
-        })
-
-        // 3) Build per-bootcamp steps + tags (tags derived from child courses)
-        const stepsMap = new Map<string, string[]>()
-        const tagsMap = new Map<string, string[]>() // store raw tags (will dedupe later)
-
-        for (const p of pivots) {
-          const c = p.expand?.course
-          if (!c) continue
-
-          // steps (ordered because query sorted by bootcamp,order)
-          const stepsArr = stepsMap.get(p.bootcamp) ?? []
-          stepsArr.push(c.title)
-          stepsMap.set(p.bootcamp, stepsArr)
-
-          // tags from child course
-          const rawTags = Array.isArray(c.tags) ? c.tags : []
-          const tagArr = tagsMap.get(p.bootcamp) ?? []
-          tagArr.push(...rawTags)
-          tagsMap.set(p.bootcamp, tagArr)
-        }
-
-        // 4) Final cards
-        const cards: BootcampCard[] = boots.map((b) => {
-          const rawTags = tagsMap.get(b.id) ?? []
-          // dedupe tags case-insensitively, keep first original
-          const m = new Map<string, string>()
-          rawTags.forEach((t) => {
-            const tag = (t ?? "").trim()
-            if (!tag) return
-            const key = tag.toLowerCase()
-            if (!m.has(key)) m.set(key, tag)
-          })
-
-          return {
-            ...b,
-            steps: stepsMap.get(b.id) ?? [],
-            tags: Array.from(m.values()),
-          }
-        })
-
-        setBootcamps(cards)
+        const res = await fetch("/api/bootcamps")
+        if (!res.ok) throw new Error(`Failed to fetch bootcamps (${res.status})`)
+        const data = await res.json()
+        setBootcamps(data.bootcamps)
       } catch (err) {
-        console.error("Error fetching bootcamps", {
-          status: (err as any)?.status,
-          message: (err as any)?.message,
-          data: (err as any)?.data,
-        })
+        console.error("Error fetching bootcamps", err)
       }
     }
-
-    load()
+    fetchBootcamps()
   }, [])
 
-  // Build tag filters from all bootcamps (derived tags from children courses)
-  const tagMap = new Map<string, string>() // lower -> original
+  /* Build tag filters */
+  const tagMap = new Map<string, string>()
   bootcamps.forEach((b) => {
     b.tags.forEach((rawTag) => {
       const tag = (rawTag ?? "").trim()
@@ -206,7 +125,6 @@ export default function BootcampsPage() {
       if (!tagMap.has(key)) tagMap.set(key, tag)
     })
   })
-
   const categories = ["All", ...Array.from(tagMap.values())]
 
   const filteredBootcamps =
@@ -233,7 +151,7 @@ export default function BootcampsPage() {
 
   const handleCategoryClick = (category: string) => {
     setSelectedTag(category)
-    setAnimKey((k) => k + 1) // retrigger grid animation like formations
+    setAnimKey((k) => k + 1)
   }
 
   return (
@@ -260,16 +178,9 @@ export default function BootcampsPage() {
             >
               Des parcours intensifs et structurés, filtrables par catégories de formations.
             </motion.p>
-
-            <motion.div
-              className="mt-4 flex justify-center"
-              initial={{ opacity: 0, y: 16 }}
-              animate={started ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.45, ease: "easeOut", delay: 0.18 }}
-            />
           </div>
 
-          {/* Filtres catégories (from children courses tags) */}
+          {/* Category filters */}
           <div className="flex flex-wrap justify-center gap-2 mb-6">
             {categories.map((category, i) => (
               <motion.div
@@ -295,7 +206,7 @@ export default function BootcampsPage() {
             ))}
           </div>
 
-          {/* Grille bootcamps (same style as formations grid) */}
+          {/* Bootcamps grid */}
           <div key={animKey} className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 px-18">
             {filteredBootcamps.map((b) => (
               <motion.div

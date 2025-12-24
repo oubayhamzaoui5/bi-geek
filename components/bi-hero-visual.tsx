@@ -40,7 +40,7 @@ export function BiHeroVisual() {
         <motion.div
           animate={{ y: [0, -6, 0] }}
           transition={{ duration: 4, repeat: Infinity, repeatType: "reverse" }}
-          className="relative rounded-2xl border border-white/10 right-8 md:right-16 bg-white/10 backdrop-blur-md p-6 shadow-md hover:shadow-lg transition-all hover:-translate-y-1 w-80"
+          className="relative rounded-2xl border border-white/10 right-8 md:right-16 bg-white backdrop-blur-md p-6 shadow-md hover:shadow-lg transition-all hover:-translate-y-1 w-80"
         >
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 rounded-lg bg-accent/20">
@@ -98,7 +98,7 @@ export function BiHeroVisual() {
         <motion.div
           animate={{ y: [0, -8, 0] }}
           transition={{ duration: 4.2, repeat: Infinity, repeatType: "reverse", delay: 0.2 }}
-          className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur-md p-4 shadow-md hover:shadow-lg transition-all hover:-translate-y-1 w-72"
+          className="rounded-2xl border border-white/10 bg-white backdrop-blur-md p-4 shadow-md hover:shadow-lg transition-all hover:-translate-y-1 w-72"
         >
           <div className="flex items-center gap-2 mb-3">
             <Database className="w-4 h-4 text-chart-2" />
@@ -120,7 +120,7 @@ export function BiHeroVisual() {
         <motion.div
           animate={{ y: [0, -6, 0] }}
           transition={{ duration: 3.8, repeat: Infinity, repeatType: "reverse", delay: 0.4 }}
-          className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur-md p-4 shadow-md hover:shadow-lg transition-all hover:-translate-y-1 w-72"
+          className="rounded-2xl border border-white/10 bg-white backdrop-blur-md p-4 shadow-md hover:shadow-lg transition-all hover:-translate-y-1 w-72"
         >
           <div className="flex items-center gap-2 mb-3">
             <Code2 className="w-4 h-4 text-chart-3" />

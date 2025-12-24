@@ -22,17 +22,14 @@ type Phase = "typing" | "pausing" | "deleting"
 
 function RightHeroImage() {
   return (
-    <motion.div
+    <div
       aria-hidden
       className="pointer-events-none absolute top-1/2 right-0 -translate-y-1/2 hidden md:block z-0"
-      initial={{ opacity: 0, x: 40, scale: 0.96 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      transition={{ duration: 0.9, ease: "easeOut", delay: 0.25 }}
     >
       {/* Floating wrapper */}
       <motion.div
         className="relative"
-        animate={{ y: [0, -10, 0] }}
+        animate={{ y: [0, 0, 0] }}
         transition={{
           duration: 8,
           repeat: Infinity,
@@ -41,16 +38,16 @@ function RightHeroImage() {
         }}
       >
         <div
-          className="absolute right-[-10%] top-1/2 -translate-y-1/2 aspect-square w-[58%] rounded-full blur-3xl opacity-50"
+          className="absolute right-[-5%] top-1/2 -translate-y-1/2 aspect-square w-[70%] rounded-full blur-3xl opacity-50"
           style={{ background: "radial-gradient(closest-side, #954ABF33, transparent 65%)" }}
         />
         <Image
           src="/hero.png"
           alt=""
-          width={720}
-          height={720}
+          width={800}
+          height={800}
           priority
-          className="w-[40vw] h-auto object-contain drop-shadow-xl select-none"
+          className="w-[45vw] h-auto object-contain drop-shadow-xl select-none"
           sizes="(min-width: 1024px) 28vw, (min-width: 768px) 34vw, 0px"
           style={{
             maskImage: "linear-gradient(to left, black 80%, transparent 100%)",
@@ -58,7 +55,7 @@ function RightHeroImage() {
           }}
         />
       </motion.div>
-    </motion.div>
+    </div>
   )
 }
 
@@ -119,7 +116,7 @@ export function Hero() {
   }
 
   return (
-    <section className="relative overflow-hidden py-16 md:py-32 -mx-2 md:mx-0">
+    <section className="relative overflow-hidden py-20 md:py-40 -mx-2 md:mx-0">
       <RightHeroImage />
 
       <div className="container mx-auto px-4 relative z-10">
@@ -130,9 +127,9 @@ export function Hero() {
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
           {/* Title */}
-          <div className="mb-2 md:mb-8">
+          <div className="mb-1 md:mb-2">
             <motion.h1
-              className="text-2xl sm:text-2xl md:text-5xl lg:text-6xl font-bold leading-tight text-balance"
+              className="text-2xl sm:text-2xl md:text-4xl lg:text-5xl font-bold leading-tight text-balance"
               variants={appear}
               initial="hidden"
               animate="show"
@@ -151,7 +148,7 @@ export function Hero() {
 
           {/* Description */}
           <motion.p
-            className="text-base sm:text-lg md:text-xl text-muted-foreground text-pretty mb-6 md:mb-8 leading-relaxed"
+            className="text-base sm:text-base md:text-lg text-muted-foreground text-pretty mb-4 md:mb-5 leading-relaxed"
             variants={appear}
             initial="hidden"
             animate={startTyping ? "show" : "hidden"}

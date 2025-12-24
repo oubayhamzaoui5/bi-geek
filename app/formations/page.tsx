@@ -2,7 +2,6 @@
 "use client"
 
 import { useRef, useState, useEffect } from "react"
-import PocketBase from "pocketbase"
 import { motion, useInView } from "framer-motion"
 import { ProgramCard } from "@/components/program-card"
 import { Button } from "@/components/ui/button"
@@ -25,67 +24,65 @@ export default function FormationsPage() {
   const [started, setStarted] = useState(false)
 
   const sectionRef = useRef<HTMLDivElement | null>(null)
-  const inView = useInView(sectionRef, { once: true, amount: 0.3, margin: "-80px" })
+  const inView = useInView(sectionRef, {
+    once: true,
+    amount: 0.3,
+    margin: "-80px",
+  })
 
   useEffect(() => {
     if (inView) setStarted(true)
   }, [inView])
 
-  // Fetch courses from PocketBase (client-side)
+  /* ✅ Fetch courses from Next.js API (server → PocketBase) */
   useEffect(() => {
-    const pb = new PocketBase(process.env.NEXT_PUBLIC_PB_URL ?? "http://127.0.0.1:8090")
-
     const fetchCourses = async () => {
       try {
-        const records = await pb.collection("courses").getFullList({
-          filter: "isPublished = true",
-          sort: "-created",
-        })
+        const res = await fetch("/api/courses")
 
-        const mapped: CourseCard[] = records.map((c: any) => ({
-          id: c.id,
-          title: c.title,
-          shortDescription: c.shortDescription,
-          durationLabel: c.durationLabel, // e.g. "40 heures"
-          levelLabel: c.levelLabel, // e.g. "Intermédiaire"
-          tags: Array.isArray(c.tags) ? c.tags : [],
-        }))
+        if (!res.ok) {
+          throw new Error(`Failed to fetch courses (${res.status})`)
+        }
 
-        setCourses(mapped)
+        const data = await res.json()
+        setCourses(data.courses as CourseCard[])
       } catch (err) {
-        console.error("Error fetching courses from PocketBase", err)
+        console.error("Error fetching courses", err)
       }
     }
 
     fetchCourses()
   }, [])
 
-  // Build unique tag filters from all courses (AI == ai, no duplicates)
+  /* Build unique tag filters (case-insensitive) */
   const tagMap = new Map<string, string>() // lower -> original
   courses.forEach((course) => {
     course.tags.forEach((rawTag) => {
       const tag = (rawTag ?? "").trim()
       if (!tag) return
       const key = tag.toLowerCase()
-      if (!tagMap.has(key)) {
-        tagMap.set(key, tag)
-      }
+      if (!tagMap.has(key)) tagMap.set(key, tag)
     })
   })
 
-  const tagFilters = Array.from(tagMap.values())
-  const categories: string[] = ["All", ...tagFilters]
+  const categories: string[] = ["All", ...Array.from(tagMap.values())]
 
   const filteredCourses =
     selectedTag === "All"
       ? courses
       : courses.filter((course) =>
-          course.tags.some((t) => t.toLowerCase() === selectedTag.toLowerCase()),
+          course.tags.some(
+            (t) => t.toLowerCase() === selectedTag.toLowerCase(),
+          ),
         )
 
   const titleVariants = {
     hidden: { opacity: 0, y: 28 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.6, ease: "easeOut" },
+    },
   }
 
   const filterItemVariants = {
@@ -94,18 +91,23 @@ export default function FormationsPage() {
       opacity: 1,
       y: 0,
       scale: 1,
-      transition: { duration: 0.35, ease: "easeOut", delay: 0.15 + i * 0.06 },
+      transition: {
+        duration: 0.35,
+        ease: "easeOut",
+        delay: 0.15 + i * 0.06,
+      },
     }),
   }
 
   const handleCategoryClick = (category: string) => {
     setSelectedTag(category)
-    setAnimKey((k) => k + 1) // retrigger cards animation
+    setAnimKey((k) => k + 1)
   }
 
   return (
     <>
       <Navbar />
+
       <section className="py-12 min-h-[80vh]">
         <div ref={sectionRef} className="container mx-auto px-4">
           <div className="text-center mb-4">
@@ -123,20 +125,18 @@ export default function FormationsPage() {
               className="text-lg text-muted-foreground max-w-2xl mx-auto text-pretty"
               initial={{ opacity: 0, y: 14 }}
               animate={started ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.45, ease: "easeOut", delay: 0.1 }}
+              transition={{
+                duration: 0.45,
+                ease: "easeOut",
+                delay: 0.1,
+              }}
             >
-              Explorez l&apos;ensemble de nos parcours de formation par catégorie et par niveau.
+              Explorez l&apos;ensemble de nos parcours de formation par catégorie
+              et par niveau.
             </motion.p>
-
-            <motion.div
-              className="mt-4 flex justify-center"
-              initial={{ opacity: 0, y: 16 }}
-              animate={started ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.45, ease: "easeOut", delay: 0.18 }}
-            />
           </div>
 
-          {/* Filtres catégories (tags from PB) */}
+          {/* Filtres catégories */}
           <div className="flex flex-wrap justify-center gap-2 mb-6">
             {categories.map((category, i) => (
               <motion.div
@@ -152,8 +152,8 @@ export default function FormationsPage() {
                   onClick={() => handleCategoryClick(category)}
                   className={
                     selectedTag === category
-                      ? "bg-accent hover:bg-[#7d3d9f] cursor-pointer"
-                      : "cursor-pointer"
+                      ? "bg-accent hover:bg-[#7d3d9f]"
+                      : ""
                   }
                 >
                   {category === "All" ? "Tous" : category}
@@ -180,6 +180,7 @@ export default function FormationsPage() {
           </div>
         </div>
       </section>
+
       <Footer />
     </>
   )
