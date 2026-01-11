@@ -7,6 +7,8 @@ import { User, Eye, EyeOff, AlertCircle } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
+import { useEffect } from "react"
+
 
 /* ---------- Types ---------- */
 type Step = "username" | "password"
@@ -30,6 +32,19 @@ const stepVariants = {
 /* ---------- Page ---------- */
 export default function LoginPage() {
   const router = useRouter()
+
+    useEffect(() => {
+    const userString = localStorage.getItem("user")
+    const user = userString ? JSON.parse(userString) : null
+
+    if (user && user.role === "admin") {
+      router.push("/admin-dashboard")
+    } else if (user && user.role === "instructor") {
+      router.push("/instructor-dashboard")
+    } else if (user && user.role === "student") {
+      router.push("/student-dashboard")
+    }
+  }, [router])
 
   const [step, setStep] = useState<Step>("username")
   const [direction, setDirection] = useState(1)

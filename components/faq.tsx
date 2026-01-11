@@ -25,18 +25,14 @@ const faqs = [
 
 export function Faq() {
   return (
-    <section id="faq" className="py-4 md:py-8 -mx-2 md:mx-0">
+    <section id="faq" className="py-8 md:py-32 -mx-2 md:mx-0">
       <div className="container mx-auto px-3 sm:px-4">
         <div className="text-center mb-8 md:mb-12">
-          <p className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-accent mb-2 sm:mb-3">
-            Questions fréquentes
-          </p>
+         
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-balance mb-3 sm:mb-4">
-            FAQ
+            Questions Fréquentes
           </h2>
-          <p className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mx-auto text-pretty">
-            Trouvez les réponses aux questions les plus courantes
-          </p>
+      
         </div>
 
         <div className="max-w-3xl mx-auto">

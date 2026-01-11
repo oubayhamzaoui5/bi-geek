@@ -15,8 +15,10 @@ export async function GET() {
       title: c.title,
       shortDescription: c.shortDescription,
       durationLabel: c.durationLabel,
-      levelLabel: c.levelLabel,
       tags: Array.isArray(c.tags) ? c.tags : [],
+      coverImage: c.coverImage
+        ? `${process.env.POCKETBASE_URL}/api/files/courses/${c.id}/${c.coverImage}`
+        : null,
     }))
 
     return NextResponse.json({ courses })

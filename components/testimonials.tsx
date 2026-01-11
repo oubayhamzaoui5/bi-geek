@@ -3,126 +3,139 @@
 import { useEffect, useRef, useState } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { testimonials } from "@/data/testimonials"
-import { Card, CardContent } from "@/components/ui/card"
-import { Quote } from "lucide-react"
+import Image from "next/image"
+import { Star } from "lucide-react"
 
-const ROTATE_MS = 8000 // 8s per testimonial
+const ROTATE_MS = 8000
 
 export function Testimonials() {
   const [index, setIndex] = useState(0)
-  const [direction, setDirection] = useState<1 | -1>(1)
   const prefersReducedMotion = useReducedMotion()
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Auto-rotate
   useEffect(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
     timeoutRef.current = setTimeout(() => {
-      setDirection(1)
       setIndex((i) => (i + 1) % testimonials.length)
     }, ROTATE_MS)
 
     return () => timeoutRef.current && clearTimeout(timeoutRef.current)
   }, [index])
 
-  // Animation variants
   const variants = {
-    enter: (dir: 1 | -1) =>
-      prefersReducedMotion
-        ? { opacity: 0 }
-        : { opacity: 0, x: dir > 0 ? 24 : -24, filter: "blur(6px)" },
-    center: prefersReducedMotion
-      ? { opacity: 1 }
+    enter: prefersReducedMotion
+      ? { opacity: 0 }
+      : { opacity: 0, y: 24 },
+    center: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.45, ease: "easeOut" },
+    },
+    exit: prefersReducedMotion
+      ? { opacity: 0 }
       : {
-          opacity: 1,
-          x: 0,
-          filter: "blur(0px)",
-          transition: { duration: 0.45, ease: "easeOut" },
+          opacity: 0,
+          y: -24,
+          transition: { duration: 0.3, ease: "easeIn" },
         },
-    exit: (dir: 1 | -1) =>
-      prefersReducedMotion
-        ? { opacity: 0 }
-        : {
-            opacity: 0,
-            x: dir > 0 ? -24 : 24,
-            filter: "blur(6px)",
-            transition: { duration: 0.35, ease: "easeIn" },
-          },
   }
 
   const t = testimonials[index]
 
   return (
-    <section
-      id="temoignages"
-      className="relative flex items-center justify-center bg-accent text-white py-12 md:py-32  -mx-4 md:mx-0"
-    >
-      <div className="container mx-auto px-2 md:px-4">
-        <div className="mx-auto max-w-xl md:max-w-3xl">
-          <AnimatePresence mode="wait" custom={direction}>
-            <motion.div
-              key={t.id ?? index}
-              custom={direction}
-              variants={variants}
-              initial="enter"
-              animate="center"
-              exit="exit"
+    <section id="temoignages" className="py-16 md:py-28">
+      <div className="container mx-auto px-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          {/* LEFT — Fixed-height wrapper (prevents scroll jump) */}
+          <div className="flex justify-center">
+            <div
+              className="
+                relative
+                w-full max-w-md
+                min-h-[360px] md:min-h-[400px]
+                overflow-hidden
+                flex items-center justify-center
+              "
             >
-              {/* Consistent height for all cards (mobile + desktop) */}
-              <Card
-                className="
-                  bg-white text-foreground rounded-xl overflow-hidden 
-                  h-[300px] sm:h-[320px] md:h-[340px]
-                  flex
-                "
-              >
-                <CardContent
-                  className="
-                    flex flex-col justify-between w-full
-                    pt-6 pb-8 px-4
-                    sm:px-6 sm:pt-8 sm:pb-10
-                  "
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={t.id}
+                  variants={variants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  layout={false}
+                  className="flex flex-col items-center text-center absolute inset-0"
                 >
-                  <div>
-                    <Quote className="h-7 w-7 sm:h-9 sm:w-9 text-accent mb-4" />
-
-                    {/* Smaller text on mobile */}
-                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed mb-4">
-                      “{t.quote}”
-                    </p>
-
-                    <div>
-                      <p className="font-bold text-foreground text-sm sm:text-base">
-                        {t.author}
-                      </p>
-
-                      {(t.role || t.company) && (
-                        <p className="text-xs sm:text-sm text-muted-foreground">
-                          {t.role}
-                          {t.role && t.company ? " • " : ""}
-                          {t.company}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="absolute bottom-0 left-0 w-full h-1 bg-muted/40">
-                    <motion.div
-                      key={`progress-${index}`}
-                      initial={{ width: "0%" }}
-                      animate={{ width: "100%" }}
-                      transition={{
-                        duration: prefersReducedMotion ? 0.2 : ROTATE_MS / 1000,
-                        ease: "linear",
-                      }}
-                      className="h-full bg-accent"
+                  {/* Avatar */}
+                  <div className="mb-1">
+                    <Image
+                      src={t.avatar ?? "/sketch-face.png"}
+                      alt={t.author}
+                      width={170}
+                      height={170}
+                      className="rounded-full"
                     />
                   </div>
-                </CardContent>
-              </Card>
+
+                  {/* Name */}
+                  <p className="font-semibold text-lg mb-1">{t.author}</p>
+
+                  {/* Stars */}
+                  <div className="flex gap-1 mb-2">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star
+                        key={i}
+                        className={`h-4 w-4 ${
+                          i < t.rating
+                            ? "fill-[#C34AFF] text-[#C34AFF]"
+                            : "text-muted-foreground"
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Quote */}
+                  <div className="px-6">
+                    <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+                      “{t.quote}”
+                    </p>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* RIGHT — Static image with subtle on-scroll animation */}
+          <div className="hidden md:flex justify-center">
+            <motion.div
+              initial={
+                prefersReducedMotion
+                  ? { opacity: 1 }
+                  : { opacity: 0, scale: 0.92, rotate: 4 }
+              }
+              whileInView={{
+                opacity: 1,
+                scale: 1,
+                rotate: 0,
+              }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{
+                duration: 0.4,
+                ease: "easeIn",
+                delay: 0.25, // 👈 little late
+              }}
+            >
+              <Image
+                src="/person3.png"
+                alt="Happy student"
+                width={800}
+                height={800}
+                className="object-contain"
+                priority
+              />
             </motion.div>
-          </AnimatePresence>
+          </div>
         </div>
       </div>
     </section>

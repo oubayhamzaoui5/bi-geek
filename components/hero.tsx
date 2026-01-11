@@ -116,7 +116,7 @@ export function Hero() {
   }
 
   return (
-    <section className="relative overflow-hidden py-20 md:py-40 -mx-2 md:mx-0">
+    <section className="relative overflow-hidden pt-20 md:py-40 -mx-2 -mb-16 md:mb-0 md:mx-0 ">
       <RightHeroImage />
 
       <div className="container mx-auto px-4 relative z-10">

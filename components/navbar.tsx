@@ -2,29 +2,44 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Menu, X } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { Menu, X, User as UserIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { LanguageSwitcher } from "./language-switcher"
 import { cn } from "@/lib/utils"
 
 // type: "page" = go to another page
 // type: "home-section" = anchor on "/"
 const navLinks = [
-  { href: "/about", label: "À propos", type: "page" },
-  { href: "/formations", label: "Formations", type: "page" },
+  { href: "/#about", label: "À propos", type: "home-section" },
+  { href: "/courses", label: "Formations", type: "page" },
   { href: "/bootcamps", label: "Bootcamps", type: "page" },
-
-  // anchored sections on "/"
-  { href: "/#formateurs", label: "Formateurs", type: "home-section" },
   { href: "/#contact", label: "Contact", type: "home-section" },
   { href: "/#faq", label: "FAQ", type: "home-section" },
 ]
 
+function Spinner() {
+  return (
+    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+  )
+}
+
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [user, setUser] = useState<{ username: string; role: string } | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+
   const pathname = usePathname()
+  const router = useRouter()
+
+  // Check for logged-in user
+  useEffect(() => {
+    const userString = localStorage.getItem("user")
+    if (userString) {
+      setUser(JSON.parse(userString))
+    }
+    setAuthLoading(false)
+  }, [])
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10)
@@ -32,11 +47,11 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
-  function smoothScrollTo(href: string) {
-    if (!href.startsWith("#")) return
-    const el = document.querySelector(href)
+  function smoothScrollTo(targetId: string, offset = 60) {
+    const el = document.querySelector(targetId)
     if (!el) return
-    el.scrollIntoView({ behavior: "smooth", block: "start" })
+    const y = el.getBoundingClientRect().top + window.pageYOffset - offset
+    window.scrollTo({ top: y, behavior: "smooth" })
   }
 
   return (
@@ -60,46 +75,42 @@ export function Navbar() {
           <div
             className={cn(
               "hidden lg:flex items-center gap-6",
-              "absolute left-1/2 top-1/2 -translate-y-1/2 -translate-x-1/2"
+              "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
             )}
           >
             {navLinks.map((link) => {
-              // PAGE LINKS: never smooth-scroll
               if (link.type === "page") {
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-sm font-medium text-muted-foreground hover:text-accent transition-colors"
                   >
                     {link.label}
                   </Link>
                 )
               }
 
-              // HOME SECTIONS (/#programmes, /#contact, ...)
-              const [, hash] = link.href.split("#") // "/#programmes" -> [" /", "programmes"]
+              const [, hash] = link.href.split("#")
               const targetId = `#${hash}`
 
-              // If we're already on "/", use smooth scroll
               if (pathname === "/") {
                 return (
                   <button
                     key={link.href}
-                    onClick={() => smoothScrollTo(targetId)}
-                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    onClick={() => smoothScrollTo(targetId, 60)}
+                    className="text-sm font-medium text-muted-foreground hover:text-accent transition-colors cursor-pointer"
                   >
                     {link.label}
                   </button>
                 )
               }
 
-              // From other pages → classic navigation to "/#section"
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm font-medium text-muted-foreground hover:text-accent transition-colors"
                 >
                   {link.label}
                 </Link>
@@ -109,12 +120,36 @@ export function Navbar() {
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            <LanguageSwitcher />
-
-            <Button asChild size="sm" className="bg-accent hover:bg-[#7d3d9f] text-white">
-              <Link href="/login">Se connecter</Link>
+            {/* AUTH BUTTON */}
+            <Button
+              size="sm"
+              className={cn(
+                "min-w-[100px] flex items-center justify-center gap-2 cursor-pointer",
+                "bg-accent hover:bg-[#7d3d9f] text-white"
+              )}
+              disabled={authLoading}
+              onClick={() => {
+                if (!user) return
+                if (user.role === "admin") router.push("/admin-dashboard")
+                else if (user.role === "instructor") router.push("/instructor-dashboard")
+                else router.push("/student-dashboard")
+              }}
+            >
+              {authLoading ? (
+                <Spinner />
+              ) : user ? (
+                <>
+                  <UserIcon size={16} />
+                  {user.username}
+                </>
+              ) : (
+                <Link href="/login" className="w-full text-center">
+                  Se connecter
+                </Link>
+              )}
             </Button>
 
+            {/* Mobile menu toggle */}
             <Button
               variant="ghost"
               size="sm"
@@ -136,7 +171,7 @@ export function Navbar() {
                     <Link
                       key={link.href}
                       href={link.href}
-                      className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2"
+                      className="text-sm font-medium text-muted-foreground hover:text-accent transition-colors py-2"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       {link.label}
@@ -147,42 +182,32 @@ export function Navbar() {
                 const [, hash] = link.href.split("#")
                 const targetId = `#${hash}`
 
-                // On "/", smooth scroll
                 if (pathname === "/") {
                   return (
                     <button
                       key={link.href}
                       onClick={() => {
                         setIsMobileMenuOpen(false)
-                        requestAnimationFrame(() => smoothScrollTo(targetId))
+                        requestAnimationFrame(() => smoothScrollTo(targetId, 60))
                       }}
-                      className="text-sm text-left font-medium text-muted-foreground hover:text-foreground transition-colors py-2 cursor-pointer"
+                      className="text-sm text-left font-medium text-muted-foreground hover:text-accent transition-colors py-2 cursor-pointer"
                     >
                       {link.label}
                     </button>
                   )
                 }
 
-                // On other pages, navigate to "/#section"
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2"
+                    className="text-sm font-medium text-muted-foreground hover:text-accent transition-colors py-2"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     {link.label}
                   </Link>
                 )
               })}
-
-              <Link
-                href="/login"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Se connecter
-              </Link>
             </div>
           </div>
         )}

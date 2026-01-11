@@ -1,28 +1,43 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 import {
   Menu, X, Home, BookOpen, Award, Settings, LogOut, ChevronLeft,
-  Calendar, MessageSquare, Megaphone
+  Calendar, MessageSquare, Megaphone, Layers , Users 
 } from "lucide-react"
+
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSidebar } from "@/components/ui/sidebar-context"
 
-export function Sidebar() {
+export function Sidebar({ variant = "student" }: { variant?: "student" | "admin" }) {
+const router = useRouter()
   const [isOpen, setIsOpen] = useState(true) // mobile slide-in
   const { isCollapsed, setIsCollapsed } = useSidebar() // from context
   const pathname = usePathname()
 
-  const primaryLinks = [
-    { icon: Home,          label: "Accueil",      href: "/student-dashboard" },
-    { icon: BookOpen,      label: "Formations",   href: "/student-dashboard/courses" },
-    { icon: Calendar,      label: "Calendrier",   href: "/student-dashboard/calendar" },
-    { icon: MessageSquare, label: "Messages",     href: "/student-dashboard/messages" },
-    { icon: Megaphone,     label: "Annonces",     href: "/student-dashboard/announcements" },
-    { icon: Award,         label: "Certificats",  href: "/student-dashboard/certificates" },
-    { icon: Settings,      label: "Paramètres",   href: "/student-dashboard/settings" },
-  ]
+const adminLinks = [
+  { icon: BookOpen, label: "Courses", href: "/admin-dashboard/courses" },
+  { icon: Layers, label: "Bootcamps", href: "/admin-dashboard/bootcamps" },
+    { icon: Users, label: "Enrollments", href: "/admin-dashboard/enrollments" },
+    { icon: Award, label: "Vedettes", href: "/admin-dashboard/featured" },
+
+
+]
+
+const studentLinks = [
+  { icon: Home, label: "Accueil", href: "/student-dashboard" },
+  { icon: BookOpen, label: "Formations", href: "/student-dashboard/courses" },
+  { icon: Calendar, label: "Calendrier", href: "/student-dashboard/calendar" },
+  { icon: MessageSquare, label: "Messages", href: "/student-dashboard/messages" },
+  { icon: Megaphone, label: "Annonces", href: "/student-dashboard/announcements" },
+  { icon: Award, label: "Certificats", href: "/student-dashboard/certificates" },
+  { icon: Settings, label: "Paramètres", href: "/student-dashboard/settings" },
+]
+
+const primaryLinks = variant === "admin" ? adminLinks : studentLinks
+
 
   const isActivePath = (href: string) => {
     if (href === "/student-dashboard/courses") {
@@ -69,13 +84,13 @@ export function Sidebar() {
           {/* === LOGO (replaced) === */}
           {isCollapsed ? (
             <Link href="/" className="flex items-center justify-center mt-3" aria-label="BI GEEK - Accueil">
-              <div className="text-xl font-extrabold leading-none select-none">
+              <div className="text-2xl font-extrabold   ">
                 <span className="text-accent">BI</span>
               </div>
             </Link>
           ) : (
-            <Link href="/" className="flex items-center w-full px-3 mt-3 gap-2" aria-label="BI GEEK - Accueil">
-              <div className="text-2xl font-bold">
+            <Link href="/" className="flex items-center w-full justify-center px-3 mt-3 gap-2" aria-label="BI GEEK - Accueil">
+              <div className="text-2xl font-bold whitespace-nowrap">
                 <span className="text-accent">BI</span>
                 <span className="text-white"> GEEK</span>
               </div>
@@ -109,15 +124,24 @@ export function Sidebar() {
           </div>
 
           {/* Bottom */}
-          <button
-            title={isCollapsed ? "Déconnexion" : undefined}
-            className={`w-full flex items-center
-              ${isCollapsed ? "justify-center h-16" : "h-16 px-3"}
-              bg-sidebar/60 hover:bg-sidebar-accent/10 text-sidebar-foreground transition-colors`}
-          >
-            <LogOut size={22} className="shrink-0" />
-            {!isCollapsed && <span className="ml-2 text-sm font-medium">Déconnexion</span>}
-          </button>
+         {/* Bottom Logout Button */}
+<button
+  onClick={() => {
+    // Remove user from localStorage
+    localStorage.removeItem("user")
+
+    // Redirect to home
+    router.push("/")
+  }}
+  title={isCollapsed ? "Déconnexion" : undefined}
+  className={`w-full flex items-center cursor-pointer
+    ${isCollapsed ? "justify-center h-16" : "h-16 px-3"}
+    bg-sidebar/60 hover:bg-sidebar-accent/10 text-sidebar-foreground transition-colors`}
+>
+  <LogOut size={22} className="shrink-0" />
+  {!isCollapsed && <span className="ml-2 text-sm font-medium">Déconnexion</span>}
+</button>
+
         </div>
       </aside>
 

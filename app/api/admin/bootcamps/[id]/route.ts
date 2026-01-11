@@ -28,7 +28,7 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
     const pivots = await pb.collection("bootcamp_courses").getFullList({
       filter: `bootcamp="${bootcampId}"`,
     })
-
+ 
     for (const p of pivots as any[]) {
       await pb.collection("bootcamp_courses").delete(p.id)
     }

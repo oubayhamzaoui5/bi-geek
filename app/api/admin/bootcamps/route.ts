@@ -1,4 +1,3 @@
-// app/api/admin/bootcamps/route.ts
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
 
@@ -8,15 +7,10 @@ type IncomingBootcamp = {
   shortDescription: string
   longDescription?: string
   durationLabel: string
-  levelLabel: string
-  certificate?: boolean
+  prerequis: "Aucun" | "Contacter l'administration"
   rating?: number
   reviewsCount?: number
   isPublished?: boolean
-  /**
-   * Ordered list of course IDs in this bootcamp.
-   * The index in this array is used as "order".
-   */
   courseIds?: string[]
 }
 
@@ -40,7 +34,6 @@ export async function GET() {
 
     const [bootcampRecords, pivotRecords] = await Promise.all([
       pb.collection("bootcamps").getFullList({ sort: "title" }),
-      // sort also by bootcamp so we get a consistent ordering
       pb.collection("bootcamp_courses").getFullList({ sort: "bootcamp,order" }),
     ])
 
@@ -48,7 +41,7 @@ export async function GET() {
 
     for (const p of pivotRecords as any[]) {
       const arr = coursesByBootcamp.get(p.bootcamp) ?? []
-      arr.push(p.course) // already in "order" thanks to sort above
+      arr.push(p.course)
       coursesByBootcamp.set(p.bootcamp, arr)
     }
 
@@ -56,10 +49,10 @@ export async function GET() {
       id: b.id,
       title: b.title,
       shortDescription: b.shortDescription,
-      longDescription: b.longDescription,
+      longDescription: b.longDescription || "",
       durationLabel: b.durationLabel,
-      levelLabel: b.levelLabel,
-      certificate: !!b.certificate,
+      prerequis: b.prerequis || "Aucun",
+      coverImage: b.coverImage || null,
       rating: b.rating ?? 4.8,
       reviewsCount: b.reviewsCount ?? 0,
       isPublished: !!b.isPublished,
@@ -76,72 +69,86 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json().catch(() => ({}))) as IncomingBootcamp
-    const {
-      id,
-      title,
-      shortDescription,
-      longDescription,
-      durationLabel,
-      levelLabel,
-      certificate,
-      rating,
-      reviewsCount,
-      isPublished,
-      courseIds,
-    } = body
+    const formData = await req.formData()
+    const pb = await getAdminPb()
 
-    if (!title || !shortDescription || !durationLabel || !levelLabel) {
+    // Parse form data
+    const id = formData.get("id")?.toString()
+    const title = formData.get("title")?.toString() || ""
+    const shortDescription = formData.get("shortDescription")?.toString() || ""
+    const longDescription = formData.get("longDescription")?.toString() || ""
+    const durationLabel = formData.get("durationLabel")?.toString() || ""
+    const prerequis = (formData.get("prerequis")?.toString() || "Aucun") as "Aucun" | "Contacter l'administration"
+    
+    const rating = Number(formData.get("rating") ?? 4.8)
+    const reviewsCount = Number(formData.get("reviewsCount") ?? 0)
+    const isPublished = formData.get("isPublished") !== "false"
+
+    // Parse courseIds from JSON string
+    let courseIds: string[] = []
+    try {
+      const courseIdsStr = formData.get("courseIds")?.toString()
+      if (courseIdsStr) {
+        courseIds = JSON.parse(courseIdsStr)
+      }
+    } catch (e) {
+      courseIds = []
+    }
+
+    // Validation
+    if (!title || !shortDescription || !durationLabel || !prerequis) {
       return NextResponse.json(
         {
-          error:
-            "title, shortDescription, durationLabel, levelLabel sont requis pour le bootcamp.",
+          error: "Le titre, la description courte, la durée et les prérequis sont obligatoires."
         },
-        { status: 400 },
+        { status: 400 }
       )
     }
 
-    const pb = await getAdminPb()
-
-    const payload = {
+    // Prepare payload
+    const payload: any = {
       title,
       shortDescription,
       longDescription: longDescription || shortDescription,
       durationLabel,
-      levelLabel,
-      certificate: certificate ?? true,
-      rating: rating ?? 4.8,
-      reviewsCount: reviewsCount ?? 0,
-      isPublished: isPublished ?? true,
+      prerequis,
+      rating,
+      reviewsCount,
+      isPublished,
     }
 
-    let bootcampRecord: any
-    if (id) {
-      bootcampRecord = await pb.collection("bootcamps").update(id, payload)
-    } else {
-      bootcampRecord = await pb.collection("bootcamps").create(payload)
+    // Handle cover image
+    const coverImage = formData.get("coverImage")
+    if (coverImage instanceof File && coverImage.size > 0) {
+      payload.coverImage = coverImage
     }
+
+    // Create or update bootcamp
+    const bootcampRecord = id
+      ? await pb.collection("bootcamps").update(id, payload)
+      : await pb.collection("bootcamps").create(payload)
 
     const bootcampId = bootcampRecord.id
-    const desiredCourseIds = courseIds ?? []
 
-    // sync bootcamp_courses pivots
+    // Sync courses
     const existingPivots = await pb.collection("bootcamp_courses").getFullList({
       filter: `bootcamp="${bootcampId}"`,
     })
 
+    // Delete old pivots
     for (const p of existingPivots as any[]) {
       await pb.collection("bootcamp_courses").delete(p.id)
     }
 
-    for (let i = 0; i < desiredCourseIds.length; i++) {
-      const courseId = desiredCourseIds[i]
+    // Create new pivots with order
+    for (let i = 0; i < courseIds.length; i++) {
+      const courseId = courseIds[i]
       if (!courseId) continue
 
       await pb.collection("bootcamp_courses").create({
         bootcamp: bootcampId,
         course: courseId,
-        order: i + 1, // 👈 order is index-based
+        order: i + 1,
       })
     }
 
@@ -149,14 +156,14 @@ export async function POST(req: Request) {
       id: bootcampRecord.id,
       title: bootcampRecord.title,
       shortDescription: bootcampRecord.shortDescription,
-      longDescription: bootcampRecord.longDescription,
+      longDescription: bootcampRecord.longDescription || "",
       durationLabel: bootcampRecord.durationLabel,
-      levelLabel: bootcampRecord.levelLabel,
-      certificate: !!bootcampRecord.certificate,
+      prerequis: bootcampRecord.prerequis || "Aucun",
+      coverImage: bootcampRecord.coverImage || null,
       rating: bootcampRecord.rating ?? 4.8,
       reviewsCount: bootcampRecord.reviewsCount ?? 0,
       isPublished: !!bootcampRecord.isPublished,
-      courseIds: desiredCourseIds,
+      courseIds,
     }
 
     return NextResponse.json({ ok: true, bootcamp })

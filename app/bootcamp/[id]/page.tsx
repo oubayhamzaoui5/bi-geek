@@ -5,8 +5,8 @@ import { useParams } from "next/navigation"
 
 import { Navbar } from "@/components/navbar"
 import { CourseDetailsSection } from "@/components/student/course-details-section"
-import { CurriculumSection } from "@/components/student/curriculum-section"
 import { Footer } from "@/components/footer"
+import LoadingBI from "@/components/LoadingBI"
 
 export default function BootcampDetailsPage() {
   const params = useParams()
@@ -25,6 +25,9 @@ export default function BootcampDetailsPage() {
       try {
         const res = await fetch(`/api/bootcamps/${id}`)
         const data = await res.json()
+
+        console.log("BOOTCAMP FROM API 👉", data.bootcamp)
+
         setBootcamp(data.bootcamp)
         setCourses(data.courses)
         setModules(data.modules)
@@ -39,10 +42,9 @@ export default function BootcampDetailsPage() {
     fetchBootcamp()
   }, [id])
 
-  // ✅ Always return an array from useMemo
+  // Aggregate lessons by module and course
   const modulesFromPb = useMemo(() => {
     const result: any[] = []
-
     if (!courses.length) return result
 
     const modulesByCourse = new Map<string, any[]>()
@@ -95,7 +97,7 @@ export default function BootcampDetailsPage() {
     return items
   }, [courses])
 
-  if (loading) return <div className="p-6">Loading...</div>
+  if (loading) return <LoadingBI />
   if (!bootcamp) return <div className="p-6">Bootcamp not found</div>
 
   const courseFromPb = {
@@ -113,23 +115,21 @@ export default function BootcampDetailsPage() {
     rating: bootcamp.rating ?? 4.8,
     reviewsCount: bootcamp.reviewsCount ?? 0,
     whatYouWillLearn: bootcampWhatYouWillLearn,
+    coverImage: bootcamp.image ?? courses[0]?.coverImage ?? null, // fallback to first course
+    prerequis: bootcamp.prerequis,
   }
 
   return (
     <div className="flex h-screen bg-muted/30">
       <main className="flex-1 overflow-auto">
         <Navbar />
-        <div className="p-6 md:p-8 space-y-6">
+        <div className="space-y-6">
           <CourseDetailsSection
             variant="guest"
             context="bootcamp"
-            courseFromPb={courseFromPb}
+            courseFromPb={courseFromPb} // bootcamp main info
             courseId={bootcamp.id}
-          />
-          <CurriculumSection
-            variant="guest"
-            context="bootcamp"
-            modulesFromPb={modulesFromPb}
+            courses={courses} // all courses for certifications
           />
         </div>
         <Footer />

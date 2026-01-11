@@ -114,8 +114,10 @@ export function CourseEnrollDialog({
     (form.hasExperience === "yes" || form.hasExperience === "no")
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[560px] rounded-2xl border border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 shadow-xl">
+    <Dialog   open={open} onOpenChange={onOpenChange}>
+<DialogContent
+  className=" w-full h-full -px-4 md:mpx-0 sm:max-w-[560px] sm:h-auto sm:rounded-2xl sm:border sm:border-border sm:bg-card/95 sm:backdrop-blur supports-[backdrop-filter]:sm:bg-card/80 shadow-xl"
+>
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-foreground">
             {ctaLabel}
@@ -172,7 +174,7 @@ export function CourseEnrollDialog({
                 id="phone"
                 value={form.phone}
                 onChange={(e) => update("phone", e.target.value)}
-                placeholder="+216 ..."
+                placeholder="xx xxx xxx"
                 className="bg-background/60"
                 required
               />

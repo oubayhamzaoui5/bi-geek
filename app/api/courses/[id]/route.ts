@@ -5,41 +5,36 @@ import { NextResponse } from "next/server"
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
     const { id } = params
-    const pb = new PocketBase(process.env.NEXT_PUBLIC_PB_URL ?? "http://127.0.0.1:8090")
+    const PB_URL = process.env.NEXT_PUBLIC_PB_URL ?? "http://127.0.0.1:8090"
+    const pb = new PocketBase(PB_URL)
 
-    // 1) Course with instructor expanded
-    const courseRecord = await pb.collection("courses").getOne(id, {
-      expand: "instructor",
-    })
+    // Fetch the course
+    const courseRecord = await pb.collection("courses").getOne(id)
 
+    // Normalize cover image URL
+    const coverImageUrl = courseRecord.coverImage
+      ? courseRecord.coverImage.startsWith("http")
+        ? courseRecord.coverImage
+        : `${PB_URL}/api/files/courses/${courseRecord.id}/${courseRecord.coverImage}`
+      : null
+
+    // Build guestCourse object
     const guestCourse = {
       id: courseRecord.id,
       title: courseRecord.title,
       shortDescription: courseRecord.shortDescription,
-      longDescription: courseRecord.longDescription,
+      longDescription: courseRecord.longDescription ?? "",
       durationLabel: courseRecord.durationLabel,
-      levelLabel: courseRecord.levelLabel,
-      certificate: courseRecord.certificate,
-      rating: courseRecord.rating,
-      reviewsCount: courseRecord.reviewsCount,
+      prerequis: courseRecord.prerequis ?? "Aucun",
+      certificate: !!courseRecord.certificate,
+      certifications: courseRecord.certifications ?? [],
+      rating: courseRecord.rating ?? 4.8,
+      reviewsCount: courseRecord.reviewsCount ?? 0,
       whatYouWillLearn: courseRecord.whatYouWillLearn ?? [],
+      coverImage: coverImageUrl,
     }
 
-    // Instructor
-    let instructorFromPb
-    const instructorRecord = (courseRecord.expand as any)?.instructor
-    if (instructorRecord) {
-      const inst = Array.isArray(instructorRecord) ? instructorRecord[0] : instructorRecord
-      instructorFromPb = {
-        fullName: `${inst.firstName} ${inst.lastName}`,
-        title: inst.title,
-        description: inst.description,
-        avatarUrl: `${pb.baseUrl}/api/files/instructors/${inst.id}/${inst.avatar}`,
-        linkedinLink: inst.linkedinLink ?? "",
-      }
-    }
-
-    // Modules
+    // Fetch course modules
     const moduleRecords = await pb.collection("course_modules").getFullList({
       filter: `course="${id}"`,
       sort: "order",
@@ -63,7 +58,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       }
     })
 
-    return NextResponse.json({ guestCourse, instructorFromPb, guestModules })
+    return NextResponse.json({ guestCourse, guestModules })
   } catch (err) {
     console.error("Error fetching course details:", err)
     return NextResponse.json({ error: "Failed to fetch course details" }, { status: 500 })

@@ -1,4 +1,3 @@
-// /api/bootcamps/route.ts
 import PocketBase from "pocketbase"
 import { NextResponse } from "next/server"
 
@@ -7,10 +6,10 @@ type BootcampCard = {
   title: string
   shortDescription?: string
   durationLabel?: string
-  levelLabel?: string
   hours?: number
   steps: string[]
   tags: string[]
+  coverImage?: string | null
 }
 
 export async function GET() {
@@ -70,6 +69,9 @@ export async function GET() {
         ...b,
         steps: stepsMap.get(b.id) ?? [],
         tags: Array.from(m.values()),
+        coverImage: b.coverImage
+          ? `${process.env.NEXT_PUBLIC_PB_URL}/api/files/bootcamps/${b.id}/${b.coverImage}`
+          : null,
       }
     })
 
