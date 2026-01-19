@@ -24,7 +24,7 @@ export function Contact() {
         {/* LEFT — Person Image */}
         <div className="hidden md:flex justify-center md:w-1/2">
           <Image
-            src="/person4.png"
+            src="/person4.webp"
             alt="Contact person"
             width={600}
             height={600}

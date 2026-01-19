@@ -42,7 +42,7 @@ function RightHeroImage() {
           style={{ background: "radial-gradient(closest-side, #954ABF33, transparent 65%)" }}
         />
         <Image
-          src="/hero.png"
+          src="/hero.webp"
           alt=""
           width={800}
           height={800}

@@ -43,7 +43,7 @@ export function AboutHero() {
           >
             <div className="w-64 h-64 md:w-80 md:h-80 lg:w-[800px] lg:h-[800px] relative">
               <Image
-                src="/person2.png"
+                src="/person2.webp"
                 alt="Girl thinking"
                 fill
                 className="object-contain"

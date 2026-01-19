@@ -17,7 +17,7 @@ export const testimonials: Testimonial[] = [
     role: "Analyste Business",
     company: "TechCorp",
     rating: 4,
-    avatar: "/tp1.png",
+    avatar: "/tp1.webp",
   },
   {
     id: "t2",
@@ -27,7 +27,7 @@ export const testimonials: Testimonial[] = [
     role: "Data Analyst",
     company: "DataFlow",
     rating: 5,
-    avatar: "/tp2.png",
+    avatar: "/tp2.webp",
   },
   {
     id: "t3",
@@ -37,6 +37,6 @@ export const testimonials: Testimonial[] = [
     role: "Ingénieur Data",
     company: "CloudSystems",
     rating: 4,
-    avatar: "/tp3.png",
+    avatar: "/tp3.webp",
   },
 ]

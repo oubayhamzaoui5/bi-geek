@@ -4,10 +4,10 @@ import Image from "next/image"
 import { motion } from "framer-motion"
 
 const images = [
-  "/p1.png", "/p2.png",
-  "/p3.png", "/p4.png", "/p5.png",
-  "/p6.png", "/p7.png", "/p8.png",
-  "/p9.png", "/p10.png",
+  "/p1.webp", "/p2.webp",
+  "/p3.webp", "/p4.webp", "/p5.webp",
+  "/p6.webp", "/p7.webp", "/p8.webp",
+  "/p9.webp", "/p10.webp",
 ]
 
 // Grid structure per row

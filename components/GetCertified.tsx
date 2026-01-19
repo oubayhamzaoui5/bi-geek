@@ -4,12 +4,12 @@ import Image from "next/image"
 import { motion } from "framer-motion"
 
 const images = [
-  "/i1.png",
-  "/i2.png",
-  "/i3.png",
-  "/i4.png",
-  "/i5.png",
-  "/i6.png",
+  "/i1.webp",
+  "/i2.webp",
+  "/i3.webp",
+  "/i4.webp",
+  "/i5.webp",
+  "/i6.webp",
 ]
 
 export default function GetCertified() {
