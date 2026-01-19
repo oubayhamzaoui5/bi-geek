@@ -10,6 +10,8 @@ export async function GET() {
       sort: "-created",
     })
 
+    const PB_URL = process.env.NEXT_PUBLIC_PB_URL ?? process.env.POCKETBASE_URL
+
     const courses = records.map((c: any) => ({
       id: c.id,
       title: c.title,
@@ -17,8 +19,8 @@ export async function GET() {
       durationLabel: c.durationLabel,
       tags: Array.isArray(c.tags) ? c.tags : [],
       coverImage: c.coverImage
-        ? `${process.env.POCKETBASE_URL}/api/files/courses/${c.id}/${c.coverImage}`
-        : null,
+  ? `${PB_URL}/api/files/courses/${c.id}/${c.coverImage}`
+  : null,
     }))
 
     return NextResponse.json({ courses })
