@@ -70,7 +70,7 @@ export function Testimonials() {
                   {/* Avatar */}
                   <div className="mb-1">
                     <Image
-                      src={t.avatar ?? "/sketch-face.png"}
+                      src={t.avatar ?? "/sketch-face.webp"}
                       alt={t.author}
                       width={170}
                       height={170}
@@ -127,7 +127,7 @@ export function Testimonials() {
               }}
             >
               <Image
-                src="/person3.png"
+                src="/person3.webp"
                 alt="Happy student"
                 width={800}
                 height={800}

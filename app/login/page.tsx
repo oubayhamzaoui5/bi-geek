@@ -128,7 +128,7 @@ export default function LoginPage() {
         {/* IMAGE */}
         <div className="hidden md:flex w-[58%] relative px-10 py-10">
           <Image
-            src="/login.png"
+            src="/login.webp"
             alt="Login illustration"
             fill
             className="object-contain"
