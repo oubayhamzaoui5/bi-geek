@@ -185,7 +185,7 @@ export function Hero() {
     className="bg-white/80 text-accent border border-accent cursor-pointer text-base sm:text-lg hover:bg-accent hover:text-white"
     variant="outline"
   >
-    <Link href="/formations">
+    <Link href="/courses">
       Découvrir nos formations
     </Link>
   </Button>

@@ -1,58 +1,47 @@
-"use client"
+import type { Metadata } from "next"
+import PocketBase from "pocketbase"
+import CourseDetailsClient from "@/components/course-details-client"
 
-import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
-import { Navbar } from "@/components/navbar"
-import { CourseDetailsSection } from "@/components/student/course-details-section"
-import { Footer } from "@/components/footer"
-import LoadingBI from "@/components/LoadingBI"
+export async function generateMetadata({
+  params,
+}: {
+  params: { id: string }
+}): Promise<Metadata> {
+  const pb = new PocketBase(process.env.POCKETBASE_URL ?? "http://127.0.0.1:8090")
 
-export default function CourseDetailsPage() {
-  const { id } = useParams()
-  const [guestCourse, setGuestCourse] = useState<any>(null)
-  const [instructor, setInstructor] = useState<any>(null)
-  const [modules, setModules] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  try {
+    const course = await pb.collection("courses").getOne(params.id)
 
-  useEffect(() => {
-    if (!id) return
+    const title = course.title || "Course"
+    const description = course.shortDescription || "Course details"
 
-    const fetchCourse = async () => {
-      try {
-        const res = await fetch(`/api/courses/${id}`)
-        const data = await res.json()
-
-        setGuestCourse(data.guestCourse)
-        setInstructor(data.instructorFromPb)
-        setModules(data.guestModules)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        url: `https://bi-geek.net/course/${params.id}`,
+        images: course.coverImage
+          ? [
+              {
+                url: `${process.env.POCKETBASE_URL}/api/files/courses/${course.id}/${course.coverImage}`,
+                width: 1200,
+                height: 630,
+              },
+            ]
+          : undefined,
+      },
     }
+  } catch (err) {
+    console.error("Failed to fetch course for metadata:", err)
+    return {
+      title: "Course",
+      description: "Course details",
+    }
+  }
+}
 
-    fetchCourse()
-  }, [id])
-
-  if (loading) return <LoadingBI />
-  if (!guestCourse) return <div className="p-6">Course not found</div>
-
-  return (
-    <div className="flex h-screen bg-muted/30">
-      <main className="flex-1 overflow-auto">
-        <Navbar />
-
-        <div className="space-y-6">
-          <CourseDetailsSection
-            variant="guest"
-            context="course"
-            courseFromPb={guestCourse}
-          />
-        </div>
-
-        <Footer />
-      </main>
-    </div>
-  )
+export default function CourseDetailsPageWrapper() {
+  return <CourseDetailsClient />
 }

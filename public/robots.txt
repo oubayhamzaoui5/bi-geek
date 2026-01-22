@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://bi-geek.net/sitemap.xml
+
+# Crawl delay (optional)
+# Crawl-delay: 10
+
+# Disallow private routes (example)
+Disallow: /api/
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /_next/
+Disallow: /404
+Disallow: /500

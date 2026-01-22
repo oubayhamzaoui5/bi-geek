@@ -44,14 +44,14 @@ const sampleCategories = [
   {
     id: "wd",
     title: "Web Development",
-    imageUrl: "catweb.webp",
+    imageUrl: "/catweb.webp",
     description: "Développez des sites et applications web modernes en frontend, backend et full-stack.",
     link: "/",
   },
   {
     id: "pm",
     title: "Project Managment",
-    imageUrl: "catmanagment.webp",
+    imageUrl: "/catmanagment.webp",
     description: "Planifiez, gérez et pilotez des projets efficacement avec des méthodes agiles et classiques.",
     link: "/",
   },
