@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import { useRef, useState, useEffect } from "react"
 import { motion, useInView } from "framer-motion"
 import { ProgramCard } from "@/components/program-card"
