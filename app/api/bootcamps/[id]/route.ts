@@ -45,7 +45,7 @@ export async function GET(
         durationLabel: c.durationLabel,
         whatYouWillLearn: c.whatYouWillLearn ?? [],
         prerequis: c.prerequis ?? "Aucun",
-        image: getFileUrl(c, c.coverImage ?? c.image),
+        coverImage: getFileUrl(c, c.coverImage ?? c.image),
         certificate: !!c.certificate,
         certifications: c.certifications ?? [],
       }))

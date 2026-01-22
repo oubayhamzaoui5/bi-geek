@@ -72,7 +72,7 @@ interface CategoryCardProps {
 
 function CategoryCard({ category }: CategoryCardProps) {
   return (
-    <Link href={category.link}>
+<Link href={`/courses?category=${encodeURIComponent(category.title)}`}>
       <div
         className={cn(
           "group relative overflow-hidden rounded-2xl max-w-sm mx-auto",

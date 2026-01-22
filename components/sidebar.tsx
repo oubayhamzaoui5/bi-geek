@@ -18,9 +18,9 @@ const router = useRouter()
   const pathname = usePathname()
 
 const adminLinks = [
-  { icon: BookOpen, label: "Courses", href: "/admin-dashboard/courses" },
+  { icon: BookOpen, label: "Formations", href: "/admin-dashboard/courses" },
   { icon: Layers, label: "Bootcamps", href: "/admin-dashboard/bootcamps" },
-    { icon: Users, label: "Enrollments", href: "/admin-dashboard/enrollments" },
+    { icon: Users, label: "Inscriptions", href: "/admin-dashboard/enrollments" },
     { icon: Award, label: "Vedettes", href: "/admin-dashboard/featured" },
 
 

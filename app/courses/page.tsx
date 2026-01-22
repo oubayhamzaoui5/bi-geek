@@ -7,6 +7,7 @@ import { ProgramCard } from "@/components/program-card"
 import { Button } from "@/components/ui/button"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
+import { useSearchParams, useRouter } from "next/navigation"
 
 // ✅ Skeleton component for loading placeholders
 function Skeleton({ className }: { className?: string }) {
@@ -26,7 +27,12 @@ type Program = {
 
 export default function FormationsPage() {
   const [courses, setCourses] = useState<Program[]>([])
-  const [selectedTag, setSelectedTag] = useState<string>("All")
+  const searchParams = useSearchParams()
+const router = useRouter()
+
+const initialCategory = searchParams.get("category") || "All"
+const [selectedTag, setSelectedTag] = useState<string>(initialCategory)
+
   const [animKey, setAnimKey] = useState(0)
   const [loading, setLoading] = useState(true)
 
@@ -108,9 +114,16 @@ export default function FormationsPage() {
   }
 
   const handleCategoryClick = (category: string) => {
-    setSelectedTag(category)
-    setAnimKey((k) => k + 1)
-  }
+  setSelectedTag(category)
+  setAnimKey((k) => k + 1)
+
+  // update URL
+  const url = category === "All"
+    ? "/formations"
+    : `/formations?category=${encodeURIComponent(category)}`
+  router.push(url)
+}
+
 
   return (
     <>

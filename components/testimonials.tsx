@@ -97,7 +97,7 @@ export function Testimonials() {
 
                   {/* Quote */}
                   <div className="px-6">
-                    <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+                    <p className="text-xs md:text-base text-muted-foreground leading-relaxed">
                       “{t.quote}”
                     </p>
                   </div>

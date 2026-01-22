@@ -51,15 +51,14 @@ export function ProgramCard({
           {primaryTag}
         </Badge>
 
-        {program.image && (
-          <div className="w-full aspect-video overflow-hidden rounded-sm">
-            <img
-              src={program.image}
-              alt={program.title}
-              className="object-cover w-full h-full"
-            />
-          </div>
-        )}
+       <div className="w-full aspect-video overflow-hidden rounded-sm mb-2">
+  <img
+    src={program.image || "/placeholder-course.png"}
+    alt={program.title}
+    className="object-cover w-full h-full"
+  />
+</div>
+
 
         <h3
           className="
@@ -78,7 +77,7 @@ export function ProgramCard({
       </CardHeader>
 
       {/* 🔹 Content */}
-      <CardContent className="flex-1 px-2 py-1 md:px-4 md:py-2">
+      <CardContent className="flex-1 px-2 py-1 -mt-2 md:-mt-4 md:px-4 md:py-2">
         <p className="text-sm md:text-base text-muted-foreground leading-relaxed text-center md:text-left">
           {program.shortDescription}
         </p>

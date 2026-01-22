@@ -468,13 +468,13 @@ function StatCard({ title, value, icon, gradient, accent }: StatCardProps) {
                       <span className="text-sm text-gray-900">{selectedEnrollment.birthDate.split(" ")[0]}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Expérience</span>
+                      <span className="text-sm font-medium text-gray-700">Connaissance</span>
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         selectedEnrollment.hasExperience 
                           ? 'bg-green-100 text-green-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {selectedEnrollment.hasExperience ? "Avec expérience" : "Débutant"}
+                        {selectedEnrollment.hasExperience ? "Oui" : "Non"}
                       </span>
                     </div>
                   </div>
