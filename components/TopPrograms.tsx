@@ -153,7 +153,7 @@ export default function TopPrograms() {
                 variants={itemVariants}
                 className="snap-center min-w-[85%] sm:min-w-[70%]"
               >
-                <ProgramCard program={program} />
+                <ProgramCard program={program} variant={activeTab === "bootcamps" ? "bootcamp" : "course"} />
               </motion.div>
             ))}
           </div>
@@ -172,7 +172,7 @@ export default function TopPrograms() {
                 variants={itemVariants}
                 className="h-full w-full"
               >
-                <ProgramCard program={program} />
+                <ProgramCard program={program} variant={activeTab === "bootcamps" ? "bootcamp" : "course"} />
               </motion.div>
             ))}
           </div>

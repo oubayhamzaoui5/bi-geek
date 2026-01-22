@@ -69,6 +69,17 @@ const toggleCard = (index: number) => {
 }
 
 useEffect(() => {
+  if (!courseFromPb?.id) return
+
+  // @ts-ignore
+  window.fbq?.("track", "ViewContent", {
+    content_name: courseFromPb.title,
+    content_ids: [courseFromPb.id],
+      content_type: isBootcamp ? "bootcamp" : "course",
+  })
+}, [courseFromPb])
+
+useEffect(() => {
   if (certifications.length === 0) return
 
   const interval = setInterval(() => {
@@ -122,7 +133,17 @@ const [certIndex, setCertIndex] = useState(0)
               {isGuest && (
 <div className="flex flex-col md:flex-row items-center gap-4 pt-4 w-full">
                   <Button
-        onClick={() => setEnrollOpen(true)}
+        onClick={() => {
+  // Meta Pixel event
+  // @ts-ignore
+  window.fbq?.("track", "CompleteRegistration", {
+    content_name: title,
+    content_ids: [resolvedCourseId],
+  content_type: isBootcamp ? "bootcamp" : "course",
+  })
+
+  setEnrollOpen(true)
+}}
         className="w-full md:w-auto bg-accent hover:bg-[#7d3d9f] text-white px-6 py-2 text-sm font-semibold h-[40px] cursor-pointer"
       >
                     {isBootcamp ? "S'inscrire au bootcamp" : "S'inscrire à la formation"}
@@ -151,7 +172,7 @@ const [certIndex, setCertIndex] = useState(0)
             {/* RIGHT IMAGE */}
             <div className="order-1 md:order-2 relative aspect-video -mb-16 -mx-4 md:mx-0 md:mb-0">
             <div className="relative aspect-video ">
-              <div className="rounded-2xl overflow-hidden bg-[#f6a44d] w-full h-full">
+              <div className="rounded-2xl overflow-hidden bg-[#ECECEC] w-full h-full">
                 <img
                   src={coverImage ?? "/placeholder-course.png"}
                   alt={title}
@@ -378,7 +399,17 @@ const [certIndex, setCertIndex] = useState(0)
       <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
         <Button
           size="lg"
-          onClick={() => setEnrollOpen(true)}
+          onClick={() => {
+  // Meta Pixel event
+  // @ts-ignore
+  window.fbq?.("track", "CompleteRegistration", {
+    content_name: title,
+    content_ids: [resolvedCourseId],
+      content_type: isBootcamp ? "bootcamp" : "course",
+  })
+
+  setEnrollOpen(true)
+}}
           className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-8"
         >
           {isBootcamp ? "S'inscrire au bootcamp" : "S'inscrire à la formation"}

@@ -6,6 +6,7 @@ import { Navbar } from "@/components/navbar"
 import { CourseDetailsSection } from "@/components/student/course-details-section"
 import { Footer } from "@/components/footer"
 import LoadingBI from "@/components/LoadingBI"
+import { MetaPixel } from "@/components/MetaPixel"
 
 export default function CourseDetailsPage() {
   const { id } = useParams()
@@ -40,6 +41,8 @@ export default function CourseDetailsPage() {
 
   return (
     <div className="flex h-screen bg-muted/30">
+            <MetaPixel pixelId={process.env.NEXT_PUBLIC_META_PIXEL_ID!} />
+
       <main className="flex-1 overflow-auto">
         <Navbar />
 
