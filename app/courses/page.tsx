@@ -27,11 +27,13 @@ type Program = {
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Program[]>([])
-  const searchParams = useSearchParams()
 const router = useRouter()
 
-const initialCategory = searchParams.get("category") || "All"
-const [selectedTag, setSelectedTag] = useState<string>(initialCategory)
+const initialCategory =
+  typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("category") || "All"
+    : "All"
+    const [selectedTag, setSelectedTag] = useState<string>(initialCategory)
 
   const [animKey, setAnimKey] = useState(0)
   const [loading, setLoading] = useState(true)
