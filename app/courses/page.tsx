@@ -121,8 +121,8 @@ const initialCategory =
 
   // update URL
   const url = category === "All"
-    ? "/formations"
-    : `/formations?category=${encodeURIComponent(category)}`
+    ? "/courses"
+    : `/courses?category=${encodeURIComponent(category)}`
   router.push(url)
 }
 
