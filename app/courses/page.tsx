@@ -1,4 +1,4 @@
-// app/formations/page.tsx
+// app/courses/page.tsx
 "use client"
 
 import { useRef, useState, useEffect } from "react"
@@ -25,7 +25,7 @@ type Program = {
   image?: string | null
 }
 
-export default function FormationsPage() {
+export default function CoursesPage() {
   const [courses, setCourses] = useState<Program[]>([])
   const searchParams = useSearchParams()
 const router = useRouter()
