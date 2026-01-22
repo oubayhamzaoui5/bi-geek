@@ -1,4 +1,3 @@
-// app/courses/page.tsx
 "use client"
 
 import { useRef, useState, useEffect } from "react"
