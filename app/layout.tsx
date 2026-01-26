@@ -6,7 +6,7 @@ import "./globals.css"
 import Script from "next/script"
 import { MetaPixel } from "@/components/MetaPixel"
 
-
+import { GoogleTag } from "@/components/GoogleTag"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -78,6 +78,7 @@ export default function RootLayout({
       </head>
       <body className={`font-sans antialiased bg-background text-foreground`}>
   <MetaPixel />
+  <GoogleTag />
         {children}
         <Analytics />
       </body>
