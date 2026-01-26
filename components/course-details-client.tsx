@@ -41,7 +41,7 @@ export default function CourseDetailsPage() {
 
   return (
     <div className="flex h-screen bg-muted/30">
-            <MetaPixel pixelId={process.env.NEXT_PUBLIC_META_PIXEL_ID!} />
+<MetaPixel />
 
       <main className="flex-1 overflow-auto">
         <Navbar />

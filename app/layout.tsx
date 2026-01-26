@@ -4,6 +4,9 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import Script from "next/script"
+import { MetaPixel } from "@/components/MetaPixel"
+
+
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -74,6 +77,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body className={`font-sans antialiased bg-background text-foreground`}>
+  <MetaPixel />
         {children}
         <Analytics />
       </body>
