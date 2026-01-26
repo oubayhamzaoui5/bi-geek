@@ -134,13 +134,6 @@ const [certIndex, setCertIndex] = useState(0)
 <div className="flex flex-col md:flex-row items-center gap-4 pt-4 w-full">
                   <Button
         onClick={() => {
-  // Meta Pixel event
-  // @ts-ignore
-  window.fbq?.("track", "CompleteRegistration", {
-    content_name: title,
-    content_ids: [resolvedCourseId],
-  content_type: isBootcamp ? "bootcamp" : "course",
-  })
 
   setEnrollOpen(true)
 }}
@@ -400,14 +393,6 @@ const [certIndex, setCertIndex] = useState(0)
         <Button
           size="lg"
           onClick={() => {
-  // Meta Pixel event
-  // @ts-ignore
-  window.fbq?.("track", "CompleteRegistration", {
-    content_name: title,
-    content_ids: [resolvedCourseId],
-      content_type: isBootcamp ? "bootcamp" : "course",
-  })
-
   setEnrollOpen(true)
 }}
           className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-8"

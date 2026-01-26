@@ -87,6 +87,13 @@ export function CourseEnrollDialog({
         setError(data?.error ?? "Erreur lors de l’envoi. Réessayez.")
         return
       }
+      // ✅ Meta Pixel — real conversion
+// @ts-ignore
+window.fbq?.("track", "CompleteRegistration", {
+  content_name: title,
+  content_ids: [courseId],
+  content_type: context, // "course" | "bootcamp"
+})
 
       setSuccess(true)
       onOpenChange(false)
