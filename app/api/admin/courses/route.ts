@@ -1,4 +1,7 @@
 // app/api/admin/courses/route.ts
+export const runtime = "nodejs"
+
+console.log("NEXT_RUNTIME:", process.env.NEXT_RUNTIME)
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
 
