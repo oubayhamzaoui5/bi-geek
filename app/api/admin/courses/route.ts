@@ -230,9 +230,25 @@ export async function GET() {
 
 // ---------------- POST ----------------
 export async function POST(req: Request) {
+  console.log("🟢 POST /api/admin/courses START")
   try {
-    const pb = await getAdminPb()
+    let pb
+try {
+  pb = await getAdminPb()
+  console.log("✅ PocketBase admin authenticated")
+} catch (err) {
+  console.error("❌ PocketBase auth failed", err)
+  throw err
+}
     const formData = await req.formData()
+    console.log("📦 RAW FORMDATA CONTENTS:")
+for (const [key, value] of formData.entries()) {
+  if (value instanceof File) {
+    console.log(`  ${key}: [File] name=${value.name} size=${value.size}`)
+  } else {
+    console.log(`  ${key}:`, value)
+  }
+}
 
     // ---------------- PARSE DATA ----------------
     const parseJSON = <T>(value: FormDataEntryValue | null, defaultValue: T) => {
@@ -278,6 +294,24 @@ export async function POST(req: Request) {
     console.log("reviewsCount:", reviewsCount)
     console.log("=================================")
 
+    console.log("🧠 PARSED VALUES CHECK")
+console.log({
+  id,
+  title,
+  shortDescription,
+  durationLabel,
+  prerequis,
+  certificate,
+  certificationsType: typeof certifications,
+  certificationsIsArray: Array.isArray(certifications),
+  whatYouWillLearn,
+  tags,
+  rating,
+  reviewsCount,
+})
+
+
+
     // ---------------- VALIDATION ----------------
     if (!title || !shortDescription || !durationLabel || !prerequis)
       return NextResponse.json(
@@ -312,6 +346,8 @@ export async function POST(req: Request) {
 
     // ---------------- CREATE OR UPDATE ----------------
 let courseRecord
+
+
 
 if (id) {
   // UPDATE → keep existing slug
