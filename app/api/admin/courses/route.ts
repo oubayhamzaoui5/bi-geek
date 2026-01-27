@@ -234,24 +234,20 @@ export async function GET() {
 // ---------------- POST ----------------
 export async function POST(req: Request) {
   console.log("🟢 POST /api/admin/courses START")
+
   try {
-    let pb
-try {
-  pb = await getAdminPb()
-  console.log("✅ PocketBase admin authenticated")
-} catch (err) {
-  console.error("❌ PocketBase auth failed", err)
-  throw err
-}
+    const pb = await getAdminPb()
+    console.log("✅ PocketBase admin authenticated")
+
     const formData = await req.formData()
     console.log("📦 RAW FORMDATA CONTENTS:")
-for (const [key, value] of formData.entries()) {
-  if (value instanceof File) {
-    console.log(`  ${key}: [File] name=${value.name} size=${value.size}`)
-  } else {
-    console.log(`  ${key}:`, value)
-  }
-}
+    for (const [key, value] of formData.entries()) {
+      if (value instanceof File) {
+        console.log(`  ${key}: [File] name=${value.name} size=${value.size}`)
+      } else {
+        console.log(`  ${key}:`, value)
+      }
+    }
 
     // ---------------- PARSE DATA ----------------
     const parseJSON = <T>(value: FormDataEntryValue | null, defaultValue: T) => {
@@ -279,41 +275,6 @@ for (const [key, value] of formData.entries()) {
 
     const rating = Number(formData.get("rating") ?? 4.8)
     const reviewsCount = Number(formData.get("reviewsCount") ?? 0)
-
-    // ---------------- DEBUG LOG ----------------
-    console.log("===== DEBUG POST FORM DATA =====")
-    console.log("id:", id)
-    console.log("title:", title)
-    console.log("shortDescription:", shortDescription)
-    console.log("longDescription:", longDescription)
-    console.log("durationLabel:", durationLabel)
-    console.log("prerequis:", prerequis)
-    console.log("certificate:", certificate)
-    console.log("certifications:", certifications)
-    console.log("modules:", modules)
-    console.log("whatYouWillLearn:", whatYouWillLearn)
-    console.log("tags:", tags)
-    console.log("rating:", rating)
-    console.log("reviewsCount:", reviewsCount)
-    console.log("=================================")
-
-    console.log("🧠 PARSED VALUES CHECK")
-console.log({
-  id,
-  title,
-  shortDescription,
-  durationLabel,
-  prerequis,
-  certificate,
-  certificationsType: typeof certifications,
-  certificationsIsArray: Array.isArray(certifications),
-  whatYouWillLearn,
-  tags,
-  rating,
-  reviewsCount,
-})
-
-
 
     // ---------------- VALIDATION ----------------
     if (!title || !shortDescription || !durationLabel || !prerequis)
@@ -345,25 +306,25 @@ console.log({
     }
 
     const coverImage = formData.get("coverImage")
-    if (coverImage instanceof File && coverImage.size > 0) payload.coverImage = coverImage
+    if (coverImage instanceof File && coverImage.size > 0) {
+      payload.coverImage = coverImage
+    }
 
     // ---------------- CREATE OR UPDATE ----------------
-let courseRecord
+    let courseRecord
 
+    if (id) {
+      // UPDATE → keep existing slug
+      courseRecord = await pb.collection("courses").update(id, payload)
+    } else {
+      // CREATE → generate slug once
+      const slug = await generateUniqueSlug(pb, title)
+      courseRecord = await pb.collection("courses").create({
+        ...payload,
+        slug,
+      })
+    }
 
-
-if (id) {
-  // UPDATE → keep existing slug
-  courseRecord = await pb.collection("courses").update(id, payload)
-} else {
-  // CREATE → generate slug once
-  const slug = await generateUniqueSlug(pb, title)
-
-  courseRecord = await pb.collection("courses").create({
-    ...payload,
-    slug,
-  })
-}
     const courseId = courseRecord.id
 
     // ---------------- SYNC MODULES & LESSONS ----------------
@@ -405,7 +366,17 @@ if (id) {
       }
     }
 
-    return NextResponse.json({ ok: true, course: courseRecord })
+    // 🔥 IMPORTANT FIX: return correct coverImage
+    const finalCourse = await pb.collection("courses").getOne(courseId)
+
+    return NextResponse.json({
+      ok: true,
+      course: {
+        ...finalCourse,
+        coverImage: finalCourse.coverImage?.[0] ?? null,
+      },
+    })
+
   } catch (err: any) {
     console.error("ADMIN COURSES POST ERROR:", err)
     return NextResponse.json(
