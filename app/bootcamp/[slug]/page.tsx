@@ -5,15 +5,18 @@ import BootcampDetailsClient from "@/components/bootcamp-details-client"
 export async function generateMetadata({
   params,
 }: {
-  params: { id: string }
+  params: { slug: string }
 }): Promise<Metadata> {
   const pb = new PocketBase(process.env.POCKETBASE_URL ?? "http://127.0.0.1:8090")
 
   try {
-    const bootcamp = await pb.collection("bootcamps").getOne(params.id)
+    const bootcamp = await pb
+      .collection("bootcamps")
+      .getFirstListItem(`slug="${params.slug}"`)
 
     const title = bootcamp.title || "Bootcamp"
-    const description = bootcamp.shortDescription || bootcamp.description || "Bootcamp details"
+    const description =
+      bootcamp.shortDescription || bootcamp.description || "Bootcamp details"
 
     return {
       title,
@@ -21,7 +24,7 @@ export async function generateMetadata({
       openGraph: {
         title,
         description,
-        url: `https://bi-geek.net/bootcamp/${params.id}`,
+        url: `https://bi-geek.net/bootcamp/${params.slug}`,
         images: bootcamp.coverImage
           ? [
               {

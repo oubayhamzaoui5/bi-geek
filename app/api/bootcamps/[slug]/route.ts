@@ -1,4 +1,3 @@
-// /api/bootcamps/[id]/route.ts
 import PocketBase from "pocketbase"
 import { NextResponse } from "next/server"
 
@@ -12,14 +11,16 @@ const getFileUrl = (record: any, file: string | null) => {
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: { slug: string } }
 ) {
   try {
-    const { id } = params
+    const { slug } = params
     const pb = new PocketBase(PB_URL)
 
     // 1) Bootcamp
-    const bootcampRaw = await pb.collection("bootcamps").getOne(id)
+    const bootcampRaw = await pb
+      .collection("bootcamps")
+      .getFirstListItem(`slug="${slug}"`)
 
     const bootcamp = {
       ...bootcampRaw,
@@ -29,7 +30,7 @@ export async function GET(
 
     // 2) Pivot courses inside bootcamp
     const pivots = await pb.collection("bootcamp_courses").getFullList({
-      filter: `bootcamp="${id}"`,
+      filter: `bootcamp="${bootcampRaw.id}"`,
       sort: "order",
       expand: "course",
     })

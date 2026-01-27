@@ -69,7 +69,9 @@ export function ProgramCard({
             transition-colors duration-300
             leading-snug
             mt-0.5 md:mt-1
+            w-full
             text-center md:text-left
+
           "
         >
           {program.title}

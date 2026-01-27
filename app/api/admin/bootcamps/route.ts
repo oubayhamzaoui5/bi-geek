@@ -14,6 +14,33 @@ type IncomingBootcamp = {
   courseIds?: string[]
 }
 
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+}
+
+async function generateUniqueSlug(pb: PocketBase, title: string) {
+  const baseSlug = slugify(title)
+  let slug = baseSlug
+  let counter = 1
+
+  while (true) {
+    try {
+      await pb.collection("bootcamps").getFirstListItem(`slug="${slug}"`)
+      // slug exists → try next
+      counter++
+      slug = `${baseSlug}-${counter}`
+    } catch {
+      // slug not found → safe to use
+      return slug
+    }
+  }
+}
+
 async function getAdminPb() {
   const PB_URL = process.env.POCKETBASE_URL
   const ADMIN_EMAIL = process.env.POCKETBASE_ADMIN_EMAIL
@@ -32,10 +59,19 @@ export async function GET() {
   try {
     const pb = await getAdminPb()
 
-    const [bootcampRecords, pivotRecords] = await Promise.all([
-      pb.collection("bootcamps").getFullList({ sort: "title" }),
-      pb.collection("bootcamp_courses").getFullList({ sort: "bootcamp,order" }),
-    ])
+    const bootcampRecords = await pb.collection("bootcamps").getFullList({ sort: "title" })
+
+    // 🔥 Fix missing slugs automatically
+    for (const b of bootcampRecords as any[]) {
+      if (!b.slug || b.slug.trim() === "") {
+        const slug = await generateUniqueSlug(pb, b.title)
+        await pb.collection("bootcamps").update(b.id, { slug })
+        console.log(`Generated slug for bootcamp "${b.title}" → ${slug}`)
+      }
+    }
+
+    // Now fetch pivot records
+    const pivotRecords = await pb.collection("bootcamp_courses").getFullList({ sort: "bootcamp,order" })
 
     const coursesByBootcamp = new Map<string, string[]>()
 
@@ -57,6 +93,7 @@ export async function GET() {
       reviewsCount: b.reviewsCount ?? 0,
       isPublished: !!b.isPublished,
       courseIds: coursesByBootcamp.get(b.id) ?? [],
+      slug: b.slug || "", // include slug
     }))
 
     return NextResponse.json({ ok: true, bootcamps })
@@ -124,9 +161,16 @@ export async function POST(req: Request) {
     }
 
     // Create or update bootcamp
-    const bootcampRecord = id
-      ? await pb.collection("bootcamps").update(id, payload)
-      : await pb.collection("bootcamps").create(payload)
+    let bootcampRecord: any
+
+    if (id) {
+      // Update → keep existing slug
+      bootcampRecord = await pb.collection("bootcamps").update(id, payload)
+    } else {
+      // Create → generate slug once
+      const slug = await generateUniqueSlug(pb, title)
+      bootcampRecord = await pb.collection("bootcamps").create({ ...payload, slug })
+    }
 
     const bootcampId = bootcampRecord.id
 
@@ -164,6 +208,7 @@ export async function POST(req: Request) {
       reviewsCount: bootcampRecord.reviewsCount ?? 0,
       isPublished: !!bootcampRecord.isPublished,
       courseIds,
+      slug: bootcampRecord.slug || "",
     }
 
     return NextResponse.json({ ok: true, bootcamp })

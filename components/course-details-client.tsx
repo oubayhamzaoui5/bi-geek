@@ -9,18 +9,18 @@ import LoadingBI from "@/components/LoadingBI"
 import { MetaPixel } from "@/components/MetaPixel"
 
 export default function CourseDetailsPage() {
-  const { id } = useParams()
+ const { slug } = useParams() // ✅ CORRECT
   const [guestCourse, setGuestCourse] = useState<any>(null)
   const [instructor, setInstructor] = useState<any>(null)
   const [modules, setModules] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!id) return
+    if (!slug) return
 
     const fetchCourse = async () => {
       try {
-        const res = await fetch(`/api/courses/${id}`)
+        const res = await fetch(`/api/courses/${slug}`)
         const data = await res.json()
 
         setGuestCourse(data.guestCourse)
@@ -34,7 +34,7 @@ export default function CourseDetailsPage() {
     }
 
     fetchCourse()
-  }, [id])
+  }, [slug])
 
   if (loading) return <LoadingBI />
   if (!guestCourse) return <div className="p-6">Course not found</div>

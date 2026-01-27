@@ -40,6 +40,35 @@ type IncomingCourse = {
   modules?: IncomingModule[]
 }
 
+
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+}
+
+
+async function generateUniqueSlug(pb: PocketBase, title: string) {
+  const baseSlug = slugify(title)
+  let slug = baseSlug
+  let counter = 1
+
+  while (true) {
+    try {
+      await pb.collection("courses").getFirstListItem(`slug="${slug}"`)
+      // slug exists → try next
+      counter++
+      slug = `${baseSlug}-${counter}`
+    } catch {
+      // slug not found → safe to use
+      return slug
+    }
+  }
+}
+
 // ---------------- POCKETBASE ----------------
 async function getAdminPb() {
   const { POCKETBASE_URL, POCKETBASE_ADMIN_EMAIL, POCKETBASE_ADMIN_PASSWORD } = process.env
@@ -52,13 +81,94 @@ async function getAdminPb() {
   return pb
 }
 
-// ---------------- GET ----------------
+
+/*
 export async function GET() {
   try {
     const pb = await getAdminPb()
 
     const [courseRecords, moduleRecords, lessonRecords] = await Promise.all([
       pb.collection("courses").getFullList({ sort: "title" }),
+      pb.collection("course_modules").getFullList({ sort: "course,order" }),
+      pb.collection("course_lessons").getFullList({ sort: "course,order" }),
+    ])
+
+    // Map modules to courses
+    const modulesByCourse = moduleRecords.reduce((map: Map<string, any[]>, m: any) => {
+      map.set(m.course, [...(map.get(m.course) ?? []), m])
+      return map
+    }, new Map<string, any[]>())
+
+    // Map lessons to modules
+    const lessonsByModule = lessonRecords.reduce((map: Map<string, any[]>, l: any) => {
+      map.set(l.module, [...(map.get(l.module) ?? []), l])
+      return map
+    }, new Map<string, any[]>())
+
+    const courses = courseRecords.map((c: any) => {
+      const mods = modulesByCourse.get(c.id) ?? []
+      const modules = mods.map((m: any) => ({
+        id: m.id,
+        title: m.title,
+        durationLabel: m.durationLabel ?? m.duration ?? "",
+        order: m.order ?? 0,
+        lessons: (lessonsByModule.get(m.id) ?? []).map((l: any) => ({
+          id: l.id,
+          title: l.title,
+          durationLabel: l.durationLabel ?? l.duration ?? "",
+          order: l.order ?? 0,
+        })),
+      }))
+
+      return {
+        id: c.id,
+        title: c.title,
+        shortDescription: c.shortDescription,
+        longDescription: c.longDescription ?? "",
+        durationLabel: c.durationLabel,
+        prerequis: c.prerequis ?? "Aucun",
+        coverImage: c.coverImage || null,
+        certificate: !!c.certificate,
+        certifications: c.certifications ?? [],
+        rating: c.rating ?? 4.8,
+        reviewsCount: c.reviewsCount ?? 0,
+        whatYouWillLearn: c.whatYouWillLearn ?? [],
+        tags: c.tags ?? [],
+        modules: modules ?? [], // Always return an array
+      }
+    })
+
+    return NextResponse.json({ ok: true, courses })
+  } catch (err: any) {
+    console.error("ADMIN COURSES GET ERROR:", err)
+    return NextResponse.json(
+      { error: err?.message || "Erreur serveur" },
+      { status: 500 }
+    )
+  }
+}
+
+ */
+
+// ---------------- GET ----------------
+export async function GET() {
+  try {
+    const pb = await getAdminPb()
+
+    // 1) Fetch all courses
+    const courseRecords = await pb.collection("courses").getFullList({ sort: "title" })
+
+    // 2) Fix missing slugs
+    for (const course of courseRecords) {
+      if (!course.slug || course.slug.trim() === "") {
+        const slug = await generateUniqueSlug(pb, course.title)
+        await pb.collection("courses").update(course.id, { slug })
+        console.log(`Generated slug for course "${course.title}" → ${slug}`)
+      }
+    }
+
+    // 3) Fetch modules & lessons after slug fix
+    const [moduleRecords, lessonRecords] = await Promise.all([
       pb.collection("course_modules").getFullList({ sort: "course,order" }),
       pb.collection("course_lessons").getFullList({ sort: "course,order" }),
     ])
@@ -201,10 +311,20 @@ export async function POST(req: Request) {
     if (coverImage instanceof File && coverImage.size > 0) payload.coverImage = coverImage
 
     // ---------------- CREATE OR UPDATE ----------------
-    const courseRecord = id
-      ? await pb.collection("courses").update(id, payload)
-      : await pb.collection("courses").create(payload)
+let courseRecord
 
+if (id) {
+  // UPDATE → keep existing slug
+  courseRecord = await pb.collection("courses").update(id, payload)
+} else {
+  // CREATE → generate slug once
+  const slug = await generateUniqueSlug(pb, title)
+
+  courseRecord = await pb.collection("courses").create({
+    ...payload,
+    slug,
+  })
+}
     const courseId = courseRecord.id
 
     // ---------------- SYNC MODULES & LESSONS ----------------

@@ -10,8 +10,8 @@ import LoadingBI from "@/components/LoadingBI"
 import { MetaPixel } from "@/components/MetaPixel"
 
 export default function BootcampDetailsPage() {
-  const params = useParams()
-  const id = (params?.id as string) ?? ""
+   const { slug } = useParams() // ✅ CORRECT
+
 
   const [bootcamp, setBootcamp] = useState<any>(null)
   const [courses, setCourses] = useState<any[]>([])
@@ -20,11 +20,11 @@ export default function BootcampDetailsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!id) return
+    if (!slug) return
 
     const fetchBootcamp = async () => {
       try {
-        const res = await fetch(`/api/bootcamps/${id}`)
+        const res = await fetch(`/api/bootcamps/${slug}`)
         const data = await res.json()
 
         console.log("BOOTCAMP FROM API 👉", data.bootcamp)
@@ -41,7 +41,7 @@ export default function BootcampDetailsPage() {
     }
 
     fetchBootcamp()
-  }, [id])
+  }, [slug])
 
   // Aggregate lessons by module and course
   const modulesFromPb = useMemo(() => {
@@ -64,13 +64,13 @@ export default function BootcampDetailsPage() {
 
     for (let idx = 0; idx < courses.length; idx++) {
       const c = courses[idx]
-      const courseMods = modulesByCourse.get(c.id) ?? []
+      const courseMods = modulesByCourse.get(c.slug) ?? []
 
       result.push({
         title: `Formation ${idx + 1} : ${c.title}`,
         duration: c.durationLabel ?? "",
         lessons: courseMods.map((m) => {
-          const modLessons = lessonsByModule.get(m.id) ?? []
+          const modLessons = lessonsByModule.get(m.slug) ?? []
           return {
             title: m.title,
             duration: m.duration ?? "",
