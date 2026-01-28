@@ -35,7 +35,7 @@ const itemVariants = {
 }
 
 export default function TopPrograms() {
-  const [activeTab, setActiveTab] = useState<"courses" | "bootcamps">("bootcamps")
+  const [activeTab, setActiveTab] = useState<"courses" | "bootcamps">("courses")
   const [courses, setCourses] = useState<Program[]>([])
   const [bootcamps, setBootcamps] = useState<Program[]>([])
   const [loading, setLoading] = useState(true)
@@ -97,16 +97,7 @@ export default function TopPrograms() {
 
       {/* 🔹 Tabs */}
       <div className="mb-2 md:mb-8 flex justify-center gap-2 md:gap-4">
-        <Button
-          onClick={() => setActiveTab("bootcamps")}
-          variant={activeTab === "bootcamps" ? "default" : "outline"}
-          className={`flex items-center gap-2 ${
-            activeTab === "bootcamps" ? "bg-[#C84FFF]" : ""
-          }`}
-        >
-          <Layers size={18} />
-          Bootcamps
-        </Button>
+     
 
         <Button
           onClick={() => setActiveTab("courses")}
@@ -117,6 +108,17 @@ export default function TopPrograms() {
         >
           <Code size={18} />
           Formations
+        </Button>
+
+           <Button
+          onClick={() => setActiveTab("bootcamps")}
+          variant={activeTab === "bootcamps" ? "default" : "outline"}
+          className={`flex items-center gap-2 ${
+            activeTab === "bootcamps" ? "bg-[#C84FFF]" : ""
+          }`}
+        >
+          <Layers size={18} />
+          Bootcamps
         </Button>
       </div>
 

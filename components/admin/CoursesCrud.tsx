@@ -239,15 +239,12 @@ setEditingCourse({
       // Update local state
       if (editingCourse.id) {
         // Update existing
-       setCourses(prev =>
+  setCourses(prev =>
   prev.map(c =>
     c.id === editingCourse.id
       ? {
           ...editingCourse,
-          coverImage: editingCourse.coverPreview?.startsWith("http")
-  ? editingCourse.coverPreview
-  : editingCourse.coverImage,
-
+          coverImage: c.coverImage, // ✅ keep filename, never URL
         }
       : c
   )
