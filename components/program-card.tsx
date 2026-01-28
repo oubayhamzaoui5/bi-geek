@@ -55,7 +55,7 @@ export function ProgramCard({ program, variant = "course" }: ProgramCardProps) {
           cursor-pointer
         "
       >
-        <CardHeader className="flex flex-col gap-1 p-2 md:p-4">
+        <CardHeader className="flex flex-col gap-1 px-2 md:px-4  ">
           <Badge className="bg-accent/10 text-accent text-xs md:text-sm w-fit">
             {primaryTag}
           </Badge>
