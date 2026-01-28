@@ -68,7 +68,7 @@ export function ProgramCard({ program, variant = "course" }: ProgramCardProps) {
             />
           </div>
 
-          <h3 className="text-base md:text-xl font-semibold md:font-bold text-slate-900 dark:text-white group-hover:text-accent transition-colors duration-300 leading-snug text-center md:text-left">
+          <h3 className="text-base md:text-xl font-semibold md:font-bold text-slate-900 dark:text-white group-hover:text-accent transition-colors duration-300 leading-snug w-full text-center md:text-left">
             {program.title}
           </h3>
         </CardHeader>
