@@ -10,8 +10,7 @@ import LoadingBI from "@/components/LoadingBI"
 import { MetaPixel } from "@/components/MetaPixel"
 
 export default function BootcampDetailsPage() {
-   const { slug } = useParams() // ✅ CORRECT
-
+  const { slug } = useParams() // âœ… CORRECT
 
   const [bootcamp, setBootcamp] = useState<any>(null)
   const [courses, setCourses] = useState<any[]>([])
@@ -20,21 +19,34 @@ export default function BootcampDetailsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!slug) return
+    const slugValue = Array.isArray(slug) ? slug[0] : slug
+    if (!slugValue) return
 
     const fetchBootcamp = async () => {
       try {
-        const res = await fetch(`/api/bootcamps/${slug}`)
+        const res = await fetch(`/api/bootcamps/${slugValue}`)
+        if (!res.ok) {
+          console.error("Bootcamp fetch failed:", res.status)
+          setBootcamp(null)
+          setCourses([])
+          setModules([])
+          setLessons([])
+          return
+        }
         const data = await res.json()
 
-        console.log("BOOTCAMP FROM API 👉", data.bootcamp)
+        console.log("BOOTCAMP FROM API ðŸ‘‰", data.bootcamp)
 
         setBootcamp(data.bootcamp)
-        setCourses(data.courses)
-        setModules(data.modules)
-        setLessons(data.lessons)
+        setCourses(Array.isArray(data.courses) ? data.courses : [])
+        setModules(Array.isArray(data.modules) ? data.modules : [])
+        setLessons(Array.isArray(data.lessons) ? data.lessons : [])
       } catch (err) {
         console.error(err)
+        setBootcamp(null)
+        setCourses([])
+        setModules([])
+        setLessons([])
       } finally {
         setLoading(false)
       }
@@ -46,17 +58,17 @@ export default function BootcampDetailsPage() {
   // Aggregate lessons by module and course
   const modulesFromPb = useMemo(() => {
     const result: any[] = []
-    if (!courses.length) return result
+    if (!Array.isArray(courses) || courses.length === 0) return result
 
     const modulesByCourse = new Map<string, any[]>()
-    for (const m of modules) {
+    for (const m of Array.isArray(modules) ? modules : []) {
       const arr = modulesByCourse.get(m.course) ?? []
       arr.push(m)
       modulesByCourse.set(m.course, arr)
     }
 
     const lessonsByModule = new Map<string, any[]>()
-    for (const l of lessons) {
+    for (const l of Array.isArray(lessons) ? lessons : []) {
       const arr = lessonsByModule.get(l.module) ?? []
       arr.push(l)
       lessonsByModule.set(l.module, arr)
@@ -122,8 +134,8 @@ export default function BootcampDetailsPage() {
 
   return (
     <div className="flex h-screen bg-muted/30">
-<MetaPixel />
-       <main className="flex-1 overflow-auto">
+      <MetaPixel />
+      <main className="flex-1 overflow-auto">
         <Navbar />
         <div className="space-y-6">
           <CourseDetailsSection

@@ -6,7 +6,7 @@ import { Clock, CheckCircle2, ClipboardList, CalendarDays, ArrowRight, Archive }
 export type CourseStatus = "upcoming" | "active" | "completed" | "stored"
 
 export interface Course {
-  id: number
+  id: string
   title: string
   progress: number
   duration: string
@@ -15,6 +15,7 @@ export interface Course {
   status: CourseStatus
   startDate?: string
   applyUrl?: string
+  slug?: string
 }
 
 export function CourseCard({ course }: { course: Course }) {
@@ -22,10 +23,10 @@ export function CourseCard({ course }: { course: Course }) {
   const isUpcoming = course.status === "upcoming"
   const isActive = course.status === "active"
   const isStored = course.status === "stored"
+  const courseHref = `/student-dashboard/course/${course.slug ?? course.id}`
 
   return (
     <div className="glass-dark p-4 rounded-lg border border-white/10 hover:border-accent/50 transition-all duration-300 group flex flex-col">
-      {/* Thumbnail */}
       <div className="w-full h-48 rounded-sm overflow-hidden bg-white/5 mb-4">
         <img
           src={course.thumbnail || "/placeholder.svg"}
@@ -34,7 +35,6 @@ export function CourseCard({ course }: { course: Course }) {
         />
       </div>
 
-      {/* Content */}
       <div className="flex-1 flex flex-col justify-between">
         <div>
           <h4 className="text-lg font-semibold text-white mb-1">{course.title}</h4>
@@ -48,14 +48,14 @@ export function CourseCard({ course }: { course: Course }) {
             {isCompleted && (
               <span className="flex items-center gap-1 text-accent">
                 <CheckCircle2 size={14} />
-                Complété
+                ComplÃ©tÃ©
               </span>
             )}
 
             {course.hasWork && isActive && (
               <span className="flex items-center gap-1 text-yellow-400">
                 <ClipboardList size={14} />
-                Travail à faire
+                Travail Ã  faire
               </span>
             )}
 
@@ -73,13 +73,12 @@ export function CourseCard({ course }: { course: Course }) {
             {isStored && (
               <span className="flex items-center gap-1 text-white/80 px-2 py-0.5 rounded-md bg-white/10 border border-white/10 text-xs">
                 <Archive size={12} />
-                100% enregistré
+                100% enregistrÃ©
               </span>
             )}
           </div>
         </div>
 
-        {/* Progress bar (hide for upcoming & stored) */}
         {!isUpcoming && !isStored && (
           <div className="space-y-2 mt-2">
             <div className="flex justify-between items-center text-xs">
@@ -95,7 +94,6 @@ export function CourseCard({ course }: { course: Course }) {
           </div>
         )}
 
-        {/* Action buttons */}
         <div className="mt-4">
           {(isUpcoming || isStored) && (
             <Link href={course.applyUrl ?? `/apply/${course.id}`}>
@@ -106,15 +104,15 @@ export function CourseCard({ course }: { course: Course }) {
           )}
 
           {isActive && (
-            <Link href={`/student-dashboard/course/${course.id}`}>
+            <Link href={courseHref}>
               <button className="w-full px-4 py-2 bg-white/5 text-white rounded-lg text-sm font-medium hover:bg-white/10 transition-colors border border-white/10">
-                Détails
+                DÃ©tails
               </button>
             </Link>
           )}
 
           {isCompleted && (
-            <Link href={`/student-dashboard/course/${course.id}`}>
+            <Link href={courseHref}>
               <button className="w-full px-4 py-2 bg-white/5 text-white rounded-lg text-sm font-medium hover:bg-white/10 transition-colors border border-white/10">
                 Voir le cours
               </button>

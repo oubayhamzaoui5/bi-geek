@@ -3,10 +3,10 @@
 
 import { useState, useEffect, useMemo , useRef  } from "react"
 import { 
-  Search, Trash2, Save, X, Users,
+  Search, Trash2, X,
   BookOpen, Star, Award, TrendingUp,
-  CheckCircle, AlertCircle, Loader2,
-  ArrowUp, ArrowDown , Layers
+  CheckCircle, AlertCircle,
+  ArrowUp, ArrowDown, Layers
 } from "lucide-react"
 
 // Types
@@ -55,6 +55,43 @@ type FeaturedSelectionProps = {
   bootcamps: AdminBootcamp[]
   onSaveFeatured?: (items: FeaturedItem[]) => Promise<void>
   maxItems?: number
+}
+
+// ---- UI primitives (matching CoursesCrud style) ----
+function FormCard({ title, icon, children, action }: { title: string; icon?: React.ReactNode; children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #e8ecf3", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+      <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(180deg,#fafbfd 0%,#fff 100%)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 9, background: "linear-gradient(135deg,rgba(99,102,241,0.12),rgba(129,140,248,0.06))", color: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {icon}
+          </div>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h3>
+        </div>
+        {action}
+      </div>
+      <div style={{ padding: 20 }}>{children}</div>
+    </div>
+  )
+
+}
+
+function IconBtn({ onClick, title, color = "#64748b", hoverBg = "#f1f5f9", children, disabled }: {
+  onClick: () => void; title?: string; color?: string; hoverBg?: string; children: React.ReactNode; disabled?: boolean
+}) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      disabled={disabled}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ padding: 7, borderRadius: 8, border: "none", background: hover ? hoverBg : "transparent", color, cursor: disabled ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s", opacity: disabled ? 0.5 : 1 }}
+    >
+      {children}
+    </button>
+  )
 }
 
 export default function FeaturedSelection({
@@ -147,18 +184,23 @@ export default function FeaturedSelection({
     return featuredItems.some(item => item.itemId === itemId)
   }
 
-  // Get available items (not already featured)
+  const getFeaturedOrder = (itemId: string): number | null => {
+    const found = featuredItems.find(item => item.itemId === itemId)
+    return found ? found.order : null
+  }
+
+  // Get visible items (includes already featured)
   const getAvailableItems = () => {
     if (activeTab === 'courses') {
       return courses
-        .filter(course => (course.isPublished ?? true) && !isItemFeatured(course.id))
+        .filter(course => (course.isPublished ?? true))
         .filter(item => 
           item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.shortDescription.toLowerCase().includes(searchTerm.toLowerCase())
         )
     } else {
       return bootcamps
-        .filter(bootcamp => (bootcamp.isPublished ?? true) && !isItemFeatured(bootcamp.id))
+        .filter(bootcamp => (bootcamp.isPublished ?? true))
         .filter(item =>
           item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.shortDescription.toLowerCase().includes(searchTerm.toLowerCase())
@@ -187,6 +229,15 @@ export default function FeaturedSelection({
     })))
     
     showToast("success", `${activeTab === 'courses' ? 'Formation' : 'Bootcamp'} ajouté aux vedettes`)
+  }
+
+  const handleToggleFeatured = (item: AdminCourse | AdminBootcamp) => {
+    const already = isItemFeatured(item.id)
+    if (already) {
+      handleRemoveFeatured(item.id)
+      return
+    }
+    handleAddFeatured(item)
   }
 
   // Remove item from featured
@@ -257,394 +308,253 @@ export default function FeaturedSelection({
   }, [featuredItems])
 
   return (
-    <div className="h-screen px-6 py-4 overflow-hidden">
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-        
-        {/* Left Column - Available Items */}
-        <div className="lg:col-span-1 h-full flex flex-col overflow-hidden">
-          <div className="bg-white rounded-xl border shadow-sm h-full flex flex-col">
-            {/* Tabs */}
-            <div className="border-b flex-shrink-0">
-              <div className="flex">
-                <button
-                  onClick={() => setActiveTab('courses')}
-                  className={`flex-1 py-3 px-4 text-center font-medium transition-colors ${
-                    activeTab === 'courses'
-                      ? 'border-b-2 border-accent text-accent'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <BookOpen className="w-4 h-4" />
-                    Formations
-                  </div>
-                </button>
-                <button
-                  onClick={() => setActiveTab('bootcamps')}
-                  className={`flex-1 py-3 px-4 text-center font-medium transition-colors ${
-                    activeTab === 'bootcamps'
-                      ? 'border-b-2 border-accent text-accent'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <Layers className="w-4 h-4" />
-                    Bootcamps
-                  </div>
-                </button>
-              </div>
-            </div>
+    <div style={{ height: "100vh", display: "flex", background: "#f0f2f8", fontFamily: "'DM Sans','Inter',sans-serif", overflow: "hidden" }}>
 
-            {/* Search */}
-            <div className="p-4 border-b flex-shrink-0">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder={`Rechercher ${activeTab === 'courses' ? 'unne Formation' : 'un bootcamp'}...`}
-                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+      {/* Left panel */}
+      <div style={{ width: 420, minWidth: 420, background: "#fff", borderRight: "1px solid #e8ecf3", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "24px 22px 16px", borderBottom: "1px solid #f1f5f9" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8", marginBottom: 2 }}>Selection</p>
+              <h1 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", margin: 0 }}>Vedettes</h1>
             </div>
+            <div style={{ background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", borderRadius: 12, padding: "6px 16px", fontSize: 16, fontWeight: 800 }}>{featuredItems.length}/{maxItems * 2}</div>
+          </div>
 
-            {/* Items List */}
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <div className="h-full overflow-y-auto p-4">
-                {getAvailableItems().length === 0 ? (
-                  <div className="p-8 text-center">
-                    <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-600">
-                      {searchTerm 
-                        ? ` ${activeTab === 'courses' ? 'Aucune Formation' : 'Aucun bootcamp'} trouvé`
-                        : `Tous les ${activeTab === 'courses' ? 'Formations' : 'bootcamps'} sont sélectionnés ou aucun disponible`
-                      }
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {getAvailableItems().map((item) => (
-                      <div
-                        key={item.id}
-                        className="group p-4 border border-gray-200 rounded-lg hover:border-accent transition-all"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-gray-900 truncate">{item.title}</h4>
-                            <p className="text-sm text-gray-500 truncate mt-1">{item.shortDescription}</p>
-                            <div className="flex items-center justify-between mt-2">
-                              <span className="text-xs text-gray-500">{item.durationLabel}</span>
-                              <div className="flex items-center gap-1">
-                                <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                                <span className="text-xs text-gray-600">{item.rating.toFixed(1)}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleAddFeatured(item)}
-                          disabled={featuredItems.filter(i => i.type === (activeTab === 'courses' ? 'course' : 'bootcamp')).length >= maxItems}
-                          className="mt-3 w-full py-2 bg-accent/10 text-accent rounded-lg hover:bg-accent/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                        >
-                          + Ajouter aux vedettes
-                        </button>
+          <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+            <button
+              onClick={() => setActiveTab('courses')}
+              style={{ flex: 1, padding: "8px 10px", borderRadius: 10, border: activeTab === 'courses' ? "1.5px solid rgba(99,102,241,0.3)" : "1.5px solid #e2e8f0", background: activeTab === 'courses' ? "rgba(99,102,241,0.08)" : "#fff", color: activeTab === 'courses' ? "var(--accent,#6366f1)" : "#64748b", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <BookOpen style={{ width: 14, height: 14 }} /> Formations
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('bootcamps')}
+              style={{ flex: 1, padding: "8px 10px", borderRadius: 10, border: activeTab === 'bootcamps' ? "1.5px solid rgba(99,102,241,0.3)" : "1.5px solid #e2e8f0", background: activeTab === 'bootcamps' ? "rgba(99,102,241,0.08)" : "#fff", color: activeTab === 'bootcamps' ? "var(--accent,#6366f1)" : "#64748b", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <Layers style={{ width: 14, height: 14 }} /> Bootcamps
+              </div>
+            </button>
+          </div>
+
+          <div style={{ position: "relative" }}>
+            <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 15, height: 15, color: "#94a3b8" }} />
+            <input
+              type="text"
+              placeholder={`Rechercher ${activeTab === 'courses' ? 'une formation' : 'un bootcamp'}...`}
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{ width: "100%", padding: "9px 12px 9px 36px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit" }}
+              onFocus={e => { e.currentTarget.style.borderColor = "var(--accent,#6366f1)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.1)" }}
+              onBlur={e => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.boxShadow = "none" }}
+            />
+          </div>
+          <p style={{ fontSize: 11, color: "#94a3b8", margin: "8px 0 0" }}>Cliquez sur un element pour l'ajouter ou le retirer des vedettes.</p>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "12px" }}>
+          {getAvailableItems().length === 0 ? (
+            <div style={{ padding: "48px 24px", textAlign: "center" }}>
+              <BookOpen style={{ width: 40, height: 40, color: "#cbd5e1", margin: "0 auto 12px" }} />
+              <p style={{ fontSize: 13, color: "#94a3b8" }}>
+                {searchTerm
+                  ? `${activeTab === 'courses' ? 'Aucune formation' : 'Aucun bootcamp'} trouve`
+                  : `Tous les ${activeTab === 'courses' ? 'formations' : 'bootcamps'} sont selectionnes ou aucun disponible`}
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {getAvailableItems().map(item => (
+                <div
+                  key={item.id}
+                  style={{
+                    border: isItemFeatured(item.id) ? "1.5px solid rgba(99,102,241,0.35)" : "1px solid #e8ecf3",
+                    borderRadius: 14,
+                    padding: 12,
+                    background: isItemFeatured(item.id) ? "rgba(99,102,241,0.06)" : "#fff",
+                    cursor: "pointer",
+                    transition: "all 0.15s"
+                  }}
+                  onClick={() => handleToggleFeatured(item)}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</div>
+                      <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.shortDescription}</div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+                        <span style={{ fontSize: 11, color: "#64748b" }}>{item.durationLabel}</span>
+                        <span style={{ fontSize: 11, color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}>
+                          <Star style={{ width: 11, height: 11, color: "#f59e0b" }} /> {item.rating.toFixed(1)}
+                        </span>
                       </div>
-                    ))}
+                    </div>
+                    {isItemFeatured(item.id) && (
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--accent,#6366f1)", background: "rgba(99,102,241,0.12)", padding: "4px 8px", borderRadius: 999 }}>
+                        #{getFeaturedOrder(item.id)}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleToggleFeatured(item) }}
+                    disabled={!isItemFeatured(item.id) && featuredItems.filter(i => i.type === (activeTab === 'courses' ? 'course' : 'bootcamp')).length >= maxItems}
+                    style={{
+                      marginTop: 10,
+                      width: "100%",
+                      padding: "8px 10px",
+                      borderRadius: 10,
+                      border: isItemFeatured(item.id) ? "1.5px solid rgba(244,63,94,0.2)" : "1.5px dashed #e2e8f0",
+                      background: isItemFeatured(item.id) ? "rgba(244,63,94,0.08)" : "transparent",
+                      color: isItemFeatured(item.id) ? "#e11d48" : "var(--accent,#6366f1)",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: (!isItemFeatured(item.id) && featuredItems.filter(i => i.type === (activeTab === 'courses' ? 'course' : 'bootcamp')).length >= maxItems) ? "not-allowed" : "pointer",
+                      opacity: (!isItemFeatured(item.id) && featuredItems.filter(i => i.type === (activeTab === 'courses' ? 'course' : 'bootcamp')).length >= maxItems) ? 0.6 : 1
+                    }}
+                  >
+                    {isItemFeatured(item.id) ? "Retirer des vedettes" : "+ Ajouter aux vedettes"}
+                  </button>
+                </div>
+              ))}
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Right panel */}
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e8ecf3", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8", margin: 0 }}>Selection</p>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>Elements selectionnes</h2>
+          </div>
+          <div style={{ padding: "6px 10px", background: "rgba(99,102,241,0.1)", color: "var(--accent,#6366f1)", borderRadius: 999, fontSize: 12, fontWeight: 600 }}>
+            {featuredItems.length} sur {maxItems * 2}
           </div>
         </div>
 
-        {/* Right Column - Selected Items */}
-        <div className="lg:col-span-2 h-full flex flex-col overflow-hidden">
-          <div className="bg-white rounded-xl border shadow-sm h-full flex flex-col">
-            {/* Header */}
-            <div className="p-6 border-b flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">Éléments sélectionnés</h2>
-                  <p className="text-gray-600 mt-1">
-                    L'ordre d'affichage détermine la priorité d'affichage sur le site
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-3 py-1 bg-accent/10 text-accent rounded-full text-sm font-medium">
-                    {featuredItems.length} sur {maxItems * 2} sélectionnés
-                  </span>
-                </div>
-              </div>
-            </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "28px" }}>
+          <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: 28 }}>
 
-            {/* Instructions */}
-            <div className="px-6 py-4 bg-blue-50 border-y flex-shrink-0">
-              <div className="flex items-start gap-3">
-                <Award className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm text-blue-800 font-medium">
-                    Instructions de sélection
-                  </p>
-                  <p className="text-sm text-blue-700 mt-1">
-                    Sélectionnez jusqu'à {maxItems} Formations et {maxItems} bootcamps. 
-                    Les éléments seront affichés dans l'ordre que vous définissez ici.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <FormCard
+              title="Instructions"
+              icon={<Award style={{ width: 16, height: 16 }} />}
+            >
+              <p style={{ margin: 0, fontSize: 13, color: "#475569" }}>
+                Selectionnez jusqu'a {maxItems} formations et {maxItems} bootcamps. L'ordre d'affichage depend de l'ordre ici.
+              </p>
+            </FormCard>
 
-            {/* Selected Items Grid */}
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <div className="h-full overflow-y-auto p-6">
-                {fullFeaturedItems.length === 0 ? (
-                  <div className="text-center py-12">
-                    <TrendingUp className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      Aucun élément sélectionné
-                    </h3>
-                    <p className="text-gray-600">
-                      Sélectionnez des Formations et bootcamps dans la colonne de gauche
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Courses Section */}
-                    {fullFeaturedItems.filter(item => item.type === 'course').length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <BookOpen className="w-5 h-5 text-accent" />
-                          <h3 className="font-semibold text-gray-900">Formations vedettes</h3>
-                          <span className="ml-auto text-sm text-gray-500">
-                            {fullFeaturedItems.filter(item => item.type === 'course').length}/{maxItems}
-                          </span>
-                        </div>
-                        <div className="space-y-3">
-                          {fullFeaturedItems
-                            .filter(item => item.type === 'course')
-                            .sort((a, b) => a.order - b.order)
-                            .map((item) => (
-                              <div
-                                key={item.itemId}
-                                className="border border-gray-200 rounded-xl p-4 hover:border-accent transition-all group relative"
-                              >
-                                <div className="flex items-center gap-4">
-                                  <div className="flex-shrink-0">
-                                    <div className="w-10 h-10 rounded-full bg-accent/20 text-accent flex items-center justify-center font-bold">
-                                      <Award className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
-                                    </div>
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-3">
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between">
-                                          <div>
-                                            <div className="flex items-center gap-2">
-                                              <h4 className="font-medium text-gray-900 truncate">{item.title}</h4>
-                                              <span className="px-2 py-0.5 bg-accent/10 text-accent rounded-full text-xs">
-                                                Formation
-                                              </span>
-                                            </div>
-                                            <p className="text-sm text-gray-500 mt-1">{item.description}</p>
-                                          </div>
-                                          <div className="flex items-center gap-2 ml-4">
-                                            {item.rating && (
-                                              <div className="flex items-center gap-1">
-                                                <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                                                <span className="text-sm text-gray-600">{item.rating.toFixed(1)}</span>
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <div className="flex items-center gap-3 mt-2">
-                                          <span className="text-xs text-gray-500">{item.durationLabel}</span>
-                                          <div className="flex items-center gap-1">
-                                            <button
-                                              onClick={() => handleMoveItem(item.itemId, 'up')}
-                                              className="p-1 hover:bg-gray-100 rounded"
-                                              disabled={item.order === 1}
-                                            >
-                                              <ArrowUp className="w-4 h-4 text-gray-500" />
-                                            </button>
-                                            <button
-                                              onClick={() => handleMoveItem(item.itemId, 'down')}
-                                              className="p-1 hover:bg-gray-100 rounded"
-                                              disabled={item.order === fullFeaturedItems.length}
-                                            >
-                                              <ArrowDown className="w-4 h-4 text-gray-500" />
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={() => handleRemoveFeatured(item.itemId)}
-                                    className="p-2 hover:bg-red-50 rounded-lg transition-colors"
-                                  >
-                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                  </button>
+            {fullFeaturedItems.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "48px 24px" }}>
+                <TrendingUp style={{ width: 56, height: 56, color: "#cbd5e1", margin: "0 auto 12px" }} />
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", margin: "0 0 6px" }}>Aucun element selectionne</h3>
+                <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>Ajoutez des elements depuis la colonne de gauche.</p>
+              </div>
+            ) : (
+              <>
+                {fullFeaturedItems.filter(item => item.type === 'course').length > 0 && (
+                  <FormCard
+                    title="Formations vedettes"
+                    icon={<BookOpen style={{ width: 16, height: 16 }} />}
+                    action={<span style={{ fontSize: 12, color: "#94a3b8" }}>{fullFeaturedItems.filter(item => item.type === 'course').length}/{maxItems}</span>}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {fullFeaturedItems
+                        .filter(item => item.type === 'course')
+                        .sort((a, b) => a.order - b.order)
+                        .map(item => (
+                          <div key={item.itemId} style={{ border: "1px solid #e8ecf3", borderRadius: 12, padding: 12, background: "#fff" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <div style={{ width: 30, height: 30, borderRadius: 999, background: "rgba(99,102,241,0.12)", color: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>{item.order}</div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</div>
+                                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.description}</div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+                                  <span style={{ fontSize: 11, color: "#64748b" }}>{item.durationLabel}</span>
+                                  <span style={{ fontSize: 11, color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}><Star style={{ width: 11, height: 11, color: "#f59e0b" }} /> {item.rating.toFixed(1)}</span>
                                 </div>
                               </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Bootcamps Section */}
-                    {fullFeaturedItems.filter(item => item.type === 'bootcamp').length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-3 mt-6">
-                          <Layers className="w-5 h-5 text-accent" />
-                          <h3 className="font-semibold text-gray-900">Bootcamps vedettes</h3>
-                          <span className="ml-auto text-sm text-gray-500">
-                            {fullFeaturedItems.filter(item => item.type === 'bootcamp').length}/{maxItems}
-                          </span>
-                        </div>
-                        <div className="space-y-3">
-                          {fullFeaturedItems
-                            .filter(item => item.type === 'bootcamp')
-                            .sort((a, b) => a.order - b.order)
-                            .map((item) => (
-                              <div
-                                key={item.itemId}
-                                className="border border-gray-200 rounded-xl p-4 hover:border-accent transition-all group relative"
-                              >
-                                <div className="flex items-center gap-4">
-                                  <div className="flex-shrink-0">
-                                    <div className="w-10 h-10 rounded-full bg-accent/20 text-accent flex items-center justify-center font-bold">
-                                        <Award className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
-
-                                    </div>
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-3">
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between">
-                                          <div>
-                                            <div className="flex items-center gap-2">
-                                              <h4 className="font-medium text-gray-900 truncate">{item.title}</h4>
-                                              <span className="px-2 py-0.5 bg-accent/10 text-accent rounded-full text-xs">
-                                                Bootcamp
-                                              </span>
-                                            </div>
-                                            <p className="text-sm text-gray-500 truncate mt-1">{item.description}</p>
-                                          </div>
-                                          <div className="flex items-center gap-2 ml-4">
-                                            {item.rating && (
-                                              <div className="flex items-center gap-1">
-                                                <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                                                <span className="text-sm text-gray-600">{item.rating.toFixed(1)}</span>
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <div className="flex items-center gap-3 mt-2">
-                                          <span className="text-xs text-gray-500">{item.durationLabel}</span>
-                                          <div className="flex items-center gap-1">
-                                            <button
-                                              onClick={() => handleMoveItem(item.itemId, 'up')}
-                                              className="p-1 hover:bg-gray-100 rounded"
-                                              disabled={item.order === 1}
-                                            >
-                                              <ArrowUp className="w-4 h-4 text-gray-500" />
-                                            </button>
-                                            <button
-                                              onClick={() => handleMoveItem(item.itemId, 'down')}
-                                              className="p-1 hover:bg-gray-100 rounded"
-                                              disabled={item.order === fullFeaturedItems.length}
-                                            >
-                                              <ArrowDown className="w-4 h-4 text-gray-500" />
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={() => handleRemoveFeatured(item.itemId)}
-                                    className="p-2 hover:bg-red-50 rounded-lg transition-colors"
-                                  >
-                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                  </button>
-                                </div>
+                              <div style={{ display: "flex", gap: 4 }}>
+                                <IconBtn onClick={() => handleMoveItem(item.itemId, 'up')} disabled={item.order === 1} title="Monter"><ArrowUp style={{ width: 14, height: 14 }} /></IconBtn>
+                                <IconBtn onClick={() => handleMoveItem(item.itemId, 'down')} disabled={item.order === fullFeaturedItems.length} title="Descendre"><ArrowDown style={{ width: 14, height: 14 }} /></IconBtn>
+                                <IconBtn onClick={() => handleRemoveFeatured(item.itemId)} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Retirer"><Trash2 style={{ width: 14, height: 14 }} /></IconBtn>
                               </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </FormCard>
                 )}
-              </div>
-            </div>
 
-            {/* Footer */}
-            <div className="border-t p-4 flex-shrink-0">
-              <div className="flex items-center justify-between text-sm text-gray-600">
-                <div>
-                  <p className="font-medium">Conseil :</p>
-                  <p>Les éléments en haut de la liste seront affichés en premier</p>
-                </div>
-                <div className="text-right">
-                  <p>Statut : {fullFeaturedItems.length === maxItems * 2 ? '✓ Complet' : 'En cours'}</p>
-                  <p>{fullFeaturedItems.length} éléments sélectionnés</p>
-                </div>
-              </div>
-            </div>
+                {fullFeaturedItems.filter(item => item.type === 'bootcamp').length > 0 && (
+                  <FormCard
+                    title="Bootcamps vedettes"
+                    icon={<Layers style={{ width: 16, height: 16 }} />}
+                    action={<span style={{ fontSize: 12, color: "#94a3b8" }}>{fullFeaturedItems.filter(item => item.type === 'bootcamp').length}/{maxItems}</span>}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {fullFeaturedItems
+                        .filter(item => item.type === 'bootcamp')
+                        .sort((a, b) => a.order - b.order)
+                        .map(item => (
+                          <div key={item.itemId} style={{ border: "1px solid #e8ecf3", borderRadius: 12, padding: 12, background: "#fff" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <div style={{ width: 30, height: 30, borderRadius: 999, background: "rgba(99,102,241,0.12)", color: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>{item.order}</div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</div>
+                                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.description}</div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+                                  <span style={{ fontSize: 11, color: "#64748b" }}>{item.durationLabel}</span>
+                                  <span style={{ fontSize: 11, color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}><Star style={{ width: 11, height: 11, color: "#f59e0b" }} /> {item.rating.toFixed(1)}</span>
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", gap: 4 }}>
+                                <IconBtn onClick={() => handleMoveItem(item.itemId, 'up')} disabled={item.order === 1} title="Monter"><ArrowUp style={{ width: 14, height: 14 }} /></IconBtn>
+                                <IconBtn onClick={() => handleMoveItem(item.itemId, 'down')} disabled={item.order === fullFeaturedItems.length} title="Descendre"><ArrowDown style={{ width: 14, height: 14 }} /></IconBtn>
+                                <IconBtn onClick={() => handleRemoveFeatured(item.itemId)} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Retirer"><Trash2 style={{ width: 14, height: 14 }} /></IconBtn>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </FormCard>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* 🔔 TOAST SYSTEM - Toast Container */}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-3 max-w-md">
-        {toasts.map((toast) => {
-          const elapsed = Date.now() - toast.createdAt
-          const progress = Math.max(0, 100 - (elapsed / toast.duration) * 100)
-          
+      {/* Toasts */}
+      <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 10 }}>
+        {toasts.map(toast => {
+          if (toast.type === "loading") return null
+          const progress = Math.max(0, 100 - ((Date.now() - toast.createdAt) / toast.duration) * 100)
+          const ok = toast.type === "success"
           return (
-            <div
-              key={toast.id}
-              className={`
-                relative overflow-hidden rounded-xl shadow-lg border transform transition-all duration-300
-                ${toast.type === "success" 
-                  ? "bg-green-50 border-green-200 text-green-800" 
-                  : toast.type === "error" 
-                  ? "bg-red-50 border-red-200 text-red-800"
-                  : "hidden"}
-              `}
-            >
-              {/* Progress Bar */}
-              <div 
-                className={`
-                  absolute bottom-0 left-0 h-1 transition-all duration-100
-                  ${toast.type === "success" 
-                    ? "bg-green-500" 
-                    : toast.type === "error" 
-                    ? "bg-red-500"
-                    : "bg-blue-500"}
-                `}
-                style={{ width: `${progress}%` }}
-              />
-              
-              <div className="flex items-start gap-3 p-4">
-                <div className="flex-shrink-0 mt-0.5">
-                  {toast.type === "success" && <CheckCircle className="w-5 h-5 text-green-600" />}
-                  {toast.type === "error" && <AlertCircle className="w-5 h-5 text-red-600" />}
-                  {toast.type === "loading" && <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />}
-                </div>
-                <div className="flex-1 text-sm font-medium">{toast.message}</div>
-                <button
-                  onClick={() => removeToast(toast.id)}
-                  className="flex-shrink-0 text-gray-400 hover:text-gray-600 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+            <div key={toast.id} style={{ position: "relative", overflow: "hidden", background: ok ? "#f0fdf4" : "#fff1f2", border: `1px solid ${ok ? "#bbf7d0" : "#fecdd3"}`, borderRadius: 14, boxShadow: "0 8px 24px rgba(0,0,0,0.1)", minWidth: 280, maxWidth: 360, animation: "slideIn 0.2s ease" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px" }}>
+                {ok ? <CheckCircle style={{ width: 18, height: 18, color: "#22c55e", flexShrink: 0 }} /> : <AlertCircle style={{ width: 18, height: 18, color: "#f43f5e", flexShrink: 0 }} />}
+                <p style={{ flex: 1, fontSize: 13, fontWeight: 600, color: ok ? "#166534" : "#9f1239", margin: 0 }}>{toast.message}</p>
+                <button onClick={() => removeToast(toast.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#94a3b8", display: "flex" }}><X style={{ width: 14, height: 14 }} /></button>
               </div>
+              <div style={{ position: "absolute", bottom: 0, left: 0, height: 3, background: ok ? "#22c55e" : "#f43f5e", width: `${progress}%`, transition: "width 0.1s linear" }} />
             </div>
           )
         })}
       </div>
+
+      <style>{`
+        @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+        ::-webkit-scrollbar{width:5px;height:5px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:99px}
+        ::-webkit-scrollbar-thumb:hover{background:#cbd5e1}
+      `}</style>
     </div>
   )
+
 }

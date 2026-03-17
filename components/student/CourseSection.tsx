@@ -3,6 +3,7 @@
 import { ProgramCard } from "@/components/program-card"
 import { motion } from "framer-motion"
 import { useSidebar } from "@/components/ui/sidebar-context"
+import type { Course } from "@/components/student/CourseCard"
 
 interface CourseSectionProps {
   title: string
@@ -30,13 +31,10 @@ const cardVariants = {
 
 export function CourseSection({ title, subtitle, courses }: CourseSectionProps) {
   const { isCollapsed } = useSidebar()
-
-  // ✅ 2 columns if expanded, 3 columns if collapsed
   const gridCols = isCollapsed ? "grid-cols-3" : "grid-cols-2"
 
   return (
     <section className="space-y-4">
-      {/* --- Title --- */}
       <motion.div
         variants={titleVariants}
         initial="hidden"
@@ -48,9 +46,8 @@ export function CourseSection({ title, subtitle, courses }: CourseSectionProps) 
         {subtitle && <span className="text-sm text-muted-foreground">{subtitle}</span>}
       </motion.div>
 
-      {/* --- Grid --- */}
       {courses.length === 0 ? (
-        <p className="text-muted-foreground">Aucun formation dans cette catégorie.</p>
+        <p className="text-muted-foreground">Aucun formation dans cette catÃ©gorie.</p>
       ) : (
         <motion.div
           className={`grid ${gridCols} gap-6 transition-all duration-300 px-4`}
@@ -65,33 +62,23 @@ export function CourseSection({ title, subtitle, courses }: CourseSectionProps) 
               title: course.title,
               shortDescription:
                 course.status === "active"
-                  ? "Formation en cours – poursuivez votre apprentissage."
+                  ? "Formation en cours â€“ poursuivez votre apprentissage."
                   : course.status === "upcoming"
-                  ? "Prochainement disponible, inscrivez-vous dès maintenant."
+                  ? "Prochainement disponible, inscrivez-vous dÃ¨s maintenant."
                   : course.status === "completed"
-                  ? "Formation terminée – consultez vos progrès."
-                  : "Formation enregistrée – apprenez à votre rythme.",
-              category:
-                course.status === "upcoming"
-                  ? "BI"
-                  : course.status === "active"
-                  ? "Data"
-                  : course.status === "completed"
-                  ? "AI/ML"
-                  : "Cloud",
-              level:
-                course.progress >= 80
-                  ? "Avancé"
-                  : course.progress >= 40
-                  ? "Intermédiaire"
-                  : "Débutant",
-              hours: parseInt(course.duration),
-              thumbnail: course.thumbnail,
+                  ? "Formation terminÃ©e â€“ consultez vos progrÃ¨s."
+                  : "Formation enregistrÃ©e â€“ apprenez Ã  votre rythme.",
+              durationLabel: course.duration,
+              image: course.thumbnail,
+              tags: [course.status],
             }
 
             return (
               <motion.div key={course.id} variants={cardVariants}>
-                <ProgramCard program={pseudoProgram} />
+                <ProgramCard
+                  program={pseudoProgram}
+                  hrefOverride={`/student-dashboard/course/${course.slug ?? course.id}`}
+                />
               </motion.div>
             )
           })}

@@ -40,13 +40,18 @@ export default function AdminUsersPage() {
 
   // POST / UPDATE (+ avatar)
   const handleSave = async (user: AdminUser, avatarFile?: File) => {
+    const method = user.id ? "PATCH" : "POST";
     const res = await fetch("/api/admin/users", {
-      method: "POST",
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(user),
     });
 
-    const { user: saved } = await res.json();
+    const saved = await res.json();
+
+    if (!res.ok || !saved?.id) {
+      throw new Error(saved?.error || "Erreur lors de l'enregistrement de l'utilisateur");
+    }
 
     if (avatarFile) {
       const fd = new FormData();
@@ -71,7 +76,7 @@ export default function AdminUsersPage() {
 
   // DELETE
   const handleDelete = async (id: string) => {
-    await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
+    await fetch(`/api/admin/users?id=${id}`, { method: "DELETE" });
     setUsers(prev => prev.filter(u => u.id !== id));
   };
 

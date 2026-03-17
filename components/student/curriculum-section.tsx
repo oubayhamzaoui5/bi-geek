@@ -1,8 +1,19 @@
-"use client"
+﻿"use client"
 
-import { ChevronDown, Play, FileText, Code, Lock } from "lucide-react"
-import { useState } from "react"
+import {
+  ChevronDown,
+  Play,
+  FileText,
+  Image as ImageIcon,
+  Lock,
+  Check,
+  Loader2,
+  ExternalLink,
+} from "lucide-react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { AnimatePresence, motion } from "framer-motion"
+import { getPDFViewerUrl } from "@/lib/pdf"
 
 type ContentType = "video" | "document" | "exercise"
 
@@ -10,6 +21,10 @@ interface Content {
   title: string
   type: ContentType
   playbackId?: string
+  href?: string
+  lessonId?: string
+  filename?: string
+  courseId?: string
 }
 
 interface Lesson {
@@ -29,27 +44,46 @@ interface Module {
 type CurriculumSectionProps = {
   variant?: "student" | "guest"
   context?: "course" | "bootcamp"
-  /**
-   * ✅ Used for guest (course OR bootcamp)
-   * - For course: modulesFromPb = course modules
-   * - For bootcamp: modulesFromPb = formations (courses)
-   *   and each formation contains "lessons" = its modules
-   *   and each module contains "contents" = its lessons
-   */
+  courseId?: string
   modulesFromPb?: {
     title: string
     duration: string
     lessons: {
       title: string
       duration: string
-      contents?: { title: string; type?: ContentType; playbackId?: string }[]
+      locked?: boolean
+      contents?: Content[]
     }[]
   }[]
+}
+
+const isPdf = (href: string) => href.toLowerCase().includes(".pdf")
+const parsePocketBasePdf = (href: string) => {
+  const match = href.match(/\/api\/files\/course_lessons\/([^/]+)\/([^/?#]+\.pdf)/i)
+  if (!match) return null
+  const [, lessonId, filename] = match
+  return { lessonId, filename: filename.replace(/\.pdf$/i, "") }
+}
+
+const moduleVariants = {
+  open: { height: "auto", opacity: 1 },
+  collapsed: { height: 0, opacity: 0 },
+}
+
+const lessonListVariants = {
+  open: { transition: { staggerChildren: 0.05, delayChildren: 0.08 } },
+  collapsed: { transition: { staggerChildren: 0.02, staggerDirection: -1 } },
+}
+
+const lessonItemVariants = {
+  open: { opacity: 1, y: 0 },
+  collapsed: { opacity: 0, y: -6 },
 }
 
 export function CurriculumSection({
   variant = "student",
   context = "course",
+  courseId,
   modulesFromPb,
 }: CurriculumSectionProps) {
   const isGuest = variant === "guest"
@@ -57,197 +91,30 @@ export function CurriculumSection({
 
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set())
   const [expandedLessons, setExpandedLessons] = useState<Record<number, Set<number>>>({})
+  const [activeLesson, setActiveLesson] = useState<string | null>(null)
   const router = useRouter()
 
-  // -----------------------------
-  // DATA: course curriculum (unchanged)
-  // -----------------------------
-  const courseModules: Module[] = [
-    {
-      title: "Module 1 : Fondamentaux de Python",
-      duration: "8 heures",
-      lessons: [
-        {
-          title: "Introduction à Python",
-          duration: "45 min",
-          contents: [
-            {
-              title: "Vidéo Introduction",
-              type: "video",
-              playbackId: "hpnBz15009TAvXFOUS01uO4g5bkrAp8byb01RIRSo01sUAI",
-            },
-            { title: "Document PDF", type: "document" },
-            { title: "Exercice pratique", type: "exercise" },
-          ],
-        },
-        {
-          title: "Variables et types de données",
-          duration: "1h 15 min",
-          contents: [
-            { title: "Vidéo", type: "video", playbackId: "aBCdEFgHiJKLmNopQR12stuv3" },
-            { title: "Exercice code", type: "exercise" },
-          ],
-        },
-      ],
-    },
-    {
-      title: "Module 2 : Pandas et manipulation de données",
-      duration: "12 heures",
-      lessons: [
-        {
-          title: "Introduction à Pandas",
-          duration: "1h",
-          contents: [
-            { title: "Vidéo", type: "video", playbackId: "pqrsTUVwxYz0123456789abcd" },
-            { title: "Document PDF", type: "document" },
-          ],
-        },
-        {
-          title: "DataFrames et Series",
-          duration: "1h 45 min",
-          contents: [
-            { title: "Vidéo", type: "video", playbackId: "efghijklMNOP345678qrstuv" },
-            { title: "Exercice pratique", type: "exercise" },
-          ],
-        },
-        {
-          title: "Nettoyage de données",
-          duration: "2h",
-          contents: [
-            { title: "Vidéo", type: "video", playbackId: "wxyz1234ABCD5678EFghijkl" },
-            { title: "Document PDF", type: "document" },
-          ],
-          locked: true,
-        },
-      ],
-    },
-    {
-      title: "Module 3 : Visualisation de données",
-      duration: "10 heures",
-      locked: true,
-      lessons: [
-        {
-          title: "Matplotlib basique",
-          duration: "1h 30 min",
-          contents: [{ title: "Vidéo", type: "video", playbackId: "QWErTYuiOP12asdf3456zxcv" }],
-        },
-        {
-          title: "Seaborn avancé",
-          duration: "2h",
-          contents: [{ title: "Vidéo", type: "video", playbackId: "ZXcvBNmm1234ASDfghJKL890" }],
-        },
-      ],
-    },
-  ]
+  const modules: Module[] = (modulesFromPb ?? []).map((m) => ({
+    title: m.title,
+    duration: m.duration,
+    lessons: m.lessons.map((l) => ({
+      title: l.title,
+      duration: l.duration,
+      locked: l.locked ?? false,
+      contents: l.contents ?? [],
+    })),
+  }))
 
-  // -----------------------------
-  // DATA: bootcamp curriculum (unchanged hardcoded fallback)
-  // -----------------------------
-  const bootcampModules: Module[] = [
-    {
-      title: "Formation 1 : HTML / CSS / JavaScript",
-      duration: "40 heures",
-      lessons: [
-        {
-          title: "Module : Bases du Web (HTML & CSS)",
-          duration: "10h",
-          contents: [
-            { title: "Leçon : Structure HTML", type: "video" },
-            { title: "Leçon : Styles CSS essentiels", type: "video" },
-            { title: "Leçon : Support PDF", type: "document" },
-          ],
-        },
-        {
-          title: "Module : JavaScript Fondamentaux",
-          duration: "14h",
-          contents: [
-            { title: "Leçon : Variables, fonctions, boucles", type: "video" },
-            { title: "Leçon : Exercices JS", type: "exercise" },
-          ],
-        },
-      ],
-    },
-    {
-      title: "Formation 2 : SQL & Bases de données",
-      duration: "24 heures",
-      lessons: [
-        {
-          title: "Module : Introduction à SQL",
-          duration: "8h",
-          contents: [
-            { title: "Leçon : CRUD avec SQL", type: "video" },
-            { title: "Leçon : Exercices de requêtes", type: "exercise" },
-          ],
-        },
-        {
-          title: "Module : Modélisation & Jointures",
-          duration: "8h",
-          contents: [
-            { title: "Leçon : Modélisation relationnelle", type: "video" },
-            { title: "Leçon : Jointures avancées", type: "video" },
-          ],
-        },
-      ],
-    },
-    {
-      title: "Formation 3 : React & SPA",
-      duration: "36 heures",
-      lessons: [
-        {
-          title: "Module : Bases de React",
-          duration: "12h",
-          contents: [
-            { title: "Leçon : Components & Props", type: "video" },
-            { title: "Leçon : JSX & événements", type: "video" },
-          ],
-        },
-        {
-          title: "Module : React avancé & API",
-          duration: "16h",
-          locked: true,
-          contents: [
-            { title: "Leçon : Hooks avancés", type: "video" },
-            { title: "Leçon : Appels API & erreurs", type: "video" },
-            { title: "Leçon : TP : Application complète", type: "exercise" },
-          ],
-        },
-      ],
-    },
-  ]
-
-  // ✅ Use PB for guest (course OR bootcamp) if modulesFromPb is provided
-  let modules: Module[]
-  const hasPbModules = isGuest && !!modulesFromPb
-
-  if (hasPbModules) {
-    modules = modulesFromPb.map((m) => ({
-      title: m.title,
-      duration: m.duration,
-      lessons: m.lessons.map((l) => ({
-        title: l.title,
-        duration: l.duration,
-        locked: false,
-        // ✅ if PB provided "contents", use them; else keep empty
-        contents: (l.contents ?? []).map((c) => ({
-          title: c.title,
-          type: c.type ?? "video",
-          playbackId: c.playbackId,
-        })),
-      })),
-      locked: false,
-    }))
-  } else {
-    modules = isBootcamp ? bootcampModules : courseModules
-  }
+  const totalLessons = useMemo(() => modules.reduce((sum, m) => sum + m.lessons.length, 0), [modules])
 
   const renderContentIcon = (type: ContentType) => {
     switch (type) {
       case "video":
-        return <Play size={16} className="text-accent flex-shrink-0" />
+        return <Play size={14} className="text-blue-600" />
       case "document":
-        return <FileText size={16} className="text-accent flex-shrink-0" />
+        return <FileText size={14} className="text-amber-600" />
       case "exercise":
-        return <Code size={16} className="text-accent flex-shrink-0" />
+        return <ImageIcon size={14} className="text-purple-600" />
     }
   }
 
@@ -267,144 +134,275 @@ export function CurriculumSection({
   const handleContentClick = (content: Content) => {
     if (isBootcamp || isGuest) return
 
-    if (content.type === "document") {
-      router.push("/pdf-viewer")
-    } else if (content.type === "video" && content.playbackId) {
-      const q = new URLSearchParams({ pid: content.playbackId, title: content.title })
-      router.push(`/video-viewer?${q.toString()}`)
+    if (content.type === "document" && content.href) {
+      if (isPdf(content.href)) {
+        const parsed = parsePocketBasePdf(content.href)
+        const resolvedCourseId = content.courseId ?? courseId
+        const resolvedLessonId = content.lessonId ?? parsed?.lessonId
+        const resolvedFilename = content.filename ?? parsed?.filename
+
+        if (resolvedCourseId && resolvedLessonId && resolvedFilename) {
+          router.push(getPDFViewerUrl(resolvedCourseId, resolvedLessonId, resolvedFilename))
+        } else if (!parsed) {
+          window.open(content.href, "_blank", "noreferrer")
+        } else {
+          console.warn("Missing course or lesson identifiers for PDF viewer link.")
+        }
+      } else {
+        window.open(content.href, "_blank", "noreferrer")
+      }
+      return
     }
+
+    if (content.type === "video") {
+      if (content.playbackId) {
+        const q = new URLSearchParams({ pid: content.playbackId, title: content.title })
+        router.push(`/video-viewer?${q.toString()}`)
+        return
+      }
+      if (content.href) {
+        window.open(content.href, "_blank", "noreferrer")
+      }
+    }
+  }
+
+  const lessonStatus = (lesson: Lesson, moduleIndex: number, lessonIndex: number) => {
+    if (lesson.locked) return "locked"
+    if (moduleIndex === 0 && lessonIndex === 0) return "in_progress"
+    return "completed"
+  }
+
+  const moduleStatus = (module: Module) => {
+    const total = module.lessons.length
+    const locked = module.lessons.filter((l) => l.locked).length
+    if (locked === total) return "locked"
+    if (locked === 0) return "completed"
+    return "in_progress"
   }
 
   const unitLabel = isBootcamp ? "modules" : "leçons"
 
   return (
-    <div className="rounded-xl border border-border bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/80 shadow-md p-6 space-y-4">
-      <h2 className="text-2xl font-bold text-foreground">
-        {isBootcamp ? "Curriculum du bootcamp" : "Curriculum"}
-      </h2>
+    <div className="rounded-2xl border border-border bg-card/90 backdrop-blur p-6 lg:p-8 space-y-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-semibold text-foreground">Curriculum</h2>
+          <p className="text-xs text-muted-foreground">
+            {totalLessons} {unitLabel} au total
+          </p>
+        </div>
+        <span className="text-xs uppercase tracking-[0.2em] text-accent">Modules</span>
+      </div>
 
-      <div className="space-y-3">
-        {modules.map((module, moduleIndex) => {
-          const isModuleLockedForStudent = !!module.locked && !isGuest && !isBootcamp
+      {modules.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">
+          Aucun contenu disponible pour le moment.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {modules.map((module, moduleIndex) => {
+            const status = moduleStatus(module)
+            const accentColor =
+              status === "completed"
+                ? "border-emerald-500/40"
+                : status === "in_progress"
+                ? "border-accent/60"
+                : "border-border"
 
-          return (
-            <div key={moduleIndex} className="border border-border rounded-lg overflow-hidden">
-              <button
-                onClick={() => toggleModule(moduleIndex)}
-                className={`w-full p-4 flex items-center justify-between transition-colors ${
-                  isModuleLockedForStudent ? "opacity-60 cursor-not-allowed" : "hover:bg-muted/50"
+            return (
+              <div
+                key={moduleIndex}
+                className={`rounded-xl border border-border overflow-hidden bg-muted/20 ${
+                  expandedModules.has(moduleIndex) ? "bg-muted/40" : ""
                 }`}
               >
-                <div className="flex items-center gap-3 text-left">
-                  {isModuleLockedForStudent ? (
-                    <Lock size={20} className="text-foreground/70" />
-                  ) : (
+                <button
+                  onClick={() => toggleModule(moduleIndex)}
+                  className={`w-full p-4 flex items-center justify-between transition-colors ${
+                    module.locked && !isGuest && !isBootcamp
+                      ? "opacity-60 cursor-not-allowed"
+                      : "hover:bg-muted/40"
+                  }`}
+                >
+                  <div className={`flex items-center gap-4 text-left border-l-2 ${accentColor} pl-3`}>
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-background text-xs font-semibold text-muted-foreground border border-border">
+                      {String(moduleIndex + 1).padStart(2, "0")}
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-semibold text-foreground">{module.title}</h3>
+                      <p className="text-xs text-muted-foreground">{module.duration}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs rounded-full border border-border bg-background px-3 py-1 text-muted-foreground">
+                      {module.lessons.length} {unitLabel}
+                    </span>
                     <ChevronDown
-                      size={20}
+                      size={18}
                       className={`text-accent transition-transform ${
                         expandedModules.has(moduleIndex) ? "rotate-180" : ""
                       }`}
                     />
-                  )}
-                  <div>
-                    <h3 className="font-semibold text-foreground">{module.title}</h3>
-                    <p className="text-sm text-muted-foreground">{module.duration}</p>
                   </div>
-                </div>
-                <span className="text-sm font-medium text-accent">
-                  {module.lessons.length} {unitLabel}
-                </span>
-              </button>
+                </button>
 
-              {expandedModules.has(moduleIndex) && (
-                <div className="bg-muted/30 border-t border-border p-4 space-y-2">
-                  {module.lessons.map((lesson, lessonIndex) => {
-                    const isLessonLockedForStudent = !!lesson.locked && !isGuest && !isBootcamp
-                    const canExpandLesson = isBootcamp ? true : !isGuest && !lesson.locked
-
-                    return (
-                      <div key={lessonIndex} className="space-y-1">
-                        <button
-                          onClick={() => {
-                            if (canExpandLesson) toggleLesson(moduleIndex, lessonIndex)
-                          }}
-                          className={`w-full flex items-center justify-between p-3 rounded transition-colors ${
-                            isLessonLockedForStudent
-                              ? "opacity-60 cursor-not-allowed"
-                              : isGuest && !isBootcamp
-                              ? "cursor-default"
-                              : "hover:bg-muted/50 cursor-pointer"
-                          }`}
+                <AnimatePresence initial={false}>
+                  {expandedModules.has(moduleIndex) && (
+                    <motion.div
+                      key="module-content"
+                      initial="collapsed"
+                      animate="open"
+                      exit="collapsed"
+                      variants={moduleVariants}
+                      transition={{ duration: 0.35, ease: "easeInOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="border-t border-border p-4 space-y-2">
+                        <motion.ul
+                          variants={lessonListVariants}
+                          initial="collapsed"
+                          animate="open"
+                          className="space-y-2"
                         >
-                          <div className="flex items-center gap-3">
-                            {isBootcamp ? (
-                              <ChevronDown
-                                size={16}
-                                className={`text-accent transition-transform ${
-                                  expandedLessons[moduleIndex]?.has(lessonIndex) ? "rotate-180" : ""
-                                }`}
-                              />
-                            ) : isGuest ? (
-                              <div className="w-2 h-2 rounded-full bg-accent/70" />
-                            ) : isLessonLockedForStudent ? (
-                              <Lock size={16} className="text-foreground/70" />
-                            ) : (
-                              <ChevronDown
-                                size={16}
-                                className={`text-accent transition-transform ${
-                                  expandedLessons[moduleIndex]?.has(lessonIndex) ? "rotate-180" : ""
-                                }`}
-                              />
-                            )}
+                          {module.lessons.map((lesson, lessonIndex) => {
+                            const isLocked = !!lesson.locked && !isGuest && !isBootcamp
+                            const canExpandLesson = isBootcamp ? true : !isGuest && !lesson.locked
+                            const status = lessonStatus(lesson, moduleIndex, lessonIndex)
+                            const lessonKey = `${moduleIndex}-${lessonIndex}`
+                            const isActive = activeLesson === lessonKey
 
-                            <p className="font-medium text-sm text-foreground">{lesson.title}</p>
-                          </div>
-
-                          {!isGuest && (
-                            <span className="text-xs text-muted-foreground">{lesson.duration}</span>
-                          )}
-                        </button>
-
-                        {expandedLessons[moduleIndex]?.has(lessonIndex) && !lesson.locked && (
-                          <div className="pl-6">
-                            <ul className="space-y-1">
-                              {lesson.contents.map((content, contentIndex) => {
-                                const clickable = !isGuest && !isBootcamp
-                                return (
-                                  <li key={contentIndex}>
+                            return (
+                              <motion.li key={lessonIndex} variants={lessonItemVariants}>
+                                <button
+                                  onClick={() => {
+                                    if (canExpandLesson) {
+                                      toggleLesson(moduleIndex, lessonIndex)
+                                      setActiveLesson(lessonKey)
+                                    }
+                                  }}
+                                  className={`group w-full flex items-center justify-between rounded-xl border border-border px-4 py-3 text-left transition ${
+                                    isLocked
+                                      ? "opacity-60 pointer-events-none"
+                                      : "hover:bg-muted/40"
+                                  } ${
+                                    isActive
+                                      ? "bg-accent/10 border-accent/40 shadow-[0_0_24px_hsl(var(--accent)/0.25)] animate-[pulse_3s_ease-in-out_infinite]"
+                                      : ""
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3">
                                     <div
-                                      onClick={clickable ? () => handleContentClick(content) : undefined}
-                                      className={
-                                        "flex items-center gap-2 p-2 rounded-md transition-colors " +
-                                        "hover:bg-muted/40 " +
-                                        (clickable ? "cursor-pointer" : "cursor-default")
-                                      }
+                                      className={`flex h-7 w-7 items-center justify-center rounded-full border ${
+                                        status === "completed"
+                                          ? "bg-emerald-500/10 border-emerald-500/40"
+                                          : status === "in_progress"
+                                          ? "bg-accent/15 border-accent/50"
+                                          : "bg-muted/30 border-border"
+                                      }`}
                                     >
-                                      {!isBootcamp ? (
-                                        <>
-                                          {renderContentIcon(content.type)}
-                                          <span className="text-sm text-foreground">{content.title}</span>
-                                        </>
-                                      ) : (
-                                        <span className="text-sm text-foreground flex items-center gap-3">                               <div className="w-2 h-2 rounded-full bg-accent/70" />
- {content.title}</span>
+                                      {status === "completed" && <Check size={14} className="text-emerald-600" />}
+                                      {status === "in_progress" && (
+                                        <Loader2 size={14} className="text-accent animate-spin" />
                                       )}
+                                      {status === "locked" && <Lock size={14} className="text-muted-foreground" />}
                                     </div>
-                                  </li>
-                                )
-                              })}
-                            </ul>
-                          </div>
-                        )}
+                                    <div>
+                                      <p className="text-sm font-medium text-foreground">{lesson.title}</p>
+                                      <p className="text-xs text-muted-foreground">{lesson.duration}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    {!isGuest && <span>{lesson.duration}</span>}
+                                    <ChevronDown
+                                      size={14}
+                                      className={`text-accent transition-transform ${
+                                        expandedLessons[moduleIndex]?.has(lessonIndex) ? "rotate-180" : ""
+                                      }`}
+                                    />
+                                  </div>
+                                </button>
+
+                                <AnimatePresence initial={false}>
+                                  {expandedLessons[moduleIndex]?.has(lessonIndex) && !lesson.locked && (
+                                    <motion.div
+                                      key="lesson-content"
+                                      initial={{ height: 0, opacity: 0 }}
+                                      animate={{ height: "auto", opacity: 1 }}
+                                      exit={{ height: 0, opacity: 0 }}
+                                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                                      className="overflow-hidden"
+                                    >
+                                      <div className="pl-10 pt-2 pb-3 space-y-2">
+                                        {lesson.contents.length === 0 ? (
+                                          <div className="text-xs text-muted-foreground py-2">
+                                            Aucun fichier ou contenu pour cette leçon.
+                                          </div>
+                                        ) : (
+                                          <ul className="space-y-2">
+                                            {lesson.contents.map((content, contentIndex) => {
+                                              const clickable =
+                                                !isGuest &&
+                                                !isBootcamp &&
+                                                !!(content.playbackId || content.href)
+                                              const label =
+                                                content.filename ??
+                                                content.title ??
+                                                (content.href ? content.href.split("/").pop() : "Ressource")
+
+                                              return (
+                                                <li key={contentIndex}>
+                                                  <div
+                                                    onClick={clickable ? () => handleContentClick(content) : undefined}
+                                                    className={`group flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-3 py-2 transition ${
+                                                      clickable ? "cursor-pointer hover:bg-muted/40" : "cursor-default"
+                                                    }`}
+                                                  >
+                                                    <div className="flex items-center gap-3">
+                                                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted/40">
+                                                        {renderContentIcon(content.type)}
+                                                      </span>
+                                                      <div>
+                                                        <p className="text-xs font-medium text-foreground">{label}</p>
+                                                        <p className="text-[11px] text-muted-foreground">
+                                                          {content.type === "video"
+                                                            ? "Vidéo"
+                                                            : content.type === "document"
+                                                            ? "Article"
+                                                            : "Ressource"}
+                                                        </p>
+                                                      </div>
+                                                    </div>
+                                                    <button
+                                                      className={`text-[11px] uppercase tracking-[0.2em] text-accent/80 opacity-0 transition group-hover:opacity-100 ${
+                                                        clickable ? "" : "hidden"
+                                                      }`}
+                                                    >
+                                                      Ouvrir
+                                                      <ExternalLink size={12} className="inline ml-2" />
+                                                    </button>
+                                                  </div>
+                                                </li>
+                                              )
+                                            })}
+                                          </ul>
+                                        )}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </motion.li>
+                            )
+                          })}
+                        </motion.ul>
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

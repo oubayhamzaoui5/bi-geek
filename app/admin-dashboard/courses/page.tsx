@@ -55,16 +55,44 @@ export default function AdminCoursesPage() {
     "certifications",
     JSON.stringify(course.certifications ?? []),
   )
-  formData.append("modules", JSON.stringify(course.modules ?? []))
   formData.append(
     "whatYouWillLearn",
     JSON.stringify(course.whatYouWillLearn ?? []),
   )
   formData.append("tags", JSON.stringify(course.tags ?? []))
+  const modulesPayload = (course.modules ?? []).map((m: any) => ({
+    id: m.id,
+    title: m.title,
+    durationLabel: m.durationLabel,
+    order: m.order,
+    lessons: (m.lessons ?? []).map((l: any) => ({
+      id: l.id,
+      title: l.title,
+      durationLabel: l.durationLabel,
+      order: l.order,
+      attachmentsMeta: l.attachmentsMeta ?? [],
+      youtubeLinks: l.youtubeLinks ?? [],
+    })),
+  }))
 
   // cover image (File)
   if (course.coverImage instanceof File) {
     formData.append("coverImage", course.coverImage)
+  }
+  formData.set("modules", JSON.stringify(modulesPayload))
+
+  // lesson attachments (Files)
+  for (let mi = 0; mi < (course.modules ?? []).length; mi++) {
+    const module = course.modules[mi]
+    for (let li = 0; li < (module.lessons ?? []).length; li++) {
+      const lesson = module.lessons[li]
+      const files = Array.isArray(lesson.attachments)
+        ? lesson.attachments.filter((f: any) => f instanceof File)
+        : []
+      for (const file of files) {
+        formData.append(`lessonAttachments-${mi}-${li}`, file)
+      }
+    }
   }
 
   const res = await fetch("/api/admin/courses", {

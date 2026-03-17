@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { 
-  Search, Filter, Trash2, Eye, 
-  X, CheckCircle, Clock, AlertCircle,
-  Download, Mail, Phone, Calendar,
-  TrendingUp, Users, BookOpen, ChevronUp, ChevronDown
+  Search, Trash2,
+  X, CheckCircle, AlertCircle,
+  Mail, Phone, Users, BookOpen
 } from "lucide-react"
 
 // Types
@@ -33,10 +32,82 @@ type EnrollmentsCrudProps = {
   onExport?: () => void
 }
 
+// ---- UI primitives (matching CoursesCrud style) ----
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6, letterSpacing: "0.02em" }}>
+      {children}
+    </label>
+  )
+
+}
+
+function Input({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      style={{ width: "100%", padding: "10px 14px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, color: "#0f172a", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+      onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; e.target.style.background = "#fff" }}
+      onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none"; e.target.style.background = "#f8fafc" }}
+    />
+  )
+}
+
+function SelectField({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
+  return (
+    <div style={{ position: "relative" }}>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        style={{ width: "100%", padding: "10px 36px 10px 14px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, color: "#0f172a", outline: "none", appearance: "none", cursor: "pointer", fontFamily: "inherit" }}
+        onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)" }}
+        onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none" }}
+      >
+        {children}
+      </select>
+      <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%) rotate(90deg)", width: 14, height: 14, color: "#94a3b8", pointerEvents: "none" }}>&gt;</div>
+    </div>
+  )
+}
+
+function IconBtn({ onClick, title, color = "#64748b", hoverBg = "#f1f5f9", children }: {
+  onClick: (e: React.MouseEvent) => void; title?: string; color?: string; hoverBg?: string; children: React.ReactNode
+}) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ padding: 7, borderRadius: 8, border: "none", background: hover ? hoverBg : "transparent", color, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function FormCard({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #e8ecf3", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+      <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 8, background: "linear-gradient(180deg,#fafbfd 0%,#fff 100%)" }}>
+        <div style={{ width: 30, height: 30, borderRadius: 9, background: "linear-gradient(135deg,rgba(99,102,241,0.12),rgba(129,140,248,0.06))", color: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {icon}
+        </div>
+        <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h3>
+      </div>
+      <div style={{ padding: 20 }}>{children}</div>
+    </div>
+  )
+}
+
 const STATUS_OPTIONS: { value: EnrollmentStatus; label: string; color: string; bgColor: string }[] = [
-  { value: "pending", label: "En attente", color: "text-yellow-700", bgColor: "bg-yellow-100" },
-  { value: "contacted", label: "Contacté", color: "text-blue-700", bgColor: "bg-blue-100" },
-  { value: "confirmed", label: "Confirmé", color: "text-green-700", bgColor: "bg-green-100" },
+  { value: "pending", label: "En attente", color: "#b45309", bgColor: "rgba(251,191,36,0.2)" },
+  { value: "contacted", label: "Contacté", color: "#2563eb", bgColor: "rgba(59,130,246,0.15)" },
+  { value: "confirmed", label: "Confirmé", color: "#16a34a", bgColor: "rgba(34,197,94,0.15)" },
 ]
 
 export default function EnrollmentsCrud({
@@ -166,7 +237,7 @@ export default function EnrollmentsCrud({
   const getStatusBadge = (status: EnrollmentStatus) => {
     const statusOption = STATUS_OPTIONS.find(s => s.value === status)
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusOption?.bgColor} ${statusOption?.color}`}>
+      <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 8px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: statusOption?.bgColor ?? "#f1f5f9", color: statusOption?.color ?? "#475569" }}>
         {statusOption?.label}
       </span>
     )
@@ -236,103 +307,44 @@ function StatCard({ title, value, icon, gradient, accent }: StatCardProps) {
 
 
   return (
-    <div className="h-screen px-6 py-4 overflow-hidden flex flex-col gap-6">
+    <div style={{ height: "100vh", display: "flex", background: "#f0f2f8", fontFamily: "'DM Sans','Inter',sans-serif", overflow: "hidden" }}>
 
-     
+      {/* Left panel */}
+      <div style={{ width: 420, minWidth: 420, background: "#fff", borderRight: "1px solid #e8ecf3", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "24px 22px 16px", borderBottom: "1px solid #f1f5f9" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8", marginBottom: 2 }}>Gestion</p>
+              <h1 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", margin: 0 }}>Inscriptions</h1>
+            </div>
+            <div style={{ background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", borderRadius: 12, padding: "6px 16px", fontSize: 22, fontWeight: 800 }}>{totalEnrollments}</div>
+          </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-  <StatCard
-    title="Total inscriptions"
-    value={totalEnrollments}
-    icon={<Users className="w-6 h-6 text-blue-600" />}
-    gradient="from-blue-50 to-blue-100"
-    accent="bg-blue-500"
-  />
-
-  <StatCard
-    title="En attente"
-    value={statusCounts.pending}
-    icon={<Clock className="w-6 h-6 text-yellow-600" />}
-    gradient="from-yellow-50 to-yellow-100"
-    accent="bg-yellow-500"
-  />
-
-  <StatCard
-    title="Confirmés"
-    value={statusCounts.confirmed}
-    icon={<CheckCircle className="w-6 h-6 text-green-600" />}
-    gradient="from-green-50 to-green-100"
-    accent="bg-green-500"
-  />
-
-  <StatCard
-    title="Taux de conversion"
-    value={`${conversionRate}%`}
-    icon={<TrendingUp className="w-6 h-6 text-purple-600" />}
-    gradient="from-purple-50 to-purple-100"
-    accent="bg-purple-500"
-  />
-</div>
-
-
-      {/* Error Message */}
-      {error && (
-        <div className={`p-4 rounded-xl ${
-          error.includes("succès") 
-            ? "bg-green-50 border border-green-200 text-green-700" 
-            : "bg-red-50 border border-red-200 text-red-700"
-        }`}>
-          {error}
-        </div>
-      )}
-
-      {/* Main Content - Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
-        {/* Left Column - Filters & List */}
-        <div className="lg:col-span-2 space-y-6 h-full flex flex-col overflow-hidden">
-          {/* Search & Filters */}
-          <div className="bg-white p-4 rounded-xl border shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Rechercher une inscription..."
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent transition-all"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <select
-                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value as EnrollmentStatus | "all")}
-                >
-                  <option value="all">Tous les statuts</option>
-                  {STATUS_OPTIONS.map(status => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-                <button className="p-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                  <Filter className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ position: "relative" }}>
+              <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 15, height: 15, color: "#94a3b8" }} />
+              <input
+                type="text"
+                placeholder="Rechercher une inscription..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                style={{ width: "100%", padding: "9px 12px 9px 36px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit" }}
+                onFocus={e => { e.currentTarget.style.borderColor = "var(--accent,#6366f1)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.1)" }}
+                onBlur={e => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.boxShadow = "none" }}
+              />
             </div>
 
-            {/* Status Filters */}
-            <div className="flex flex-wrap gap-2 mt-4">
+            <SelectField value={selectedStatus} onChange={v => setSelectedStatus(v as EnrollmentStatus | "all")}> 
+              <option value="all">Tous les statuts</option>
+              {STATUS_OPTIONS.map(status => (
+                <option key={status.value} value={status.value}>{status.label}</option>
+              ))}
+            </SelectField>
+
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               <button
                 onClick={() => setSelectedStatus("all")}
-                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                  selectedStatus === "all"
-                    ? "bg-accent/20 text-accent"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                style={{ padding: "5px 10px", borderRadius: 999, border: "1px solid #e2e8f0", background: selectedStatus === "all" ? "rgba(99,102,241,0.12)" : "#f8fafc", color: selectedStatus === "all" ? "var(--accent,#6366f1)" : "#475569", fontSize: 11, cursor: "pointer" }}
               >
                 Tous ({enrollments.length})
               </button>
@@ -340,245 +352,190 @@ function StatCard({ title, value, icon, gradient, accent }: StatCardProps) {
                 <button
                   key={status.value}
                   onClick={() => setSelectedStatus(status.value)}
-                  className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                    selectedStatus === status.value
-                      ? `${status.bgColor} ${status.color}`
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
+                  style={{ padding: "5px 10px", borderRadius: 999, border: "1px solid #e2e8f0", background: selectedStatus === status.value ? status.bgColor : "#f8fafc", color: selectedStatus === status.value ? status.color : "#475569", fontSize: 11, cursor: "pointer" }}
                 >
                   {status.label} ({statusCounts[status.value]})
                 </button>
               ))}
             </div>
           </div>
+        </div>
 
-          {/* Enrollments List */}
-          <div className="bg-white rounded-xl border shadow-sm flex-1 flex flex-col min-h-0">
-  <div className="overflow-y-auto flex-1 min-h-0">
-
-              <div className="divide-y divide-gray-100">
-                {filteredEnrollments.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <Users className="w-12 h-12 text-gray-300 mx-auto" />
-                    <p className="text-gray-600 mt-2">Aucune inscription trouvée</p>
-                  </div>
-                ) : (
-                  filteredEnrollments.map((enrollment) => (
-                    <div 
-                      key={enrollment.id} 
-                      className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
-                        selectedEnrollment?.id === enrollment.id ? "bg-accent/10" : ""
-                      }`}
-                      onClick={() => setSelectedEnrollment(enrollment)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="font-medium text-gray-900 truncate">
-                              {enrollment.firstName} {enrollment.lastName}
-                            </h4>
-                            {getStatusBadge(enrollment.status)}
-                          </div>
-                          <p className="text-sm text-gray-500 truncate mb-2">
-                            {enrollment.courseTitle || enrollment.bootcampTitle || "Non spécifié"}
-                          </p>
-                          <div className="flex items-center gap-4 text-xs text-gray-500">
-                            <div className="flex items-center gap-1">
-                              <Mail className="w-3 h-3" />
-                              <span className="truncate">{enrollment.email}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Phone className="w-3 h-3" />
-                              <span>{enrollment.phone}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              <span>{formatDate(enrollment.created)}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 ml-2">
-                          <select
-                            value={enrollment.status}
-                            onChange={(e) => handleUpdateStatus(enrollment.id, e.target.value as EnrollmentStatus)}
-                            className="text-xs border rounded px-2 py-1 focus:ring-2 focus:ring-accent focus:border-accent cursor-pointer"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {STATUS_OPTIONS.map(status => (
-                              <option key={status.value} value={status.value}>
-                                {status.label}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteEnrollment(enrollment.id)
-                            }}
-                            className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </button>
-                        </div>
-                      </div>
-                    
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ background: "#f8fafc", border: "1px solid #e8ecf3", borderRadius: 12, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>En attente</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>{statusCounts.pending}</div>
+          </div>
+          <div style={{ background: "#f8fafc", border: "1px solid #e8ecf3", borderRadius: 12, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Confirmes</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>{statusCounts.confirmed}</div>
           </div>
         </div>
 
-        {/* Right Column - Details Panel */}
-        <div className="lg:col-span-1 flex flex-col min-h-0">
-          {selectedEnrollment ? (
-            <div className="bg-white rounded-xl border shadow-sm h-full flex flex-col min-h-0">
-              {/* Details Header */}
-              <div className="p-6 border-b">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900">Détails de l'inscription</h2>
-                    <p className="text-gray-600 mt-1">Informations complètes</p>
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px 8px" }}>
+          {filteredEnrollments.length === 0 ? (
+            <div style={{ padding: "48px 24px", textAlign: "center" }}>
+              <Users style={{ width: 40, height: 40, color: "#cbd5e1", margin: "0 auto 12px" }} />
+              <p style={{ fontSize: 13, color: "#94a3b8" }}>Aucune inscription trouvee</p>
+            </div>
+          ) : filteredEnrollments.map(enrollment => {
+            const isActive = selectedEnrollment?.id === enrollment.id
+            return (
+              <div
+                key={enrollment.id}
+                onClick={() => setSelectedEnrollment(enrollment)}
+                style={{ padding: "13px 14px", borderRadius: 12, cursor: "pointer", marginBottom: 4, background: isActive ? "linear-gradient(135deg,rgba(99,102,241,0.08),rgba(129,140,248,0.05))" : "transparent", border: isActive ? "1.5px solid rgba(99,102,241,0.2)" : "1.5px solid transparent", transition: "all 0.15s", position: "relative" }}
+                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = "#f8fafc" }}
+                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = "transparent" }}
+              >
+                {isActive && <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 28, background: "var(--accent,#6366f1)", borderRadius: "0 3px 3px 0" }} />}
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: isActive ? "var(--accent,#6366f1)" : "#0f172a", margin: "0 0 3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {enrollment.firstName} {enrollment.lastName}
+                    </p>
+                    <p style={{ fontSize: 12, color: "#94a3b8", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{enrollment.courseTitle || enrollment.bootcampTitle || "Non specifie"}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7 }}>
+                      {getStatusBadge(enrollment.status)}
+                      <span style={{ fontSize: 11, color: "#64748b" }}>{formatDate(enrollment.created)}</span>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => setSelectedEnrollment(null)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <X className="w-5 h-5 text-gray-600" />
-                  </button>
+                  <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                    <IconBtn onClick={e => { e.stopPropagation(); handleDeleteEnrollment(enrollment.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)"><Trash2 style={{ width: 13, height: 13 }} /></IconBtn>
+                  </div>
                 </div>
               </div>
+            )
+          })}
+        </div>
+      </div>
 
-              {/* Details Content */}
-              <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-                {/* Personal Info */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Informations personnelles</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Nom complet</span>
-                      <span className="text-sm text-gray-900">
-                        {selectedEnrollment.firstName} {selectedEnrollment.lastName}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Date de naissance</span>
-                      <span className="text-sm text-gray-900">{selectedEnrollment.birthDate.split(" ")[0]}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Connaissance</span>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        selectedEnrollment.hasExperience 
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {selectedEnrollment.hasExperience ? "Oui" : "Non"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+      {/* Right panel */}
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        {selectedEnrollment ? (
+          <>
+            <div style={{ background: "#fff", borderBottom: "1px solid #e8ecf3", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8", margin: 0 }}>Details</p>
+                <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>Inscription</h2>
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => setSelectedEnrollment(null)}
+                  style={{ padding: "8px 16px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 13, fontWeight: 600, color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s" }}
+                >
+                  <X style={{ width: 14, height: 14 }} /> Fermer
+                </button>
+                <button onClick={() => handleDeleteEnrollment(selectedEnrollment.id)}
+                  style={{ padding: "8px 16px", borderRadius: 10, border: "1.5px solid #fecdd3", background: "#fff1f2", fontSize: 13, fontWeight: 600, color: "#e11d48", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <Trash2 style={{ width: 14, height: 14 }} /> Supprimer
+                </button>
+              </div>
+            </div>
 
-                {/* Contact Info */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Coordonnées</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <Mail className="w-5 h-5 text-gray-400" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Email</p>
-                        <p className="text-sm text-gray-900">{selectedEnrollment.email}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Phone className="w-5 h-5 text-gray-400" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Téléphone</p>
-                        <p className="text-sm text-gray-900">{selectedEnrollment.phone}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "28px" }}>
+              <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: 28 }}>
 
-                {/* Program Info */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Programme</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <BookOpen className="w-5 h-5 text-accent" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">
-                          {selectedEnrollment.courseTitle ? "Cours" : "Bootcamp"}
-                        </p>
-                        <p className="text-sm text-gray-900">
-                          {selectedEnrollment.courseTitle || selectedEnrollment.bootcampTitle}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Calendar className="w-5 h-5 text-gray-400" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Date d'inscription</p>
-                        <p className="text-sm text-gray-900">{formatDate(selectedEnrollment.created)}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Status */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Statut</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="mb-2">{getStatusBadge(selectedEnrollment.status)}</div>
-                      <select
-                        value={selectedEnrollment.status}
-                        onChange={(e) => handleUpdateStatus(selectedEnrollment.id, e.target.value as EnrollmentStatus)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent cursor-pointer"
-                      >
-                        {STATUS_OPTIONS.map(status => (
-                          <option key={status.value} value={status.value}>
-                            {status.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Notes */}
-                {selectedEnrollment.note && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Notes</h3>
-                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <p className="text-sm text-gray-700">{selectedEnrollment.note}</p>
+                {error && (
+                  <div style={{ padding: "12px 14px", borderRadius: 12, background: "#fff1f2", border: "1px solid #fecdd3", color: "#9f1239", fontSize: 13, fontWeight: 600 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <AlertCircle style={{ width: 16, height: 16 }} />
+                      <span>{error}</span>
                     </div>
                   </div>
                 )}
 
-                {/* Actions */}
-                <div className="pt-4 border-t">
-                  <button
-                    onClick={() => handleDeleteEnrollment(selectedEnrollment.id)}
-                    className="w-full px-4 py-2.5 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
-                  >
-                    Supprimer
-                  </button>
-                </div>
+                <FormCard title="Informations personnelles" icon={<Users style={{ width: 16, height: 16 }} />}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div style={{ background: "#f8fafc", borderRadius: 12, padding: "10px 12px", border: "1px solid #e8ecf3" }}>
+                      <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Nom complet</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>{selectedEnrollment.firstName} {selectedEnrollment.lastName}</div>
+                    </div>
+                    <div style={{ background: "#f8fafc", borderRadius: 12, padding: "10px 12px", border: "1px solid #e8ecf3" }}>
+                      <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Date de naissance</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>{selectedEnrollment.birthDate.split(" ")[0]}</div>
+                    </div>
+                    <div style={{ background: "#f8fafc", borderRadius: 12, padding: "10px 12px", border: "1px solid #e8ecf3" }}>
+                      <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Experience</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: selectedEnrollment.hasExperience ? "#16a34a" : "#b45309", marginTop: 4 }}>{selectedEnrollment.hasExperience ? "Oui" : "Non"}</div>
+                    </div>
+                  </div>
+                </FormCard>
+
+                <FormCard title="Coordonnees" icon={<Mail style={{ width: 16, height: 16 }} />}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <Mail style={{ width: 16, height: 16, color: "#94a3b8" }} />
+                      <div>
+                        <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Email</div>
+                        <div style={{ fontSize: 13, color: "#0f172a" }}>{selectedEnrollment.email}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <Phone style={{ width: 16, height: 16, color: "#94a3b8" }} />
+                      <div>
+                        <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Telephone</div>
+                        <div style={{ fontSize: 13, color: "#0f172a" }}>{selectedEnrollment.phone}</div>
+                      </div>
+                    </div>
+                  </div>
+                </FormCard>
+
+                <FormCard title="Programme" icon={<BookOpen style={{ width: 16, height: 16 }} />}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div style={{ background: "#f8fafc", borderRadius: 12, padding: "10px 12px", border: "1px solid #e8ecf3" }}>
+                      <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>{selectedEnrollment.courseTitle ? "Formation" : "Bootcamp"}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>{selectedEnrollment.courseTitle || selectedEnrollment.bootcampTitle}</div>
+                    </div>
+                    <div style={{ background: "#f8fafc", borderRadius: 12, padding: "10px 12px", border: "1px solid #e8ecf3" }}>
+                      <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Date d'inscription</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>{formatDate(selectedEnrollment.created)}</div>
+                    </div>
+                  </div>
+                </FormCard>
+
+                <FormCard title="Statut" icon={<CheckCircle style={{ width: 16, height: 16 }} />}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div>{getStatusBadge(selectedEnrollment.status)}</div>
+                    <SelectField value={selectedEnrollment.status} onChange={v => handleUpdateStatus(selectedEnrollment.id, v as EnrollmentStatus)}>
+                      {STATUS_OPTIONS.map(status => (
+                        <option key={status.value} value={status.value}>{status.label}</option>
+                      ))}
+                    </SelectField>
+                  </div>
+                </FormCard>
+
+                {selectedEnrollment.note && (
+                  <FormCard title="Notes" icon={<AlertCircle style={{ width: 16, height: 16 }} />}>
+                    <div style={{ padding: "12px", borderRadius: 10, background: "#fff7ed", border: "1px solid #fed7aa", fontSize: 13, color: "#9a3412" }}>
+                      {selectedEnrollment.note}
+                    </div>
+                  </FormCard>
+                )}
               </div>
             </div>
-          ) : (
-            <div className="bg-accent/10 p-8 rounded-xl border border-blue-100 text-center h-full flex flex-col justify-center">
-              <Users className="w-16 h-16 text-accent mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucune inscription sélectionnée</h3>
-              <p className="text-gray-600">
-                Sélectionnez une inscription dans la liste pour voir les détails.
-              </p>
+          </>
+        ) : (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+            <div style={{ width: 80, height: 80, borderRadius: 24, background: "linear-gradient(135deg,rgba(99,102,241,0.12),rgba(129,140,248,0.06))", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Users style={{ width: 36, height: 36, color: "var(--accent,#6366f1)" }} />
             </div>
-          )}
-        </div>
+            <div style={{ textAlign: "center" }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", margin: "0 0 6px" }}>Aucune inscription selectionnee</h3>
+              <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>Choisissez une inscription dans la liste pour voir les details.</p>
+            </div>
+          </div>
+        )}
       </div>
+
+      <style>{`
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        ::-webkit-scrollbar{width:5px;height:5px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:99px}
+        ::-webkit-scrollbar-thumb:hover{background:#cbd5e1}
+      `}</style>
     </div>
   )
+
 }

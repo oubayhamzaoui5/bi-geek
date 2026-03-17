@@ -2,22 +2,26 @@
 
 import { useState, useEffect } from "react"
 import { 
-  Search, Filter, Plus, Edit, Trash2, Eye, 
-  Save, X, User, Upload, Camera,
-  Shield, Mail, Phone, Key, AlertCircle,
-  CheckCircle, XCircle, UserCheck, UserX
+  Search, Plus, Edit, Trash2, Eye, 
+  Save, X, User, Camera,
+  Mail, Phone, Key, AlertCircle, Copy,
+  UserCheck, UserX
 } from "lucide-react"
 
 // Types
-type AdminUser = {
+export type AdminUser = {
   id?: string
   avatar: string | null
   username: string
+  name?: string
+  surname?: string
   email: string
   phone: string
-  role: "admin" | "user" | "instructor"
+  role: "admin" | "student" | "instructor"
   verified: boolean
+  usePassword?: boolean
   password?: string // Note: In real app, never handle passwords directly like this
+  plainPassword?: string | null
 }
 
 type UsersCrudProps = {
@@ -25,6 +29,109 @@ type UsersCrudProps = {
   onSave?: (user: AdminUser, avatarFile?: File) => Promise<void>
   onDelete?: (id: string) => Promise<void>
   onView?: (id: string) => void
+}
+
+// ---- UI primitives (matching CoursesCrud style) ----
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6, letterSpacing: "0.02em" }}>
+      {children}{required && <span style={{ color: "#f43f5e", marginLeft: 3 }}>*</span>}
+    </label>
+  )
+
+}
+
+function Input({ value, onChange, placeholder, type = "text", readOnly, disabled, style }: {
+  value: string | number; onChange?: (v: string) => void; placeholder?: string; type?: string; readOnly?: boolean; disabled?: boolean; style?: React.CSSProperties
+}) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={e => onChange?.(e.target.value)}
+      placeholder={placeholder}
+      readOnly={readOnly}
+      disabled={disabled}
+      style={{
+        width: "100%",
+        padding: "10px 14px",
+        background: readOnly || disabled ? "#f1f5f9" : "#f8fafc",
+        border: "1.5px solid #e2e8f0",
+        borderRadius: 10,
+        fontSize: 14,
+        color: readOnly || disabled ? "#64748b" : "#0f172a",
+        outline: "none",
+        boxSizing: "border-box",
+        fontFamily: "inherit",
+        ...style
+      }}
+      onFocus={e => {
+        if (readOnly || disabled) return
+        e.target.style.borderColor = "var(--accent,#6366f1)"
+        e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"
+        e.target.style.background = "#fff"
+      }}
+      onBlur={e => {
+        e.target.style.borderColor = "#e2e8f0"
+        e.target.style.boxShadow = "none"
+        e.target.style.background = readOnly || disabled ? "#f1f5f9" : "#f8fafc"
+      }}
+    />
+  )
+}
+
+function SelectField({ value, onChange, children, disabled }: { value: string; onChange: (v: string) => void; children: React.ReactNode; disabled?: boolean }) {
+  return (
+    <div style={{ position: "relative" }}>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        disabled={disabled}
+        style={{ width: "100%", padding: "10px 36px 10px 14px", background: disabled ? "#f1f5f9" : "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, color: disabled ? "#94a3b8" : "#0f172a", outline: "none", appearance: "none", cursor: disabled ? "not-allowed" : "pointer", fontFamily: "inherit" }}
+        onFocus={e => { if (!disabled) { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)" } }}
+        onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none" }}
+      >
+        {children}
+      </select>
+      <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%) rotate(90deg)", width: 14, height: 14, color: "#94a3b8", pointerEvents: "none" }}>
+        &gt;
+      </div>
+    </div>
+  )
+}
+
+function IconBtn({ onClick, title, color = "#64748b", hoverBg = "#f1f5f9", children }: {
+  onClick: (e: React.MouseEvent) => void; title?: string; color?: string; hoverBg?: string; children: React.ReactNode
+}) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ padding: 7, borderRadius: 8, border: "none", background: hover ? hoverBg : "transparent", color, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function FormCard({ title, icon, children, action }: { title: string; icon?: React.ReactNode; children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #e8ecf3", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+      <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(180deg,#fafbfd 0%,#fff 100%)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 9, background: "linear-gradient(135deg,rgba(99,102,241,0.12),rgba(129,140,248,0.06))", color: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {icon}
+          </div>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h3>
+        </div>
+        {action}
+      </div>
+      <div style={{ padding: 20 }}>{children}</div>
+    </div>
+  )
 }
 
 export default function UsersCrud({
@@ -42,13 +149,32 @@ export default function UsersCrud({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
+  const [generatedPassword, setGeneratedPassword] = useState("")
+  const [passwordCopied, setPasswordCopied] = useState(false)
 
- // Update users whenever initialUsers changes
-useEffect(() => {
-  setUsers(initialUsers)
-}, [initialUsers])
+  const normalizeUser = (user: AdminUser): AdminUser => {
+    const fallback = user as AdminUser & { firstName?: string; lastName?: string }
+    return {
+      ...user,
+      name: user.name ?? fallback.firstName ?? "",
+      surname: user.surname ?? fallback.lastName ?? "",
+      phone: user.phone ?? "",
+      username: user.username ?? "",
+      plainPassword: user.plainPassword ?? null,
+      usePassword: user.usePassword ?? false,
+      verified: typeof user.verified === "boolean" ? user.verified : true
+    }
+  }
+
+  const getDisplayName = (user: AdminUser) => {
+    const fullName = [user.name, user.surname].filter(Boolean).join(" ").trim()
+    return fullName || user.username || user.email
+  }
+
+  // Update users whenever initialUsers changes
+  useEffect(() => {
+    setUsers(initialUsers.map(normalizeUser))
+  }, [initialUsers])
 
   // Handle avatar preview
   useEffect(() => {
@@ -66,11 +192,15 @@ useEffect(() => {
   // Create blank user
   const createBlankUser = (): AdminUser => ({
     avatar: null,
+    name: "",
+    surname: "",
     username: "",
     email: "",
     phone: "",
-    role: "user",
-    verified: false
+    role: "student",
+    verified: true,
+    usePassword: false,
+    plainPassword: null
   })
 
   // Filter users
@@ -78,6 +208,8 @@ useEffect(() => {
     const searchLower = searchTerm.toLowerCase()
     return (
       user.username.toLowerCase().includes(searchLower) ||
+      (user.name || "").toLowerCase().includes(searchLower) ||
+      (user.surname || "").toLowerCase().includes(searchLower) ||
       user.email.toLowerCase().includes(searchLower) ||
       user.phone.toLowerCase().includes(searchLower) ||
       user.role.toLowerCase().includes(searchLower)
@@ -89,17 +221,17 @@ useEffect(() => {
     total: users.length,
     admin: users.filter(u => u.role === "admin").length,
     instructor: users.filter(u => u.role === "instructor").length,
-    regular: users.filter(u => u.role === "user").length,
+    student: users.filter(u => u.role === "student").length,
     verified: users.filter(u => u.verified).length
   }
 
   // User handlers
   const handleSelectUser = (user: AdminUser) => {
-    setEditingUser({ ...user })
+    setEditingUser(normalizeUser(user))
     setAvatarFile(null)
     setAvatarPreview(user.avatar || null)
-    setPassword("")
-    setConfirmPassword("")
+    setGeneratedPassword("")
+    setPasswordCopied(false)
     setIsCreating(false)
   }
 
@@ -107,8 +239,8 @@ useEffect(() => {
     setEditingUser(createBlankUser())
     setAvatarFile(null)
     setAvatarPreview(null)
-    setPassword("")
-    setConfirmPassword("")
+    setGeneratedPassword("")
+    setPasswordCopied(false)
     setIsCreating(true)
   }
 
@@ -116,18 +248,91 @@ useEffect(() => {
     setEditingUser(null)
     setAvatarFile(null)
     setAvatarPreview(null)
-    setPassword("")
-    setConfirmPassword("")
+    setGeneratedPassword("")
+    setPasswordCopied(false)
     setIsCreating(false)
     setError(null)
   }
+
+  const generatePassword = (length = 12) => {
+    const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+    const lower = "abcdefghijkmnopqrstuvwxyz"
+    const nums = "23456789"
+    const symbols = "!@#$%*?"
+    const all = upper + lower + nums + symbols
+
+    const pick = (chars: string) => chars[Math.floor(Math.random() * chars.length)]
+    let pwd = pick(upper) + pick(lower) + pick(nums) + pick(symbols)
+
+    for (let i = pwd.length; i < length; i++) {
+      pwd += all[Math.floor(Math.random() * all.length)]
+    }
+
+    return pwd.split("").sort(() => Math.random() - 0.5).join("")
+  }
+
+  const generateUniqueUsername = (
+    name: string,
+    surname: string,
+    email: string,
+    currentId?: string
+  ) => {
+    const base = [name, surname].filter(Boolean).join("_")
+    const sanitized = base
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+
+    let baseUsername = sanitized
+    if (!baseUsername && email.includes("@")) baseUsername = email.split("@")[0].toLowerCase()
+    if (!baseUsername) baseUsername = `user${Date.now()}`
+
+    const existing = new Set(
+      users
+        .filter(u => u.id !== currentId)
+        .map(u => (u.username || "").toLowerCase())
+        .filter(Boolean)
+    )
+
+    if (!existing.has(baseUsername)) return baseUsername
+
+    let counter = 2
+    let candidate = `${baseUsername}_${counter}`
+    while (existing.has(candidate)) {
+      counter += 1
+      candidate = `${baseUsername}_${counter}`
+    }
+    return candidate
+  }
+
+  const handleCopyPassword = async () => {
+    const currentPassword = isCreating
+      ? (editingUser?.usePassword ? (editingUser?.plainPassword ?? "") : generatedPassword)
+      : (editingUser?.plainPassword ?? "")
+    if (!currentPassword) return
+    try {
+      await navigator.clipboard.writeText(currentPassword)
+      setPasswordCopied(true)
+      setTimeout(() => setPasswordCopied(false), 2000)
+    } catch {
+      setError("Impossible de copier le mot de passe")
+    }
+  }
+
+  useEffect(() => {
+    if (!isCreating || !editingUser) return
+    if (!editingUser.usePassword && editingUser.email.trim() && !generatedPassword) {
+      setGeneratedPassword(generatePassword())
+      setPasswordCopied(false)
+    }
+  }, [editingUser?.email, editingUser?.usePassword, isCreating, generatedPassword])
 
   const handleSaveUser = async () => {
     if (!editingUser) return
     
     // Validation
-    if (!editingUser.username.trim()) {
-      setError("Le nom d'utilisateur est obligatoire")
+    if (!editingUser.name?.trim() || !editingUser.surname?.trim()) {
+      setError("Le prÃ©nom et le nom sont obligatoires")
       return
     }
 
@@ -136,13 +341,18 @@ useEffect(() => {
       return
     }
 
-    if (isCreating && !password) {
-      setError("Le mot de passe est obligatoire pour un nouvel utilisateur")
+    if (!editingUser.phone.trim()) {
+      setError("Le tÃ©lÃ©phone est obligatoire")
       return
     }
 
-    if (isCreating && password !== confirmPassword) {
-      setError("Les mots de passe ne correspondent pas")
+    if (editingUser.usePassword && !(editingUser.plainPassword || "").trim()) {
+      setError("Le mot de passe en clair est obligatoire")
+      return
+    }
+
+    if (isCreating && !editingUser.usePassword && !generatedPassword) {
+      setError("Le mot de passe est obligatoire pour un nouvel utilisateur")
       return
     }
 
@@ -155,9 +365,31 @@ useEffect(() => {
     setError(null)
 
     try {
+      const username = generateUniqueUsername(
+        editingUser.name || "",
+        editingUser.surname || "",
+        editingUser.email || "",
+        editingUser.id
+      )
+
+      const finalPassword = editingUser.usePassword
+        ? (editingUser.plainPassword || "")
+        : (generatedPassword || "")
+
       const userToSave = {
         ...editingUser,
-        ...(isCreating && password ? { password } : {})
+        username,
+        ...(isCreating
+          ? {
+              password: finalPassword,
+              plainPassword: finalPassword
+            }
+          : editingUser.usePassword && finalPassword
+          ? {
+              password: finalPassword,
+              plainPassword: finalPassword
+            }
+          : {})
       }
 
       if (onSave) {
@@ -168,16 +400,18 @@ useEffect(() => {
       if (editingUser.id) {
         // Update existing
         const updatedUser = avatarPreview 
-          ? { ...editingUser, avatar: avatarPreview }
-          : editingUser
+          ? { ...editingUser, avatar: avatarPreview, username }
+          : { ...editingUser, username }
         
         setUsers(prev => prev.map(u => 
           u.id === editingUser.id ? updatedUser : u
         ))
+        setEditingUser(updatedUser)
       } else {
         // Add new with generated ID
         const newUser = {
           ...editingUser,
+          username,
           id: `user_${Date.now()}`,
           avatar: avatarPreview
         }
@@ -196,6 +430,59 @@ useEffect(() => {
     }
   }
 
+  const handleResetPassword = async () => {
+    if (!editingUser?.id) return
+    const plain = (editingUser.plainPassword || "").trim()
+    if (!plain) {
+      setError("Aucun mot de passe en clair disponible pour la rÃ©initialisation")
+      return
+    }
+
+    if (!confirm("RÃ©initialiser le mot de passe de cet utilisateur ?")) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const username = generateUniqueUsername(
+        editingUser.name || "",
+        editingUser.surname || "",
+        editingUser.email || "",
+        editingUser.id
+      )
+
+      const userToSave = {
+        ...editingUser,
+        username,
+        usePassword: false,
+        password: plain,
+        plainPassword: plain
+      }
+
+      if (onSave) {
+        await onSave(userToSave, avatarFile || undefined)
+      }
+
+      const updatedUser = {
+        ...editingUser,
+        username,
+        usePassword: false
+      }
+
+      setUsers(prev => prev.map(u => 
+        u.id === editingUser.id ? updatedUser : u
+      ))
+      setEditingUser(updatedUser)
+
+      setError("Mot de passe rÃ©initialisÃ© avec succÃ¨s!")
+      setTimeout(() => setError(null), 3000)
+    } catch (err: any) {
+      setError(err.message || "Erreur lors de la rÃ©initialisation du mot de passe")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleDeleteUser = async (id: string) => {
     const user = users.find(u => u.id === id)
     if (!user) return
@@ -205,7 +492,7 @@ useEffect(() => {
       return
     }
 
-    if (!confirm(`Supprimer l'utilisateur ${user.username} ? Cette action est irréversible.`)) return
+    if (!confirm(`Supprimer l'utilisateur ${getDisplayName(user)} ? Cette action est irréversible.`)) return
     
     try {
       if (onDelete) {
@@ -233,342 +520,210 @@ useEffect(() => {
   }
 
   return (
-    <div className="h-screen px-6 py-4 overflow-hidden flex flex-col">
-      {/* Error/Success Message */}
-      {error && (
-        <div className={`mb-4 p-4 rounded-xl ${
-          error.includes("succès") 
-            ? "bg-green-50 border border-green-200 text-green-700" 
-            : "bg-red-50 border border-red-200 text-red-700"
-        }`}>
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5" />
-            <span>{error}</span>
-          </div>
-          {error.includes("instructeur") && (
-            <p className="mt-2 text-sm">
-              Les instructeurs doivent être gérés depuis la page dédiée "Instructeurs".
-            </p>
-          )}
-        </div>
-      )}
+    <div style={{ height: "100vh", display: "flex", background: "#f0f2f8", fontFamily: "'DM Sans','Inter',sans-serif", overflow: "hidden" }}>
 
-      {/* Main Content - Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
-        {/* Left Column - Users List */}
-        <div className="lg:col-span-1 h-full flex flex-col overflow-hidden">
-          {/* Users Overview */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            {/* Total Users */}
-            <div className="bg-white border rounded-xl p-5 shadow-sm flex flex-col justify-between">
+      {/* Left panel */}
+      <div style={{ width: 420, minWidth: 420, background: "#fff", borderRight: "1px solid #e8ecf3", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "24px 22px 16px", borderBottom: "1px solid #f1f5f9" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8", marginBottom: 2 }}>Gestion</p>
+              <h1 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", margin: 0 }}>Utilisateurs</h1>
+            </div>
+            <div style={{ background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", borderRadius: 12, padding: "6px 16px", fontSize: 22, fontWeight: 800 }}>{userStats.total}</div>
+          </div>
+          <div style={{ position: "relative" }}>
+            <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 15, height: 15, color: "#94a3b8" }} />
+            <input
+              type="text"
+              placeholder="Rechercher un utilisateur..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{ width: "100%", padding: "9px 12px 9px 36px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit" }}
+              onFocus={e => { e.currentTarget.style.borderColor = "var(--accent,#6366f1)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.1)" }}
+              onBlur={e => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.boxShadow = "none" }}
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
+            {[
+              { label: "Admins", value: "admin" },
+              { label: "Instructeurs", value: "instructor" },
+              { label: "Etudiants", value: "student" },
+              { label: "Tous", value: "" }
+            ].map(btn => (
+              <button
+                key={btn.label}
+                onClick={() => setSearchTerm(btn.value)}
+                style={{ padding: "5px 10px", borderRadius: 999, border: "1px solid #e2e8f0", background: btn.value ? "#f8fafc" : "#fff", color: "#475569", fontSize: 11, cursor: "pointer" }}
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9" }}>
+          <button
+            onClick={handleNewUser}
+            style={{ width: "100%", padding: "10px 16px", background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 14px rgba(99,102,241,0.3)", transition: "opacity 0.15s,transform 0.15s" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.9"; (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)" }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; (e.currentTarget as HTMLButtonElement).style.transform = "none" }}
+          >
+            <Plus style={{ width: 15, height: 15 }} /> Nouvel utilisateur
+          </button>
+        </div>
+
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ background: "#f8fafc", border: "1px solid #e8ecf3", borderRadius: 12, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Admins</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>{userStats.admin}</div>
+          </div>
+          <div style={{ background: "#f8fafc", border: "1px solid #e8ecf3", borderRadius: 12, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Verifies</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>{userStats.verified}</div>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px 8px" }}>
+          {filteredUsers.length === 0 ? (
+            <div style={{ padding: "48px 24px", textAlign: "center" }}>
+              <User style={{ width: 40, height: 40, color: "#cbd5e1", margin: "0 auto 12px" }} />
+              <p style={{ fontSize: 13, color: "#94a3b8" }}>Aucun utilisateur trouve</p>
+            </div>
+          ) : filteredUsers.map(user => {
+            const displayName = getDisplayName(user)
+            const isActive = editingUser?.id === user.id
+            return (
+              <div
+                key={user.id}
+                onClick={() => handleSelectUser(user)}
+                style={{ padding: "13px 14px", borderRadius: 12, cursor: "pointer", marginBottom: 4, background: isActive ? "linear-gradient(135deg,rgba(99,102,241,0.08),rgba(129,140,248,0.05))" : "transparent", border: isActive ? "1.5px solid rgba(99,102,241,0.2)" : "1.5px solid transparent", transition: "all 0.15s", position: "relative" }}
+                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = "#f8fafc" }}
+                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = "transparent" }}
+              >
+                {isActive && <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 28, background: "var(--accent,#6366f1)", borderRadius: "0 3px 3px 0" }} />}
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                  <div style={{ display: "flex", gap: 10, flex: 1, minWidth: 0 }}>
+                    {user.avatar ? (
+                      <img src={user.avatar} alt={displayName} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: "2px solid #fff", boxShadow: "0 2px 6px rgba(15,23,42,0.1)" }} />
+                    ) : (
+                      <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontWeight: 700 }}>{displayName[0]?.toUpperCase()}</div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: isActive ? "var(--accent,#6366f1)" : "#0f172a", margin: "0 0 3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {displayName}
+                      </p>
+                      <p style={{ fontSize: 12, color: "#94a3b8", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                        <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 999, background: "rgba(99,102,241,0.1)", color: "var(--accent,#6366f1)" }}>{user.role}</span>
+                        <span style={{ fontSize: 11, color: user.verified ? "#16a34a" : "#f59e0b" }}>{user.verified ? "Verifie" : "Non verifie"}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                    <IconBtn onClick={e => { e.stopPropagation(); handleToggleVerification(user.id!) }} color={user.verified ? "#f59e0b" : "#16a34a"} hoverBg="rgba(99,102,241,0.08)" title={user.verified ? "Marquer non verifie" : "Marquer verifie"}>
+                      {user.verified ? <UserX style={{ width: 13, height: 13 }} /> : <UserCheck style={{ width: 13, height: 13 }} />}
+                    </IconBtn>
+                    {onView && (
+                      <IconBtn onClick={e => { e.stopPropagation(); user.id && onView(user.id) }} color="#64748b"><Eye style={{ width: 13, height: 13 }} /></IconBtn>
+                    )}
+                    <IconBtn onClick={e => { e.stopPropagation(); handleSelectUser(user) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)"><Edit style={{ width: 13, height: 13 }} /></IconBtn>
+                    <IconBtn onClick={e => { e.stopPropagation(); user.id && handleDeleteUser(user.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)"><Trash2 style={{ width: 13, height: 13 }} /></IconBtn>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Right panel */}
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        {editingUser ? (
+          <>
+            <div style={{ background: "#fff", borderBottom: "1px solid #e8ecf3", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
               <div>
-                <p className="text-sm text-gray-500 text-center">Total utilisateurs</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2 text-center">
-                  {userStats.total}
-                </p>
+                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8", margin: 0 }}>{isCreating ? "Nouvel utilisateur" : "Modifier l'utilisateur"}</p>
+                <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>{getDisplayName(editingUser)}</h2>
               </div>
-              <div className="mt-2 text-xs text-gray-400 text-center">
-                Administrateurs: {userStats.admin}
-              </div>
-            </div>
-
-            {/* Add User */}
-            <button
-              onClick={handleNewUser}
-              className="bg-accent cursor-pointer text-white rounded-xl shadow-md hover:shadow-lg transition-all flex flex-col items-center justify-center gap-2"
-            >
-              <Plus className="w-8 h-8" />
-              <span className="font-semibold">Ajouter</span>
-            </button>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <Shield className="w-5 h-5 text-blue-600" />
-                <span className="text-2xl font-bold text-blue-700">{userStats.admin}</span>
-              </div>
-              <p className="text-xs text-blue-600 mt-1">Administrateurs</p>
-            </div>
-            <div className="bg-green-50 border border-green-100 rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <UserCheck className="w-5 h-5 text-green-600" />
-                <span className="text-2xl font-bold text-green-700">{userStats.verified}</span>
-              </div>
-              <p className="text-xs text-green-600 mt-1">Vérifiés</p>
-            </div>
-          </div>
-
-          {/* Search */}
-          <div className="bg-white p-4 rounded-xl border shadow-sm flex-1 flex flex-col overflow-hidden">
-            <div className="space-y-4 pb-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Rechercher un utilisateur..."
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent transition-all"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              
-              {/* Quick Filters */}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setSearchTerm("admin")}
-                  className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={handleCancelEdit}
+                  style={{ padding: "8px 16px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 13, fontWeight: 600, color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s" }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#f43f5e"; (e.currentTarget as HTMLButtonElement).style.color = "#f43f5e" }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#e2e8f0"; (e.currentTarget as HTMLButtonElement).style.color = "#64748b" }}
                 >
-                  Admins
+                  <X style={{ width: 14, height: 14 }} /> Annuler
                 </button>
-                <button
-                  onClick={() => setSearchTerm("instructor")}
-                  className="px-3 py-1.5 text-xs bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+                <button onClick={handleSaveUser} disabled={loading || editingUser.role === "instructor"}
+                  style={{ padding: "8px 20px", borderRadius: 10, border: "none", background: loading || editingUser.role === "instructor" ? "#e2e8f0" : "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: loading || editingUser.role === "instructor" ? "#94a3b8" : "#fff", fontSize: 13, fontWeight: 600, cursor: loading || editingUser.role === "instructor" ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: loading || editingUser.role === "instructor" ? "none" : "0 4px 14px rgba(99,102,241,0.3)" }}
                 >
-                  Instructeurs
-                </button>
-                <button
-                  onClick={() => setSearchTerm("")}
-                  className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Tous
+                  <Save style={{ width: 14, height: 14 }} />
+                  {loading ? "Enregistrement..." : "Enregistrer"}
                 </button>
               </div>
             </div>
 
-            {/* Users List */}
-            <div className="divide-y divide-gray-100 overflow-y-auto flex-1 min-h-0">
-              {filteredUsers.length === 0 ? (
-                <div className="p-8 text-center">
-                  <User className="w-12 h-12 text-gray-300 mx-auto" />
-                  <p className="text-gray-600 mt-2">Aucun utilisateur trouvé</p>
-                </div>
-              ) : (
-                filteredUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
-                      editingUser?.id === user.id ? "bg-accent/10" : ""
-                    }`}
-                    onClick={() => handleSelectUser(user)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0">
-                            {user.avatar ? (
-                              <img
-                                src={user.avatar}
-                                alt={user.username}
-                                className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
-                              />
-                            ) : (
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 border-white shadow-sm ${
-                                user.role === "admin" ? "bg-red-100" :
-                                user.role === "instructor" ? "bg-purple-100" :
-                                "bg-gray-100"
-                              }`}>
-                                <span className={`font-semibold ${
-                                  user.role === "admin" ? "text-red-600" :
-                                  user.role === "instructor" ? "text-purple-600" :
-                                  "text-gray-600"
-                                }`}>
-                                  {user.username[0]?.toUpperCase()}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-medium text-gray-900 truncate">
-                                {user.username}
-                              </h4>
-                              {user.verified && (
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-500 truncate">{user.email}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                user.role === "admin" ? "bg-red-100 text-red-700" :
-                                user.role === "instructor" ? "bg-purple-100 text-purple-700" :
-                                "bg-gray-100 text-gray-700"
-                              }`}>
-                                {user.role === "admin" ? "Admin" :
-                                 user.role === "instructor" ? "Instructeur" : "Utilisateur"}
-                              </span>
-                              {user.phone && (
-                                <span className="text-xs text-gray-500">• {user.phone}</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 ml-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            user.id && handleToggleVerification(user.id)
-                          }}
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            user.verified 
-                              ? "hover:bg-red-100 text-red-600" 
-                              : "hover:bg-green-100 text-green-600"
-                          }`}
-                          title={user.verified ? "Marquer non vérifié" : "Marquer vérifié"}
-                        >
-                          {user.verified ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                        </button>
-                        {onView && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              user.id && onView(user.id)
-                            }}
-                            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-                            title="Voir"
-                          >
-                            <Eye className="w-4 h-4 text-gray-600" />
-                          </button>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleSelectUser(user)
-                          }}
-                          className="p-1.5 hover:bg-accent/20 rounded-lg transition-colors"
-                          title="Modifier"
-                        >
-                          <Edit className="w-4 h-4 text-accent" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            user.id && handleDeleteUser(user.id)
-                          }}
-                          className="p-1.5 hover:bg-red-100 rounded-lg transition-colors"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-600" />
-                        </button>
-                      </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "28px" }}>
+              <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: 28 }}>
+
+                {error && (
+                  <div style={{ padding: "12px 14px", borderRadius: 12, background: error.toLowerCase().includes("succ") ? "#f0fdf4" : "#fff1f2", border: `1px solid ${error.toLowerCase().includes("succ") ? "#bbf7d0" : "#fecdd3"}`, color: error.toLowerCase().includes("succ") ? "#166534" : "#9f1239", fontSize: 13, fontWeight: 600 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <AlertCircle style={{ width: 16, height: 16 }} />
+                      <span>{error}</span>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column - Edit/Create Form */}
-        <div className="lg:col-span-2 h-full flex flex-col min-h-0">
-          {editingUser ? (
-            <div className="bg-white rounded-xl border shadow-sm h-full flex flex-col min-h-0">
-              {/* Form Header */}
-              <div className="p-6 border-b">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900">
-                      {isCreating ? "Nouvel utilisateur" : "Modifier l'utilisateur"}
-                    </h2>
-                    <p className="text-gray-600 mt-1">
-                      {isCreating ? "Créez un nouveau compte utilisateur" : "Modifiez les informations de l'utilisateur"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleCancelEdit}
-                      className="px-4 py-2 border border-gray-300 text-[#FF0033] cursor-pointer rounded-lg transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={handleSaveUser}
-                      disabled={loading || editingUser.role === "instructor"}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                        editingUser.role === "instructor"
-                          ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                          : "bg-accent cursor-pointer text-white hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50"
-                      }`}
-                    >
-                      <Save className="w-5 h-5" />
-                      {loading ? "Enregistrement..." : "Enregistrer"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Form Content */}
-              <div className="p-6 space-y-6 overflow-y-auto flex-1">
-                {editingUser.role === "instructor" && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <h3 className="font-medium text-yellow-800">Gestion des instructeurs</h3>
-                        <p className="text-yellow-700 text-sm mt-1">
-                          Les instructeurs doivent être gérés depuis la page dédiée "Instructeurs".
-                          Pour modifier les informations de cet instructeur, veuillez utiliser la page Instructeurs.
-                        </p>
-                      </div>
-                    </div>
+                    {error.toLowerCase().includes("instructeur") && (
+                      <p style={{ margin: "6px 0 0", fontSize: 12, color: "#9f1239" }}>
+                        Les instructeurs doivent etre geres depuis la page dediee "Instructeurs".
+                      </p>
+                    )}
                   </div>
                 )}
 
-                {/* Profile Photo */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Photo de profil</h3>
-                  <div className="flex items-center gap-6">
-                    <div className="relative">
+                <FormCard title="Photo de profil" icon={<User style={{ width: 16, height: 16 }} />}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ position: "relative" }}>
                       {avatarPreview || editingUser.avatar ? (
                         <img
                           src={avatarPreview || editingUser.avatar!}
                           alt="Avatar"
-                          className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+                          style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", border: "4px solid #fff", boxShadow: "0 6px 16px rgba(15,23,42,0.12)" }}
                         />
                       ) : (
-                        <div className="w-20 h-20 rounded-full bg-accent/20 flex items-center justify-center border-4 border-white shadow-lg">
-                          <User className="w-8 h-8 text-accent" />
+                        <div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(99,102,241,0.12)", display: "flex", alignItems: "center", justifyContent: "center", border: "4px solid #fff", boxShadow: "0 6px 16px rgba(15,23,42,0.12)" }}>
+                          <User style={{ width: 28, height: 28, color: "var(--accent,#6366f1)" }} />
                         </div>
                       )}
-                      <label className="absolute -bottom-2 -right-2 w-10 h-10 bg-accent rounded-full flex items-center justify-center cursor-pointer hover:bg-accent/90 transition-colors shadow-md">
-                        <Camera className="w-5 h-5 text-white" />
+                      <label style={{ position: "absolute", right: -4, bottom: -4, width: 36, height: 36, background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: editingUser.role === "instructor" ? "not-allowed" : "pointer", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }}>
+                        <Camera style={{ width: 16, height: 16, color: "#fff" }} />
                         <input
                           type="file"
                           accept="image/*"
-                          className="hidden"
+                          style={{ display: "none" }}
                           onChange={(e) => {
                             const file = e.target.files?.[0]
-                            if (file) {
-                              setAvatarFile(file)
-                            }
+                            if (file) setAvatarFile(file)
                           }}
                           disabled={editingUser.role === "instructor"}
                         />
                       </label>
                     </div>
-                    <div className="flex-1 space-y-3">
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Télécharger une photo
-                        </label>
+                        <FieldLabel>Telecharger une photo</FieldLabel>
                         <input
                           type="file"
                           accept="image/*"
-                          className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-accent/20 file:text-accent hover:file:bg-accent/30 disabled:opacity-50"
                           onChange={(e) => {
                             const file = e.target.files?.[0]
-                            if (file) {
-                              setAvatarFile(file)
-                            }
+                            if (file) setAvatarFile(file)
                           }}
                           disabled={editingUser.role === "instructor"}
+                          style={{ width: "100%", fontSize: 12 }}
                         />
                       </div>
-                      <p className="text-sm text-gray-500">
-                        Formats: JPG, PNG, WebP. Taille max: 2MB. Recommandé: 400x400px
-                      </p>
+                      <p style={{ fontSize: 12, color: "#94a3b8", margin: 0 }}>Formats: JPG, PNG, WebP. Taille max: 2MB. Recommande: 400x400px</p>
                       {(avatarPreview || editingUser.avatar) && editingUser.role !== "instructor" && (
                         <button
                           type="button"
@@ -577,204 +732,142 @@ useEffect(() => {
                             setAvatarPreview(null)
                             setEditingUser({ ...editingUser, avatar: null })
                           }}
-                          className="text-sm text-[#FF0033] hover:text-red-700"
+                          style={{ background: "none", border: "none", color: "#f43f5e", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0, textAlign: "left" }}
                         >
                           Supprimer la photo
                         </button>
                       )}
                     </div>
                   </div>
-                </div>
+                </FormCard>
 
-                {/* Personal Information */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Informations personnelles</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {editingUser.role === "instructor" && (
+                  <div style={{ background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 12, padding: 12 }}>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <AlertCircle style={{ width: 16, height: 16, color: "#b45309" }} />
+                      <div>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#92400e" }}>Gestion des instructeurs</p>
+                        <p style={{ margin: "4px 0 0", fontSize: 12, color: "#92400e" }}>Les instructeurs doivent etre geres depuis la page dediee.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <FormCard title="Informations personnelles" icon={<Mail style={{ width: 16, height: 16 }} />}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nom d'utilisateur *
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent transition-all disabled:opacity-50"
-                        value={editingUser.username}
-                        onChange={(e) => setEditingUser({ ...editingUser, username: e.target.value })}
-                        placeholder="john_doe"
-                        disabled={editingUser.role === "instructor"}
-                      />
+                      <FieldLabel>Nom d'utilisateur</FieldLabel>
+                      <Input value={editingUser.username || ""} readOnly />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Email *
-                      </label>
-                      <input
-                        type="email"
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent transition-all disabled:opacity-50"
-                        value={editingUser.email}
-                        onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                        placeholder="john@example.com"
-                        disabled={editingUser.role === "instructor"}
-                      />
+                      <FieldLabel required>Prenom</FieldLabel>
+                      <Input value={editingUser.name || ""} onChange={v => setEditingUser({ ...editingUser, name: v })} placeholder="John" disabled={editingUser.role === "instructor"} />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Téléphone
-                      </label>
-                      <input
-                        type="tel"
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent transition-all disabled:opacity-50"
-                        value={editingUser.phone || ""}
-                        onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
-                        placeholder="+33 1 23 45 67 89"
-                        disabled={editingUser.role === "instructor"}
-                      />
+                      <FieldLabel required>Nom</FieldLabel>
+                      <Input value={editingUser.surname || ""} onChange={v => setEditingUser({ ...editingUser, surname: v })} placeholder="Doe" disabled={editingUser.role === "instructor"} />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Rôle
-                      </label>
-                      <select
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent transition-all disabled:opacity-50"
-                        value={editingUser.role}
-                        onChange={(e) => setEditingUser({ 
-                          ...editingUser, 
-                          role: e.target.value as "admin" | "user" | "instructor" 
-                        })}
-                        disabled={editingUser.role === "instructor"}
-                      >
-                        <option value="user">Utilisateur</option>
+                      <FieldLabel required>Email</FieldLabel>
+                      <Input type="email" value={editingUser.email} onChange={v => setEditingUser({ ...editingUser, email: v })} placeholder="john@example.com" disabled={editingUser.role === "instructor"} />
+                    </div>
+                    <div>
+                      <FieldLabel required>Telephone</FieldLabel>
+                      <Input type="tel" value={editingUser.phone || ""} onChange={v => setEditingUser({ ...editingUser, phone: v })} placeholder="+33 1 23 45 67 89" disabled={editingUser.role === "instructor"} />
+                    </div>
+                    <div>
+                      <FieldLabel>Role</FieldLabel>
+                      <SelectField value={editingUser.role} onChange={v => setEditingUser({ ...editingUser, role: v as "admin" | "student" | "instructor" })} disabled={editingUser.role === "instructor"}>
+                        <option value="student">Etudiant</option>
                         <option value="admin">Administrateur</option>
                         <option value="instructor">Instructeur</option>
-                      </select>
+                      </SelectField>
                       {editingUser.role === "instructor" && (
-                        <p className="text-xs text-yellow-600 mt-1">
-                          Utilisez la page Instructeurs pour modifier ce rôle
-                        </p>
+                        <p style={{ fontSize: 11, color: "#b45309", marginTop: 4 }}>Utilisez la page Instructeurs pour modifier ce role</p>
                       )}
                     </div>
                   </div>
-                </div>
+                </FormCard>
 
-                {/* Password Section */}
-                {isCreating && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Mot de passe</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormCard title="Mot de passe" icon={<Key style={{ width: 16, height: 16 }} />}>
+                  {editingUser.usePassword && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Mot de passe *
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="password"
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent transition-all"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                          />
-                          <Key className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        </div>
+                        <FieldLabel required>Mot de passe en clair</FieldLabel>
+                        <Input value={editingUser.plainPassword ?? ""} onChange={v => setEditingUser({ ...editingUser, plainPassword: v })} placeholder="Mot de passe" />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Confirmer le mot de passe *
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="password"
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent transition-all"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            placeholder="••••••••"
-                          />
-                          <Key className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        </div>
+                      <div style={{ display: "flex", alignItems: "flex-end" }}>
+                        <button
+                          type="button"
+                          onClick={handleCopyPassword}
+                          disabled={!editingUser.plainPassword}
+                          style={{ padding: "9px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 12, fontWeight: 600, color: editingUser.plainPassword ? "#475569" : "#94a3b8", cursor: editingUser.plainPassword ? "pointer" : "not-allowed" }}
+                        >
+                          <Copy style={{ width: 14, height: 14 }} /> {passwordCopied ? "Copie" : "Copier"}
+                        </button>
                       </div>
                     </div>
-                    <p className="text-sm text-gray-500 mt-2">
-                      Le mot de passe doit contenir au moins 8 caractères
-                    </p>
-                  </div>
-                )}
+                  )}
 
-                {/* Verification Status */}
-                {!isCreating && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Statut de vérification</h3>
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        {editingUser.verified ? (
-                          <>
-                            <CheckCircle className="w-6 h-6 text-green-600" />
-                            <div>
-                              <p className="font-medium text-gray-900">Compte vérifié</p>
-                              <p className="text-sm text-gray-600">L'email de cet utilisateur a été vérifié</p>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="w-6 h-6 text-yellow-600" />
-                            <div>
-                              <p className="font-medium text-gray-900">Compte non vérifié</p>
-                              <p className="text-sm text-gray-600">L'email n'a pas encore été vérifié</p>
-                            </div>
-                          </>
-                        )}
+                  {!editingUser.usePassword && !isCreating && !!editingUser.plainPassword && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}>
+                      <div>
+                        <FieldLabel>Mot de passe en clair</FieldLabel>
+                        <Input value={editingUser.plainPassword ?? ""} readOnly />
                       </div>
+                      <div style={{ display: "flex", alignItems: "flex-end" }}>
+                        <button
+                          type="button"
+                          onClick={handleCopyPassword}
+                          disabled={!editingUser.plainPassword}
+                          style={{ padding: "9px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 12, fontWeight: 600, color: editingUser.plainPassword ? "#475569" : "#94a3b8", cursor: editingUser.plainPassword ? "pointer" : "not-allowed" }}
+                        >
+                          <Copy style={{ width: 14, height: 14 }} /> {passwordCopied ? "Copie" : "Copier"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isCreating && (
+                    <div style={{ marginTop: 12 }}>
                       <button
                         type="button"
-                        onClick={() => handleToggleVerification(editingUser.id!)}
-                        className={`px-4 py-2 rounded-lg transition-colors ${
-                          editingUser.verified
-                            ? "bg-red-100 text-red-700 hover:bg-red-200"
-                            : "bg-green-100 text-green-700 hover:bg-green-200"
-                        }`}
-                        disabled={editingUser.role === "instructor"}
+                        onClick={handleResetPassword}
+                        disabled={loading || !editingUser.plainPassword}
+                        style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #fde68a", background: "#fef3c7", color: "#92400e", fontSize: 12, fontWeight: 600, cursor: loading || !editingUser.plainPassword ? "not-allowed" : "pointer" }}
                       >
-                        {editingUser.verified ? "Marquer non vérifié" : "Marquer vérifié"}
+                        Reinitialiser le mot de passe
                       </button>
                     </div>
-                  </div>
-                )}
-
-                {/* Account Info */}
-                {!isCreating && editingUser.id && (
-                  <div className="bg-gray-50 rounded-xl p-4">
-                    <h3 className="font-medium text-gray-900 mb-3">Informations du compte</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-gray-600">ID de l'utilisateur</p>
-                        <p className="font-mono text-gray-900 bg-white px-3 py-1.5 rounded-lg mt-1">
-                          {editingUser.id}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Dernière mise à jour</p>
-                        <p className="text-gray-900 mt-1">Juste maintenant</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </FormCard>
               </div>
             </div>
-          ) : (
-            <div className="bg-accent/10 p-12 rounded-xl border border-blue-100 text-center h-full flex justify-center flex-col">
-              <User className="w-16 h-16 text-accent mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucun utilisateur sélectionné</h3>
-              <p className="text-gray-600 mb-6">
-                Sélectionnez un utilisateur dans la liste pour le modifier, ou créez-en un nouveau.
-              </p>
-              <button
-                onClick={handleNewUser}
-                className="inline-flex cursor-pointer w-fit mx-auto items-center gap-2 px-6 py-3 bg-accent text-white rounded-lg shadow-md"
-              >
-                <Plus className="w-5 h-5" />
-                Créer un nouvel utilisateur
-              </button>
+          </>
+        ) : (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+            <div style={{ width: 80, height: 80, borderRadius: 24, background: "linear-gradient(135deg,rgba(99,102,241,0.12),rgba(129,140,248,0.06))", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <User style={{ width: 36, height: 36, color: "var(--accent,#6366f1)" }} />
             </div>
-          )}
-        </div>
+            <div style={{ textAlign: "center" }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", margin: "0 0 6px" }}>Aucun utilisateur selectionne</h3>
+              <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>Choisissez un utilisateur dans la liste ou creez-en un nouveau.</p>
+            </div>
+            <button onClick={handleNewUser} style={{ marginTop: 8, padding: "10px 24px", background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 4px 14px rgba(99,102,241,0.3)" }}>
+              <Plus style={{ width: 16, height: 16 }} /> Creer un utilisateur
+            </button>
+          </div>
+        )}
       </div>
+
+      <style>{`
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        ::-webkit-scrollbar{width:5px;height:5px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:99px}
+        ::-webkit-scrollbar-thumb:hover{background:#cbd5e1}
+      `}</style>
     </div>
   )
+
 }

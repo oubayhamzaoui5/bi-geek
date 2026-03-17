@@ -22,9 +22,10 @@ type ProgramVariant = "course" | "bootcamp"
 interface ProgramCardProps {
   program: Program
   variant?: ProgramVariant
+  hrefOverride?: string
 }
 
-export function ProgramCard({ program, variant = "course" }: ProgramCardProps) {
+export function ProgramCard({ program, variant = "course", hrefOverride }: ProgramCardProps) {
   const safeTags = Array.isArray(program.tags) ? program.tags : []
   const primaryTag = safeTags[0]?.trim() || "Formation"
 
@@ -40,9 +41,10 @@ export function ProgramCard({ program, variant = "course" }: ProgramCardProps) {
   }, [program.id, program.slug, variant])
 
   const href =
-    variant === "bootcamp"
+    hrefOverride ??
+    (variant === "bootcamp"
       ? `/bootcamp/${slug}`
-      : `/course/${slug}`
+      : `/course/${slug}`)
 
   return (
     <Link href={href} className="block h-full">

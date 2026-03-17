@@ -11,16 +11,27 @@ const getFileUrl = (record: any, file: string | null) => {
 
 export async function GET(
   req: Request,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { slug } = params
+    const { slug } = await params
+    const safeSlug = decodeURIComponent(slug)
     const pb = new PocketBase(PB_URL)
 
     // 1) Bootcamp
-    const bootcampRaw = await pb
-      .collection("bootcamps")
-      .getFirstListItem(`slug="${slug}"`)
+    let bootcampRaw: any
+    try {
+      bootcampRaw = await pb
+        .collection("bootcamps")
+        .getFirstListItem(`slug="${safeSlug}"`)
+    } catch (err: any) {
+      if (err?.status === 404) {
+        // Fallback: treat slug as id
+        bootcampRaw = await pb.collection("bootcamps").getOne(safeSlug)
+      } else {
+        throw err
+      }
+    }
 
     const bootcamp = {
       ...bootcampRaw,
@@ -70,7 +81,10 @@ export async function GET(
       : []
 
     return NextResponse.json({ bootcamp, courses, modules, lessons })
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.status === 404) {
+      return NextResponse.json({ error: "Bootcamp not found" }, { status: 404 })
+    }
     console.error("Error fetching bootcamp details:", err)
     return NextResponse.json(
       { error: "Failed to fetch bootcamp details" },

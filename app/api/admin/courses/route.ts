@@ -11,6 +11,8 @@ type IncomingLesson = {
   title: string
   durationLabel?: string
   order?: number
+  attachmentsMeta?: { name: string; title?: string; description?: string; order?: number }[]
+  youtubeLinks?: { url: string; title?: string; description?: string; order?: number }[]
 }
 
 type IncomingModule = {
@@ -120,6 +122,8 @@ export async function GET() {
           title: l.title,
           durationLabel: l.durationLabel ?? l.duration ?? "",
           order: l.order ?? 0,
+          attachmentsMeta: l.attachmentsMeta ?? [],
+          youtubeLinks: l.youtubeLinks ?? [],
         })),
       }))
 
@@ -131,6 +135,9 @@ export async function GET() {
         durationLabel: c.durationLabel,
         prerequis: c.prerequis ?? "Aucun",
         coverImage: c.coverImage || null,
+        attachments: c.attachments ?? [],
+        attachmentsMeta: c.attachmentsMeta ?? [],
+        youtubeLinks: c.youtubeLinks ?? [],
         certificate: !!c.certificate,
         certifications: c.certifications ?? [],
         rating: c.rating ?? 4.8,
@@ -200,6 +207,9 @@ export async function GET() {
           title: l.title,
           durationLabel: l.durationLabel ?? l.duration ?? "",
           order: l.order ?? 0,
+          attachmentsMeta: l.attachmentsMeta ?? [],
+          youtubeLinks: l.youtubeLinks ?? [],
+          attachments: l.attachments ?? [],
         })),
       }))
 
@@ -310,6 +320,7 @@ export async function POST(req: Request) {
       payload.coverImage = coverImage
     }
 
+
     // ---------------- CREATE OR UPDATE ----------------
     let courseRecord
 
@@ -327,46 +338,167 @@ export async function POST(req: Request) {
 
     const courseId = courseRecord.id
 
+
     // ---------------- SYNC MODULES & LESSONS ----------------
     const existingModules = await pb.collection("course_modules").getFullList({
       filter: `course="${courseId}"`,
     })
+    const existingModulesById = new Map<string, any>(
+      existingModules.map((m: any) => [m.id, m])
+    )
 
-    // Delete old lessons & modules
-    const moduleIds = existingModules.map((m: any) => m.id)
-    if (moduleIds.length > 0) {
-      const lessons = await pb.collection("course_lessons").getFullList({
-        filter: moduleIds.map((id) => `module="${id}"`).join(" || "),
-      })
-      await Promise.all(lessons.map((l: any) => pb.collection("course_lessons").delete(l.id)))
-      await Promise.all(existingModules.map((m: any) => pb.collection("course_modules").delete(m.id)))
+    const existingLessons = await pb.collection("course_lessons").getFullList({
+      filter: `course="${courseId}"`,
+      sort: "module,order",
+    })
+    const existingLessonsById = new Map<string, any>(
+      existingLessons.map((l: any) => [l.id, l])
+    )
+    const existingLessonsByModule = existingLessons.reduce((map: Map<string, any[]>, l: any) => {
+      map.set(l.module, [...(map.get(l.module) ?? []), l])
+      return map
+    }, new Map<string, any[]>())
+
+    const incomingModuleIds = new Set(
+      (modules ?? []).map((m) => m.id).filter(Boolean) as string[]
+    )
+
+    if (id) {
+      for (const m of existingModules) {
+        if (!incomingModuleIds.has(m.id)) {
+          const lessonsToDelete = existingLessonsByModule.get(m.id) ?? []
+          await Promise.all(lessonsToDelete.map((l: any) => pb.collection("course_lessons").delete(l.id)))
+          await pb.collection("course_modules").delete(m.id)
+        }
+      }
     }
 
-    // Create new modules & lessons
     for (let i = 0; i < modules.length; i++) {
       const m = modules[i]
-      const createdModule = await pb.collection("course_modules").create({
+      const modulePayload = {
         course: courseId,
         title: m.title || `Module ${i + 1}`,
         durationLabel: m.durationLabel ?? "",
         duration: m.durationLabel ?? "",
         order: m.order ?? i + 1,
-      })
+      }
 
-      for (let j = 0; j < (m.lessons ?? []).length; j++) {
-        const l = m.lessons![j]
-        await pb.collection("course_lessons").create({
-          course: courseId,
-          module: createdModule.id,
-          title: l.title || `Leçon ${j + 1}`,
-          durationLabel: l.durationLabel ?? "",
-          duration: l.durationLabel ?? "",
-          order: l.order ?? j + 1,
-        })
+      let moduleId = m.id
+      if (moduleId && existingModulesById.has(moduleId)) {
+        await pb.collection("course_modules").update(moduleId, modulePayload)
+      } else {
+        const createdModule = await pb.collection("course_modules").create(modulePayload)
+        moduleId = createdModule.id
+      }
+
+      const incomingLessons = m.lessons ?? []
+      const incomingLessonIds = new Set(
+        incomingLessons.map((l) => l.id).filter(Boolean) as string[]
+      )
+
+      if (id) {
+        const existingForModule = existingLessonsByModule.get(moduleId!) ?? []
+        for (const l of existingForModule) {
+          if (!incomingLessonIds.has(l.id)) {
+            await pb.collection("course_lessons").delete(l.id)
+          }
+        }
+      }
+
+      for (let j = 0; j < incomingLessons.length; j++) {
+        const l = incomingLessons[j]
+        const lessonAttachments = formData.getAll(`lessonAttachments-${i}-${j}`)
+        const attachmentFiles = lessonAttachments.filter(
+          (f): f is File => f instanceof File && f.size > 0
+        )
+
+        const lessonForm = new FormData()
+        lessonForm.append("course", courseId)
+        lessonForm.append("module", moduleId)
+        lessonForm.append("title", l.title || `Lecon ${j + 1}`)
+        lessonForm.append("durationLabel", l.durationLabel ?? "")
+        lessonForm.append("duration", l.durationLabel ?? "")
+        lessonForm.append("order", String(l.order ?? j + 1))
+        lessonForm.append("attachmentsMeta", JSON.stringify(l.attachmentsMeta ?? []))
+        lessonForm.append("youtubeLinks", JSON.stringify(l.youtubeLinks ?? []))
+        for (const file of attachmentFiles) {
+          lessonForm.append("attachments", file)
+        }
+
+        const hasAttachments = (rec: any) => {
+          if (!rec) return false
+          if (Array.isArray(rec.attachments)) return rec.attachments.length > 0
+          return !!rec.attachments
+        }
+
+        const ensureAttachmentsSaved = async (rec: any, lessonId: string) => {
+          if (attachmentFiles.length === 0) return rec
+          if (hasAttachments(rec)) return rec
+
+          // Retry for single-file fields
+          const retryForm = new FormData()
+          retryForm.append("course", courseId)
+          retryForm.append("module", moduleId)
+          retryForm.append("title", l.title || `Lecon ${j + 1}`)
+          retryForm.append("durationLabel", l.durationLabel ?? "")
+          retryForm.append("duration", l.durationLabel ?? "")
+          retryForm.append("order", String(l.order ?? j + 1))
+          retryForm.append("attachmentsMeta", JSON.stringify(l.attachmentsMeta ?? []))
+          retryForm.append("youtubeLinks", JSON.stringify(l.youtubeLinks ?? []))
+          retryForm.append("attachments", attachmentFiles[0])
+          const retryRec = await pb.collection("course_lessons").update(lessonId, retryForm)
+          if (hasAttachments(retryRec)) return retryRec
+
+          const keys = rec ? Object.keys(rec) : []
+          const hasAttachmentsField = keys.includes("attachments")
+          const hasMetaField = keys.includes("attachmentsMeta")
+          const hasYoutubeField = keys.includes("youtubeLinks")
+          console.error("Attachments not saved. Record keys:", keys)
+
+          if (!hasAttachmentsField) {
+            throw new Error(
+              "PocketBase schema missing file field 'attachments' on collection 'course_lessons'. " +
+              "Add a File field named 'attachments' (max files >= 1), then retry."
+            )
+          }
+          if (!hasMetaField || !hasYoutubeField) {
+            throw new Error(
+              "PocketBase schema missing fields on 'course_lessons': " +
+              `${!hasMetaField ? "attachmentsMeta " : ""}${!hasYoutubeField ? "youtubeLinks" : ""}`.trim() +
+              ". Add JSON fields with those names, then retry."
+            )
+          }
+          throw new Error(`Attachments failed to save for lesson ${lessonId}`)
+        }
+
+        if (l.id && existingLessonsById.has(l.id)) {
+          const updated = await pb.collection("course_lessons").update(l.id, lessonForm)
+          await ensureAttachmentsSaved(updated, l.id)
+        } else {
+          const created = await pb.collection("course_lessons").create(lessonForm)
+          const lessonId = created?.id ?? "new"
+          if (attachmentFiles.length > 0 && !hasAttachments(created)) {
+            // Retry for newly created records too
+            const retryForm = new FormData()
+            retryForm.append("course", courseId)
+            retryForm.append("module", moduleId)
+            retryForm.append("title", l.title || `Lecon ${j + 1}`)
+            retryForm.append("durationLabel", l.durationLabel ?? "")
+            retryForm.append("duration", l.durationLabel ?? "")
+            retryForm.append("order", String(l.order ?? j + 1))
+            retryForm.append("attachmentsMeta", JSON.stringify(l.attachmentsMeta ?? []))
+            retryForm.append("youtubeLinks", JSON.stringify(l.youtubeLinks ?? []))
+            retryForm.append("attachments", attachmentFiles[0])
+            const retryRec = await pb.collection("course_lessons").update(created.id, retryForm)
+            if (!hasAttachments(retryRec)) {
+              const keys = created ? Object.keys(created) : []
+              console.error("Attachments not saved on create. Record keys:", keys)
+              throw new Error(`Attachments failed to save for new lesson ${lessonId}`)
+            }
+          }
+        }
       }
     }
-
-    // 🔥 IMPORTANT FIX: return correct coverImage
     const finalCourse = await pb.collection("courses").getOne(courseId)
 
     return NextResponse.json({

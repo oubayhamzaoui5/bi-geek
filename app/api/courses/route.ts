@@ -1,26 +1,92 @@
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
 
-const pb = new PocketBase(process.env.POCKETBASE_URL!)
+type GroupRecord = {
+  id: string
+  programType?: "course" | "bootcamp"
+  course?: string | null
+  students?: string[]
+}
 
-export async function GET() {
+const safeList = async <T>(
+  pb: PocketBase,
+  collection: string,
+  options?: Record<string, unknown>,
+): Promise<T[]> => {
   try {
-    const records = await pb.collection("courses").getFullList({
-      filter: "isPublished = true",
-      sort: "-created",
-    })
+    return (await pb.collection(collection).getFullList(options)) as T[]
+  } catch {
+    return []
+  }
+}
 
+async function getPocketBase() {
+  const PB_URL = process.env.NEXT_PUBLIC_PB_URL ?? process.env.POCKETBASE_URL
+  if (!PB_URL) return null
+
+  const pb = new PocketBase(PB_URL)
+  const adminEmail = process.env.POCKETBASE_ADMIN_EMAIL
+  const adminPassword = process.env.POCKETBASE_ADMIN_PASSWORD
+
+  if (adminEmail && adminPassword) {
+    try {
+      await pb.admins.authWithPassword(adminEmail, adminPassword)
+    } catch {
+      // Ignore admin auth failure; fall back to public access
+    }
+  }
+
+  return pb
+}
+
+export async function GET(req: Request) {
+  try {
     const PB_URL = process.env.NEXT_PUBLIC_PB_URL ?? process.env.POCKETBASE_URL
+    if (!PB_URL) {
+      return NextResponse.json({ courses: [] })
+    }
 
-    const courses = records.map((c: any) => ({
+    const { searchParams } = new URL(req.url)
+    const studentId = (searchParams.get("studentId") || "").trim()
+
+    const pb = await getPocketBase()
+    if (!pb) {
+      return NextResponse.json({ courses: [] })
+    }
+
+    let courseIds: Set<string> | null = null
+    if (studentId) {
+      const groups = await safeList<GroupRecord>(pb, "groups", { sort: "-created" })
+      const related = groups.filter(
+        (g) => g.programType === "course" && Array.isArray(g.students) && g.students.includes(studentId),
+      )
+      courseIds = new Set(related.map((g) => g.course).filter(Boolean) as string[])
+      if (courseIds.size === 0) {
+        return NextResponse.json({ courses: [] })
+      }
+    }
+
+    const listOptions: Record<string, unknown> = { sort: "-created" }
+    if (!studentId) {
+      listOptions.filter = "isPublished = true"
+    }
+
+    const records = await pb.collection("courses").getFullList(listOptions)
+
+    const filteredRecords = courseIds
+      ? records.filter((c: any) => courseIds?.has(c.id))
+      : records
+
+    const courses = filteredRecords.map((c: any) => ({
       id: c.id,
+      slug: c.slug ?? c.id,
       title: c.title,
       shortDescription: c.shortDescription,
       durationLabel: c.durationLabel,
       tags: Array.isArray(c.tags) ? c.tags : [],
       coverImage: c.coverImage
-  ? `${PB_URL}/api/files/courses/${c.id}/${c.coverImage}`
-  : null,
+        ? `${PB_URL}/api/files/courses/${c.id}/${c.coverImage}`
+        : null,
     }))
 
     return NextResponse.json({ courses })

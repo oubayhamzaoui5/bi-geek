@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { 
   Search, Plus, Edit, Trash2, Eye, 
   ChevronUp, ChevronDown, Save, X, Users,
-  BookOpen, Star, Check, ChevronLeft, ChevronRight,
+  BookOpen, Star, ChevronRight, Layers, ImagePlus,
   CheckCircle, AlertCircle, Loader2
 } from "lucide-react"
 
@@ -54,6 +54,97 @@ const PREREQUIS_OPTIONS = [
   "Aucun",
   "Contacter l'administration"
 ] as const
+
+// ---- UI primitives (matching CoursesCrud style) ----
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6, letterSpacing: "0.02em" }}>
+      {children}{required && <span style={{ color: "#f43f5e", marginLeft: 3 }}>*</span>}
+    </label>
+  )
+
+}
+
+function Input({ value, onChange, placeholder, type = "text", style }: {
+  value: string | number; onChange: (v: string) => void; placeholder?: string; type?: string; style?: React.CSSProperties
+}) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      style={{ width: "100%", padding: "10px 14px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, color: "#0f172a", outline: "none", boxSizing: "border-box", fontFamily: "inherit", ...style }}
+      onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; e.target.style.background = "#fff" }}
+      onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none"; e.target.style.background = "#f8fafc" }}
+    />
+  )
+}
+
+function Textarea({ value, onChange, placeholder, rows = 3 }: { value: string; onChange: (v: string) => void; placeholder?: string; rows?: number }) {
+  return (
+    <textarea
+      rows={rows}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      style={{ width: "100%", padding: "10px 14px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, color: "#0f172a", outline: "none", resize: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+      onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; e.target.style.background = "#fff" }}
+      onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none"; e.target.style.background = "#f8fafc" }}
+    />
+  )
+}
+
+function SelectField({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
+  return (
+    <div style={{ position: "relative" }}>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        style={{ width: "100%", padding: "10px 36px 10px 14px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, color: "#0f172a", outline: "none", appearance: "none", cursor: "pointer", fontFamily: "inherit" }}
+        onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)" }}
+        onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none" }}
+      >
+        {children}
+      </select>
+      <ChevronRight style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%) rotate(90deg)", width: 14, height: 14, color: "#94a3b8", pointerEvents: "none" }} />
+    </div>
+  )
+}
+
+function IconBtn({ onClick, title, color = "#64748b", hoverBg = "#f1f5f9", children }: {
+  onClick: (e: React.MouseEvent) => void; title?: string; color?: string; hoverBg?: string; children: React.ReactNode
+}) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ padding: 7, borderRadius: 8, border: "none", background: hover ? hoverBg : "transparent", color, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function FormCard({ title, icon, children, action }: { title: string; icon?: React.ReactNode; children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #e8ecf3", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+      <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(180deg,#fafbfd 0%,#fff 100%)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 9, background: "linear-gradient(135deg,rgba(99,102,241,0.12),rgba(129,140,248,0.06))", color: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {icon}
+          </div>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h3>
+        </div>
+        {action}
+      </div>
+      <div style={{ padding: 20 }}>{children}</div>
+    </div>
+  )
+}
 
 export default function BootcampsCrud({
   initialBootcamps = [],
@@ -342,320 +433,208 @@ export default function BootcampsCrud({
   }
 
   return (
-    <div className="h-screen px-6 py-4 overflow-hidden">
-      {/* Main Content - Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-        {/* Left Column - Bootcamps List */}
-        <div className="lg:col-span-1 h-full flex flex-col overflow-hidden">
-          {/* Bootcamps Overview */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            {/* Total Bootcamps */}
-            <div className="bg-white border rounded-xl p-5 shadow-sm flex flex-col justify-between">
-              <div>
-                <p className="text-sm text-gray-500 text-center">Total des bootcamps</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2 text-center">
-                  {bootcamps.length}
-                </p>
-              </div>
-             
-            </div>
+    <div style={{ height: "100vh", display: "flex", background: "#f0f2f8", fontFamily: "'DM Sans','Inter',sans-serif", overflow: "hidden" }}>
 
-            {/* Add Bootcamp */}
-            <button
-              onClick={handleNewBootcamp}
-              className="bg-accent cursor-pointer text-white rounded-xl shadow-md hover:shadow-lg transition-all flex flex-col items-center justify-center gap-2"
-            >
-              <Plus className="w-8 h-8" />
-              <span className="font-semibold">Ajouter</span>
-            </button>
+      {/* Left panel */}
+      <div style={{ width: 420, minWidth: 420, background: "#fff", borderRight: "1px solid #e8ecf3", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "24px 22px 16px", borderBottom: "1px solid #f1f5f9" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8", marginBottom: 2 }}>Gestion</p>
+              <h1 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", margin: 0 }}>Bootcamps</h1>
+            </div>
+            <div style={{ background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", borderRadius: 12, padding: "6px 16px", fontSize: 22, fontWeight: 800 }}>{bootcamps.length}</div>
           </div>
-
-          {/* Search */}
-          <div className="bg-white p-4 rounded-xl border shadow-sm flex-1 flex flex-col overflow-hidden">
-            <div className="space-y-4 pb-4">
-              <div className="relative" ref={courseDropdownRef}>
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Rechercher un bootcamp..."
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent transition-all"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-            
-            <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
-              {filteredBootcamps.length === 0 ? (
-                <div className="p-8 text-center">
-                  <Users className="w-12 h-12 text-gray-300 mx-auto" />
-                  <p className="text-gray-600 mt-2">Aucun bootcamp trouvé</p>
-                </div>
-              ) : (
-                filteredBootcamps.map((bootcamp) => (
-                  <div
-                    key={bootcamp.id}
-                    className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
-                      editingBootcamp?.id === bootcamp.id ? "bg-accent/10" : ""
-                    }`}
-                    onClick={() => handleSelectBootcamp(bootcamp)}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-gray-900 truncate">{bootcamp.title || "Sans titre"}</h4>
-                            <p className="text-sm text-gray-500 truncate mt-1">{bootcamp.shortDescription}</p>
-                            <div className="flex items-center gap-3 mt-2">
-                              <span className="text-xs text-gray-500">{bootcamp.durationLabel}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 ml-2">
-                            {onView && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  bootcamp.id && onView(bootcamp.id)
-                                }}
-                                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-                                title="Voir"
-                              >
-                                <Eye className="w-4 h-4 text-gray-600" />
-                              </button>
-                            )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleSelectBootcamp(bootcamp)
-                              }}
-                              className="p-1.5 hover:bg-accent/20 rounded-lg transition-colors"
-                              title="Modifier"
-                            >
-                              <Edit className="w-4 h-4 text-accent" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                bootcamp.id && handleDeleteBootcamp(bootcamp.id)
-                              }}
-                              className="p-1.5 hover:bg-red-100 rounded-lg transition-colors"
-                              title="Supprimer"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
-                          <span>{bootcamp.courseIds.length} Formation</span>
-                          <span className="flex items-center gap-1">
-                            <Star className="w-3 h-3 fill-current text-yellow-500" />
-                            {bootcamp.rating.toFixed(1)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+          <div style={{ position: "relative" }}>
+            <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 15, height: 15, color: "#94a3b8" }} />
+            <input
+              type="text"
+              placeholder="Rechercher un bootcamp..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{ width: "100%", padding: "9px 12px 9px 36px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit" }}
+              onFocus={e => { e.currentTarget.style.borderColor = "var(--accent,#6366f1)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.1)" }}
+              onBlur={e => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.boxShadow = "none" }}
+            />
           </div>
         </div>
 
-        {/* Right Column - Edit/Create Form */}
-        <div className="lg:col-span-2">
-          {editingBootcamp ? (
-            <div className="bg-white rounded-xl border shadow-sm">
-              {/* Form Header */}
-              <div className="p-6 border-b">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900">
-                      {isCreating ? "Nouveau bootcamp" : "Modifier le bootcamp"}
-                    </h2>
-                    <p className="text-gray-600 mt-1">
-                      {isCreating ? "Remplissez les informations du nouveau bootcamp" : "Modifiez les informations du bootcamp"}
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9" }}>
+          <button
+            onClick={handleNewBootcamp}
+            style={{ width: "100%", padding: "10px 16px", background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 14px rgba(99,102,241,0.3)", transition: "opacity 0.15s,transform 0.15s" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.9"; (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)" }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; (e.currentTarget as HTMLButtonElement).style.transform = "none" }}
+          >
+            <Plus style={{ width: 15, height: 15 }} /> Nouveau bootcamp
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px 8px" }}>
+          {filteredBootcamps.length === 0 ? (
+            <div style={{ padding: "48px 24px", textAlign: "center" }}>
+              <Users style={{ width: 40, height: 40, color: "#cbd5e1", margin: "0 auto 12px" }} />
+              <p style={{ fontSize: 13, color: "#94a3b8" }}>Aucun bootcamp trouve</p>
+            </div>
+          ) : filteredBootcamps.map(bootcamp => {
+            const isActive = editingBootcamp?.id === bootcamp.id
+            return (
+              <div
+                key={bootcamp.id}
+                onClick={() => handleSelectBootcamp(bootcamp)}
+                style={{ padding: "13px 14px", borderRadius: 12, cursor: "pointer", marginBottom: 4, background: isActive ? "linear-gradient(135deg,rgba(99,102,241,0.08),rgba(129,140,248,0.05))" : "transparent", border: isActive ? "1.5px solid rgba(99,102,241,0.2)" : "1.5px solid transparent", transition: "all 0.15s", position: "relative" }}
+                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = "#f8fafc" }}
+                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = "transparent" }}
+              >
+                {isActive && <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 28, background: "var(--accent,#6366f1)", borderRadius: "0 3px 3px 0" }} />}
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: isActive ? "var(--accent,#6366f1)" : "#0f172a", margin: "0 0 3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {bootcamp.title || "Sans titre"}
                     </p>
+                    <p style={{ fontSize: 12, color: "#94a3b8", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bootcamp.shortDescription}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7 }}>
+                      <span style={{ fontSize: 11, color: "#64748b" }}>{bootcamp.durationLabel || "Dur?e"}</span>
+                      <span style={{ fontSize: 11, color: "#64748b" }}>{bootcamp.courseIds.length} formations</span>
+                      <span style={{ fontSize: 11, color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}>
+                        <Star style={{ width: 11, height: 11, color: "#f59e0b" }} />{bootcamp.rating.toFixed(1)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleCancelEdit}
-                      className="px-4 py-2 border border-gray-300 text-[#FF0033] cursor-pointer rounded-lg transition-colors hover:bg-gray-50"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={handleSaveBootcamp}
-                      disabled={loading}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-accent cursor-pointer text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 transition-all"
-                    >
-                      <Save className="w-5 h-5" />
-                      {loading ? "Enregistrement..." : "Enregistrer"}
-                    </button>
+                  <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                    {onView && (
+                      <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && onView(bootcamp.id) }} color="#64748b"><Eye style={{ width: 13, height: 13 }} /></IconBtn>
+                    )}
+                    <IconBtn onClick={e => { e.stopPropagation(); handleSelectBootcamp(bootcamp) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)"><Edit style={{ width: 13, height: 13 }} /></IconBtn>
+                    <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && handleDeleteBootcamp(bootcamp.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)"><Trash2 style={{ width: 13, height: 13 }} /></IconBtn>
                   </div>
                 </div>
               </div>
+            )
+          })}
+        </div>
+      </div>
 
-              {/* Form Content */}
-              <div className="p-6 space-y-6 max-h-[600px] overflow-y-auto">
-                {/* Cover Image */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Image de couverture
-                  </label>
-                  <div
-                    className="w-full aspect-video rounded-lg border-2 border-dashed border-gray-300 bg-gray-100/50 flex flex-col items-center justify-center cursor-pointer overflow-hidden relative"
-                    onClick={() => document.getElementById("coverInput")?.click()}
-                  >
-                    {editingBootcamp.coverPreview ? (
-                      <img
-                        src={editingBootcamp.coverPreview}
-                        className="w-full h-full object-cover"
-                        alt="Cover preview"
-                      />
-                    ) : (
-                      <>
-                        <div className="text-gray-400 text-4xl mb-2">+</div>
-                        <p className="text-gray-500 text-sm">Résolution recommandée : 1920x1080</p>
-                      </>
-                    )}
-                    <input
-                      id="coverInput"
-                      type="file"
-                      accept="image/*"
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) handleImageChange(file)
-                      }}
-                    />
-                  </div>
-                </div>
+      {/* Right panel */}
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        {editingBootcamp ? (
+          <>
+            <div style={{ background: "#fff", borderBottom: "1px solid #e8ecf3", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8", margin: 0 }}>{isCreating ? "Nouveau bootcamp" : "Modifier le bootcamp"}</p>
+                <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>{editingBootcamp.title || "Sans titre"}</h2>
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={handleCancelEdit}
+                  style={{ padding: "8px 16px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 13, fontWeight: 600, color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s" }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#f43f5e"; (e.currentTarget as HTMLButtonElement).style.color = "#f43f5e" }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#e2e8f0"; (e.currentTarget as HTMLButtonElement).style.color = "#64748b" }}
+                >
+                  <X style={{ width: 14, height: 14 }} /> Annuler
+                </button>
+                <button onClick={handleSaveBootcamp} disabled={loading}
+                  style={{ padding: "8px 20px", borderRadius: 10, border: "none", background: loading ? "#e2e8f0" : "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: loading ? "#94a3b8" : "#fff", fontSize: 13, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: loading ? "none" : "0 4px 14px rgba(99,102,241,0.3)" }}
+                >
+                  {loading ? <Loader2 style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+                  {loading ? "Enregistrement..." : "Enregistrer"}
+                </button>
+              </div>
+            </div>
 
-                {/* Basic Information */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Informations de base</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Titre du bootcamp *
-                      </label>
+            <div style={{ flex: 1, overflowY: "auto", padding: "28px" }}>
+              <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: 28 }}>
+
+                <FormCard title="Couverture" icon={<ImagePlus style={{ width: 16, height: 16 }} />}>
+                  <div>
+                    <FieldLabel>Image de couverture</FieldLabel>
+                    <div
+                      style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 12, border: "2px dashed #e2e8f0", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", position: "relative" }}
+                      onClick={() => document.getElementById("coverInput")?.click()}
+                    >
+                      {editingBootcamp.coverPreview ? (
+                        <img src={editingBootcamp.coverPreview} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="Cover preview" />
+                      ) : (
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 28, color: "#94a3b8", marginBottom: 6 }}>+</div>
+                          <p style={{ fontSize: 12, color: "#94a3b8", margin: 0 }}>Resolution recommandee : 1920x1080</p>
+                        </div>
+                      )}
                       <input
-                        type="text"
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent transition-all"
-                        value={editingBootcamp.title}
-                        onChange={(e) => setEditingBootcamp({ ...editingBootcamp, title: e.target.value })}
-                        placeholder="Ex: Bootcamp Développeur Full Stack"
+                        id="coverInput"
+                        type="file"
+                        accept="image/*"
+                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer" }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) handleImageChange(file)
+                        }}
                       />
                     </div>
+                  </div>
+                </FormCard>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormCard title="Informations de base" icon={<BookOpen style={{ width: 16, height: 16 }} />}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div>
+                      <FieldLabel required>Titre du bootcamp</FieldLabel>
+                      <Input value={editingBootcamp.title} onChange={v => setEditingBootcamp({ ...editingBootcamp, title: v })} placeholder="Ex: Bootcamp Developpeur Full Stack" />
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Prérequis *
-                        </label>
-                        <select
-                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
-                          value={editingBootcamp.prerequis}
-                          onChange={(e) => setEditingBootcamp({ 
-                            ...editingBootcamp, 
-                            prerequis: e.target.value as "Aucun" | "Contacter l'administration" 
-                          })}
-                        >
+                        <FieldLabel required>Prerequis</FieldLabel>
+                        <SelectField value={editingBootcamp.prerequis} onChange={v => setEditingBootcamp({ ...editingBootcamp, prerequis: v as "Aucun" | "Contacter l'administration" })}>
                           {PREREQUIS_OPTIONS.map(option => (
                             <option key={option} value={option}>{option}</option>
                           ))}
-                        </select>
+                        </SelectField>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Durée totale *
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent transition-all"
-                          value={editingBootcamp.durationLabel}
-                          onChange={(e) => setEditingBootcamp({ ...editingBootcamp, durationLabel: e.target.value })}
-                          placeholder="Ex: 120 heures"
-                        />
+                        <FieldLabel required>Duree totale</FieldLabel>
+                        <Input value={editingBootcamp.durationLabel} onChange={v => setEditingBootcamp({ ...editingBootcamp, durationLabel: v })} placeholder="Ex: 120 heures" />
                       </div>
                     </div>
-
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Description courte *
-                      </label>
-                      <textarea
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent resize-none transition-all"
-                        rows={3}
-                        value={editingBootcamp.shortDescription}
-                        onChange={(e) => setEditingBootcamp({ ...editingBootcamp, shortDescription: e.target.value })}
-                        placeholder="Une brève description du bootcamp"
-                      />
+                      <FieldLabel required>Description courte</FieldLabel>
+                      <Textarea rows={3} value={editingBootcamp.shortDescription} onChange={v => setEditingBootcamp({ ...editingBootcamp, shortDescription: v })} placeholder="Une breve description du bootcamp" />
                     </div>
-
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Description détaillée
-                      </label>
-                      <textarea
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent resize-none transition-all"
-                        rows={5}
-                        value={editingBootcamp.longDescription}
-                        onChange={(e) => setEditingBootcamp({ ...editingBootcamp, longDescription: e.target.value })}
-                        placeholder="Description complète du bootcamp, objectifs, programme..."
-                      />
+                      <FieldLabel>Description detaillee</FieldLabel>
+                      <Textarea rows={5} value={editingBootcamp.longDescription} onChange={v => setEditingBootcamp({ ...editingBootcamp, longDescription: v })} placeholder="Description complete du bootcamp, objectifs, programme..." />
                     </div>
                   </div>
-                </div>
+                </FormCard>
 
-                {/* Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Note
-                    </label>
-                    <div className="relative">
-                      <input
+                <FormCard title="Statistiques" icon={<Star style={{ width: 16, height: 16 }} />}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div>
+                      <FieldLabel>Note</FieldLabel>
+                      <Input
                         type="number"
-                        step="0.1"
-                        min="0"
-                        max="5"
-                        className="w-full pl-8 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
                         value={editingBootcamp.rating}
-                        onChange={(e) => setEditingBootcamp({ ...editingBootcamp, rating: parseFloat(e.target.value) || 0 })}
+                        onChange={v => setEditingBootcamp({ ...editingBootcamp, rating: parseFloat(v) || 0 })}
                       />
-                      <Star className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-yellow-500 fill-current" />
+                    </div>
+                    <div>
+                      <FieldLabel>Nombre d'avis</FieldLabel>
+                      <Input
+                        type="number"
+                        value={editingBootcamp.reviewsCount}
+                        onChange={v => setEditingBootcamp({ ...editingBootcamp, reviewsCount: parseInt(v) || 0 })}
+                      />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nombre d'avis
-                    </label>
-                    <input
-                      type="number"
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
-                      value={editingBootcamp.reviewsCount}
-                      onChange={(e) => setEditingBootcamp({ ...editingBootcamp, reviewsCount: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                </div>
+                </FormCard>
 
-                {/* Course Assignment - New Dropdown Style */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Formations inclus</h3>
-                  
-                  {/* Add Course Dropdown */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Ajouter une formation
-                    </label>
-                    <div className="relative" ref={courseDropdownRef}>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <FormCard title="Formations incluses" icon={<Layers style={{ width: 16, height: 16 }} />}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div>
+                      <FieldLabel>Ajouter une formation</FieldLabel>
+                      <div style={{ position: "relative" }} ref={courseDropdownRef}>
+                        <div style={{ position: "relative" }}>
+                          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#94a3b8" }} />
                           <input
                             type="text"
-                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
+                            style={{ width: "100%", padding: "9px 12px 9px 36px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit" }}
                             placeholder="Rechercher une formation..."
                             value={courseSearch}
                             onChange={(e) => {
@@ -665,188 +644,118 @@ export default function BootcampsCrud({
                             onFocus={() => setShowCourseDropdown(true)}
                             onKeyDown={handleKeyPress}
                           />
-                          
-                          {/* Dropdown */}
-                          {showCourseDropdown && availableCourses.length > 0 && (
-                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                              {availableCourses.map((course) => (
-                                <div
-                                  key={course.id}
-                                  className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                                onClick={() => {
-  if (!editingBootcamp) return
-
-  if (!editingBootcamp.courseIds.includes(course.id!)) {
-    setEditingBootcamp({
-      ...editingBootcamp,
-      courseIds: [...editingBootcamp.courseIds, course.id!],
-    })
-  }
-
-  setCourseSearch("")
-  setSelectedCourseId("")
-  setShowCourseDropdown(false)
-}}
-
-                                >
-                                  <div className="font-medium text-gray-900">{course.title}</div>
-                                  <div className="text-sm text-gray-500 truncate">{course.shortDescription}</div>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded">
-                                      {course.levelLabel}
-                                    </span>
-                                    <span className="text-xs text-gray-500">{course.durationLabel}</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
                         </div>
-                        
-                     
+
+                        {showCourseDropdown && availableCourses.length > 0 && (
+                          <div style={{ position: "absolute", zIndex: 10, width: "100%", marginTop: 6, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 8px 20px rgba(15,23,42,0.08)", maxHeight: 260, overflowY: "auto" }}>
+                            {availableCourses.map(course => (
+                              <div
+                                key={course.id}
+                                style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9", cursor: "pointer" }}
+                                onClick={() => {
+                                  if (!editingBootcamp) return
+                                  if (!editingBootcamp.courseIds.includes(course.id!)) {
+                                    setEditingBootcamp({
+                                      ...editingBootcamp,
+                                      courseIds: [...editingBootcamp.courseIds, course.id!],
+                                    })
+                                  }
+                                  setCourseSearch("")
+                                  setSelectedCourseId("")
+                                  setShowCourseDropdown(false)
+                                }}
+                              >
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{course.title}</div>
+                                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{course.shortDescription}</div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                                  <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 6, background: "#f1f5f9", color: "#475569" }}>{course.levelLabel}</span>
+                                  <span style={{ fontSize: 11, color: "#94a3b8" }}>{course.durationLabel}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      
-                      {selectedCourseId && !showCourseDropdown && (
-                        <div className="mt-2 text-sm text-gray-600">
-                          Sélectionné: {courses.find(c => c.id === selectedCourseId)?.title}
+                    </div>
+
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: "#475569", margin: 0 }}>Formations selectionnees ({getAssignedCourses().length})</p>
+                        <p style={{ fontSize: 11, color: "#94a3b8", margin: 0 }}>Utilisez les fleches pour reorganiser</p>
+                      </div>
+
+                      {getAssignedCourses().length === 0 ? (
+                        <div style={{ padding: "16px", borderRadius: 10, border: "1px dashed #e2e8f0", background: "#f8fafc", textAlign: "center", fontSize: 12, color: "#94a3b8" }}>
+                          Aucune formation selectionnee.
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {getAssignedCourses().map((course, index) => (
+                            <div key={course.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, border: "1px solid #e8ecf3", background: "#fff" }}>
+                              <div style={{ width: 26, height: 26, borderRadius: 8, background: "rgba(99,102,241,0.12)", color: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>{index + 1}</div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{course.title}</div>
+                                <div style={{ fontSize: 12, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{course.shortDescription}</div>
+                              </div>
+                              <div style={{ display: "flex", gap: 4 }}>
+                                <IconBtn onClick={() => handleMoveCourse(course.id!, "up")} color="#64748b" hoverBg="#f1f5f9"><ChevronUp style={{ width: 12, height: 12 }} /></IconBtn>
+                                <IconBtn onClick={() => handleMoveCourse(course.id!, "down")} color="#64748b" hoverBg="#f1f5f9"><ChevronDown style={{ width: 12, height: 12 }} /></IconBtn>
+                                <IconBtn onClick={() => handleRemoveCourse(course.id!)} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)"><Trash2 style={{ width: 12, height: 12 }} /></IconBtn>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
                   </div>
-
-                  {/* Assigned Courses List */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium text-gray-700">Formation sélectionnés ({getAssignedCourses().length})</h4>
-                      <p className="text-sm text-gray-500">Cliquez sur les flèches pour réorganiser</p>
-                    </div>
-                    
-                    {getAssignedCourses().length === 0 ? (
-                      <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg text-center">
-                        <p className="text-gray-500">Aucun Formation sélectionné</p>
-                        <p className="text-sm text-gray-400 mt-1">Ajoutez des formations ci-dessus</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {getAssignedCourses().map((course, index) => (
-                          <div
-                            key={course.id}
-                            className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200"
-                          >
-                            <div className="flex-shrink-0 w-8 text-center text-gray-500">
-                              {index + 1}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h5 className="font-medium text-gray-900 truncate">{course.title}</h5>
-                              <p className="text-sm text-gray-500 truncate">{course.shortDescription}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
-                                  {course.levelLabel}
-                                </span>
-                                <span className="text-xs text-gray-500">{course.durationLabel}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleMoveCourse(course.id!, "up")}
-                                disabled={index === 0}
-                                className="p-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-100 transition-colors"
-                                title="Déplacer vers le haut"
-                              >
-                                <ChevronUp className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleMoveCourse(course.id!, "down")}
-                                disabled={index === getAssignedCourses().length - 1}
-                                className="p-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-100 transition-colors"
-                                title="Déplacer vers le bas"
-                              >
-                                <ChevronDown className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleRemoveCourse(course.id!)}
-                                className="p-1.5 hover:bg-red-100 rounded-lg transition-colors"
-                                title="Retirer"
-                              >
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                </FormCard>
               </div>
             </div>
-          ) : (
-            <div className="bg-accent/10 p-12 rounded-xl border border-blue-100 text-center h-full flex justify-center flex-col">
-              <Users className="w-16 h-16 text-accent mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucun bootcamp sélectionné</h3>
-              <p className="text-gray-600 mb-6">
-                Sélectionnez un bootcamp dans la liste pour le modifier, ou créez-en un nouveau.
-              </p>
-              <button
-                onClick={handleNewBootcamp}
-                className="inline-flex cursor-pointer w-fit mx-auto items-center gap-2 px-6 py-3 bg-accent text-white rounded-lg shadow-md hover:bg-accent/90 transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                Créer un nouveau bootcamp
-              </button>
+          </>
+        ) : (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+            <div style={{ width: 80, height: 80, borderRadius: 24, background: "linear-gradient(135deg,rgba(99,102,241,0.12),rgba(129,140,248,0.06))", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Users style={{ width: 36, height: 36, color: "var(--accent,#6366f1)" }} />
             </div>
-          )}
-        </div>
+            <div style={{ textAlign: "center" }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", margin: "0 0 6px" }}>Aucun bootcamp selectionne</h3>
+              <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>Choisissez un bootcamp dans la liste ou creez-en un nouveau.</p>
+            </div>
+            <button onClick={handleNewBootcamp} style={{ marginTop: 8, padding: "10px 24px", background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 4px 14px rgba(99,102,241,0.3)" }}>
+              <Plus style={{ width: 16, height: 16 }} /> Creer un bootcamp
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* 🔔 TOAST SYSTEM - Toast Container */}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-3 max-w-md">
-        {toasts.map((toast) => {
-          const elapsed = Date.now() - toast.createdAt
-          const progress = Math.max(0, 100 - (elapsed / toast.duration) * 100)
-          
+      {/* Toasts */}
+      <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 10 }}>
+        {toasts.map(toast => {
+          if (toast.type === "loading") return null
+          const progress = Math.max(0, 100 - ((Date.now() - toast.createdAt) / toast.duration) * 100)
+          const ok = toast.type === "success"
           return (
-            <div
-              key={toast.id}
-              className={`
-                relative overflow-hidden rounded-xl shadow-lg border transform transition-all duration-300
-                ${toast.type === "success" 
-                  ? "bg-green-50 border-green-200 text-green-800" 
-                  : toast.type === "error" 
-                  ? "bg-red-50 border-red-200 text-red-800"
-                  : "hidden"}
-              `}
-            >
-              {/* Progress Bar */}
-              <div 
-                className={`
-                  absolute bottom-0 left-0 h-1 transition-all duration-100
-                  ${toast.type === "success" 
-                    ? "bg-green-500" 
-                    : toast.type === "error" 
-                    ? "bg-red-500"
-                    : "bg-blue-500"}
-                `}
-                style={{ width: `${progress}%` }}
-              />
-              
-              <div className="flex items-start gap-3 p-4">
-                <div className="flex-shrink-0 mt-0.5">
-                  {toast.type === "success" && <CheckCircle className="w-5 h-5 text-green-600" />}
-                  {toast.type === "error" && <AlertCircle className="w-5 h-5 text-red-600" />}
-                  {toast.type === "loading" && <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />}
-                </div>
-                <div className="flex-1 text-sm font-medium">{toast.message}</div>
-                <button
-                  onClick={() => removeToast(toast.id)}
-                  className="flex-shrink-0 text-gray-400 hover:text-gray-600 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+            <div key={toast.id} style={{ position: "relative", overflow: "hidden", background: ok ? "#f0fdf4" : "#fff1f2", border: `1px solid ${ok ? "#bbf7d0" : "#fecdd3"}`, borderRadius: 14, boxShadow: "0 8px 24px rgba(0,0,0,0.1)", minWidth: 280, maxWidth: 360, animation: "slideIn 0.2s ease" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px" }}>
+                {ok ? <CheckCircle style={{ width: 18, height: 18, color: "#22c55e", flexShrink: 0 }} /> : <AlertCircle style={{ width: 18, height: 18, color: "#f43f5e", flexShrink: 0 }} />}
+                <p style={{ flex: 1, fontSize: 13, fontWeight: 600, color: ok ? "#166534" : "#9f1239", margin: 0 }}>{toast.message}</p>
+                <button onClick={() => removeToast(toast.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#94a3b8", display: "flex" }}><X style={{ width: 14, height: 14 }} /></button>
               </div>
+              <div style={{ position: "absolute", bottom: 0, left: 0, height: 3, background: ok ? "#22c55e" : "#f43f5e", width: `${progress}%`, transition: "width 0.1s linear" }} />
             </div>
           )
         })}
       </div>
+
+      <style>{`
+        @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        ::-webkit-scrollbar{width:5px;height:5px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:99px}
+        ::-webkit-scrollbar-thumb:hover{background:#cbd5e1}
+      `}</style>
     </div>
   )
+
 }

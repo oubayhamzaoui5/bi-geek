@@ -20,6 +20,8 @@ const router = useRouter()
 const adminLinks = [
   { icon: BookOpen, label: "Formations", href: "/admin-dashboard/courses" },
   { icon: Layers, label: "Bootcamps", href: "/admin-dashboard/bootcamps" },
+  { icon: Users, label: "Groupes", href: "/admin-dashboard/groups" },
+  { icon: Users, label: "Utilisateurs", href: "/admin-dashboard/users" },
     { icon: Users, label: "Inscriptions", href: "/admin-dashboard/enrollments" },
     { icon: Award, label: "Vedettes", href: "/admin-dashboard/featured" },
 
