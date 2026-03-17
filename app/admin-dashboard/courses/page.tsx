@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import CoursesCrud from "@/components/admin/CoursesCrud"
 import LoadingBI from "@/components/LoadingBI"
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 
 export default function AdminCoursesPage() {
   const [courses, setCourses] = useState<any[]>([])
@@ -134,11 +135,18 @@ export default function AdminCoursesPage() {
   }
 
   return (
-    <CoursesCrud
-      initialCourses={courses}
-      onSave={handleSave}
-      onDelete={handleDelete}
-      onView={handleView}
-    />
+    <>
+      <AdminPageHeader
+        title="Formations"
+        description="Gérer les formations de la plateforme"
+        breadcrumbs={[{ label: "Formations" }]}
+      />
+      <CoursesCrud
+        initialCourses={courses}
+        onSave={handleSave}
+        onDelete={handleDelete}
+        onView={handleView}
+      />
+    </>
   )
 }

@@ -21,7 +21,7 @@ export default function AdminPage() {
     }
     
      else {
-      router.push("/admin-dashboard/courses") // admin → redirect
+      router.push("/admin-dashboard/overview") // admin → redirect
     }
   }, [router])
 

@@ -15,6 +15,7 @@ type Program = {
   tags?: string[]
   image?: string | null
   slug?: string
+  progress?: number
 }
 
 type ProgramVariant = "course" | "bootcamp"
@@ -80,6 +81,22 @@ export function ProgramCard({ program, variant = "course", hrefOverride }: Progr
             {program.shortDescription}
           </p>
         </CardContent>
+
+        {/* Progress bar (optional) */}
+        {typeof program.progress === "number" && (
+          <div className="px-2 md:px-4 pb-1">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
+              <span>Progression</span>
+              <span className="font-semibold text-foreground">{Math.round(program.progress)}%</span>
+            </div>
+            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-accent to-accent/70 rounded-full transition-all duration-700"
+                style={{ width: `${program.progress}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         <CardFooter className="flex gap-2 items-center px-2 py-1 md:px-4 md:py-2 justify-between border-t border-accent/20">
           <div className="flex items-center gap-1 text-sm text-muted-foreground">

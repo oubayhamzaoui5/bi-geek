@@ -27,6 +27,9 @@ function isLiveNow(s: Session, now = new Date()): boolean {
   return now >= start && now <= end
 }
 
+const DAYS_FR = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"]
+const MONTHS_FR = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+
 export function UpcomingSessions({ sessions = [] }: { sessions?: Session[] }) {
   const now = new Date()
 
@@ -44,69 +47,83 @@ export function UpcomingSessions({ sessions = [] }: { sessions?: Session[] }) {
   return (
     <div className="rounded-xl border border-border bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/80 shadow-md p-4 md:p-6 h-full flex flex-col min-h-0">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold text-foreground shrink-0 flex items-center gap-2">
+        <h3 className="text-lg font-bold text-foreground shrink-0 flex items-center gap-2">
           <Calendar className="w-5 h-5 text-accent" />
-          Sessions Ã  venir
+          Sessions à venir
         </h3>
-        <a
-          href="#"
-          className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Voir tout
-        </a>
       </div>
+
       <div
-        className="space-y-3 overflow-y-auto pr-1 -mr-1 max-h-[18rem]"
+        className="space-y-3 overflow-y-auto pr-1 -mr-1 flex-1"
         style={{ scrollbarGutter: "stable" }}
       >
         {ordered.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-            Aucune session Ã  venir pour le moment.
+          <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground text-center">
+            Aucune session à venir pour le moment.
           </div>
         ) : (
           ordered.map((s) => {
             const liveNow = isLiveNow(s, now)
+            const sessionDate = new Date(s.date)
+            const day = sessionDate.getDate()
+            const monthStr = MONTHS_FR[sessionDate.getMonth()]
+            const dayStr = DAYS_FR[sessionDate.getDay()]
+
             return (
               <div
                 key={s.id}
-                className="p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors"
+                className={`flex items-start gap-3 p-3 rounded-xl border transition-all
+                  ${liveNow
+                    ? "border-accent/40 bg-accent/5 shadow-sm shadow-accent/10"
+                    : "border-border bg-muted/20 hover:bg-muted/40"
+                  }`}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <h4 className="font-semibold text-foreground text-sm">{s.title}</h4>
-
-                  {liveNow && (
-                    <span className="inline-flex items-center gap-1 text-destructive text-xs font-semibold">
-                      <span className="w-2.5 h-2.5 rounded-full bg-destructive animate-pulse" />
-                      En direct
-                    </span>
-                  )}
+                {/* Date Badge */}
+                <div className={`shrink-0 w-14 h-16 rounded-xl flex flex-col items-center justify-center text-center
+                  ${liveNow
+                    ? "bg-accent text-white"
+                    : "bg-muted/60 text-foreground"
+                  }`}>
+                  <span className="text-lg font-bold leading-tight">{day}</span>
+                  <span className="text-[10px] font-medium uppercase leading-tight">{monthStr}</span>
+                  <span className="text-[9px] opacity-70 leading-tight">{dayStr}</span>
                 </div>
 
-                <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <Calendar size={12} className="shrink-0" />
-                    <span>
-                      {new Date(s.date).toLocaleDateString("fr-FR")} Ã  {s.time}
-                      {s.durationMin ? ` â€” ${s.durationMin} min` : null}
-                    </span>
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="font-semibold text-foreground text-sm leading-snug truncate">{s.title}</h4>
+                    {liveNow && (
+                      <span className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-red-500">
+                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                        Live
+                      </span>
+                    )}
                   </div>
-                  <p>
-                    Formateur : <span className="text-foreground">{s.instructor}</span>
-                  </p>
-                </div>
 
-                {liveNow && s.joinUrl && (
-                  <div className="mt-3">
+                  <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                    <p>
+                      {s.time}{s.durationMin ? ` – ${s.durationMin} min` : ""}
+                    </p>
+                    <p>
+                      Formateur : <span className="text-foreground font-medium">{s.instructor}</span>
+                    </p>
+                  </div>
+
+                  {liveNow && s.joinUrl && (
                     <a
                       href={s.joinUrl}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:opacity-90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label={`Participer Ã  ${s.title}`}
+                      className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg
+                                 bg-accent text-white text-xs font-semibold
+                                 hover:opacity-90 transition-colors
+                                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`Participer à ${s.title}`}
                     >
-                      <Radio className="w-4 h-4" />
+                      <Radio className="w-3.5 h-3.5" />
                       Participer
                     </a>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )
           })

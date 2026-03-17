@@ -17,7 +17,7 @@ export function RecentAnnouncements({ announcements = [] }: { announcements?: An
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
           <Bell className="w-5 h-5 text-accent" />
-          Annonces rÃ©centes
+          Annonces récentes
         </h3>
 
         <a

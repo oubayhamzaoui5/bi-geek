@@ -1,10 +1,10 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Menu, X, Home, BookOpen, Award, Settings, LogOut, ChevronLeft,
-  Calendar, MessageSquare, Megaphone, Layers , Users 
+  Calendar, MessageSquare, Megaphone, Layers, Users, ClipboardList, Star,
 } from "lucide-react"
 
 import Link from "next/link"
@@ -12,41 +12,69 @@ import { usePathname } from "next/navigation"
 import { useSidebar } from "@/components/ui/sidebar-context"
 
 export function Sidebar({ variant = "student" }: { variant?: "student" | "admin" }) {
-const router = useRouter()
-  const [isOpen, setIsOpen] = useState(true) // mobile slide-in
-  const { isCollapsed, setIsCollapsed } = useSidebar() // from context
+  const router = useRouter()
+  const [isOpen, setIsOpen] = useState(true)
+  const { isCollapsed, setIsCollapsed } = useSidebar()
   const pathname = usePathname()
 
-const adminLinks = [
-  { icon: BookOpen, label: "Formations", href: "/admin-dashboard/courses" },
-  { icon: Layers, label: "Bootcamps", href: "/admin-dashboard/bootcamps" },
-  { icon: Users, label: "Groupes", href: "/admin-dashboard/groups" },
-  { icon: Users, label: "Utilisateurs", href: "/admin-dashboard/users" },
-    { icon: Users, label: "Inscriptions", href: "/admin-dashboard/enrollments" },
-    { icon: Award, label: "Vedettes", href: "/admin-dashboard/featured" },
+  // User info for profile section
+  const [userName, setUserName] = useState("")
+  const [userInitials, setUserInitials] = useState("U")
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("user")
+      const user = raw ? JSON.parse(raw) : null
+      const name =
+        user?.username?.trim() ||
+        user?.email?.split("@")?.[0]?.trim() ||
+        (variant === "admin" ? "Admin" : "Étudiant")
+      setUserName(name)
+      setUserInitials(
+        name
+          .split(" ")
+          .map((w: string) => w[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2)
+      )
+    } catch {
+      setUserName(variant === "admin" ? "Admin" : "Étudiant")
+      setUserInitials("U")
+    }
+  }, [variant])
 
-]
+  const adminLinks = [
+    { icon: Home, label: "Accueil", href: "/admin-dashboard/overview" },
+    { icon: BookOpen, label: "Formations", href: "/admin-dashboard/courses" },
+    { icon: Layers, label: "Bootcamps", href: "/admin-dashboard/bootcamps" },
+    { icon: Users, label: "Groupes", href: "/admin-dashboard/groups" },
+    { icon: Users, label: "Utilisateurs", href: "/admin-dashboard/users" },
+    { icon: ClipboardList, label: "Inscriptions", href: "/admin-dashboard/enrollments" },
+    { icon: Star, label: "Vedettes", href: "/admin-dashboard/featured" },
+  ]
 
-const studentLinks = [
-  { icon: Home, label: "Accueil", href: "/student-dashboard" },
-  { icon: BookOpen, label: "Formations", href: "/student-dashboard/courses" },
-  { icon: Calendar, label: "Calendrier", href: "/student-dashboard/calendar" },
-  { icon: MessageSquare, label: "Messages", href: "/student-dashboard/messages" },
-  { icon: Megaphone, label: "Annonces", href: "/student-dashboard/announcements" },
-  { icon: Award, label: "Certificats", href: "/student-dashboard/certificates" },
-  { icon: Settings, label: "Paramètres", href: "/student-dashboard/settings" },
-]
+  const studentLinks = [
+    { icon: Home, label: "Accueil", href: "/student-dashboard" },
+    { icon: BookOpen, label: "Formations", href: "/student-dashboard/courses" },
+    { icon: Calendar, label: "Calendrier", href: "/student-dashboard/calendar" },
+    { icon: MessageSquare, label: "Messages", href: "/student-dashboard/messages" },
+    { icon: Megaphone, label: "Annonces", href: "/student-dashboard/announcements" },
+    { icon: Award, label: "Certificats", href: "/student-dashboard/certificates" },
+    { icon: Settings, label: "Paramètres", href: "/student-dashboard/settings" },
+  ]
 
-const primaryLinks = variant === "admin" ? adminLinks : studentLinks
-
+  const primaryLinks = variant === "admin" ? adminLinks : studentLinks
 
   const isActivePath = (href: string) => {
     if (href === "/student-dashboard/courses") {
       return pathname.startsWith("/student-dashboard/course") ||
              pathname.startsWith("/student-dashboard/courses")
     }
-    return pathname === href
+    if (href === "/admin-dashboard/overview") {
+      return pathname === "/admin-dashboard/overview" || pathname === "/admin-dashboard"
+    }
+    return pathname === href || pathname.startsWith(href + "/")
   }
 
   return (
@@ -83,10 +111,10 @@ const primaryLinks = variant === "admin" ? adminLinks : studentLinks
 
         {/* CONTENT */}
         <div className="flex h-full flex-col">
-          {/* === LOGO (replaced) === */}
+          {/* === LOGO === */}
           {isCollapsed ? (
             <Link href="/" className="flex items-center justify-center mt-3" aria-label="BI GEEK - Accueil">
-              <div className="text-2xl font-extrabold   ">
+              <div className="text-2xl font-extrabold">
                 <span className="text-accent">BI</span>
               </div>
             </Link>
@@ -98,11 +126,27 @@ const primaryLinks = variant === "admin" ? adminLinks : studentLinks
               </div>
             </Link>
           )}
-          {/* === /LOGO === */}
+
+          {/* === User Profile === */}
+          <div className={`mx-2 mt-3 mb-1 rounded-lg bg-sidebar-accent/15 border border-sidebar-border/30
+            ${isCollapsed ? "flex items-center justify-center p-2" : "p-3"}`}>
+            <div className={`flex items-center ${isCollapsed ? "" : "gap-3"}`}>
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-accent/60
+                              flex items-center justify-center text-[11px] font-bold text-white shrink-0">
+                {userInitials}
+              </div>
+              {!isCollapsed && (
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-sidebar-foreground truncate">{userName}</p>
+                  <p className="text-[10px] text-sidebar-foreground/50 capitalize">{variant}</p>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Nav */}
           <div className="flex-1 overflow-y-auto px-2">
-            <div className="flex flex-col items-stretch w-full mt-3 border-t border-sidebar-border/50">
+            <div className="flex flex-col items-stretch w-full mt-2 border-t border-sidebar-border/50">
               {primaryLinks.map((item, i) => {
                 const active = isActivePath(item.href)
                 return (
@@ -112,11 +156,14 @@ const primaryLinks = variant === "admin" ? adminLinks : studentLinks
                     scroll
                     title={isCollapsed ? item.label : undefined}
                     className={`flex items-center w-full rounded
-                      ${isCollapsed ? "justify-center h-12 mt-2" : "h-12 px-3 mt-2"}
-                      ${active ? "bg-sidebar-accent/20 text-accent" : "text-sidebar-foreground hover:bg-sidebar-accent/10"}
+                      ${isCollapsed ? "justify-center h-11 mt-1.5" : "h-11 px-3 mt-1.5"}
+                      ${active
+                        ? "bg-sidebar-accent/20 text-accent"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/10"
+                      }
                       transition-colors`}
                   >
-                    <item.icon className="shrink-0" size={24} />
+                    <item.icon className="shrink-0" size={20} />
                     {!isCollapsed && <span className="ml-2 text-sm font-medium">{item.label}</span>}
                   </Link>
                 )
@@ -125,25 +172,20 @@ const primaryLinks = variant === "admin" ? adminLinks : studentLinks
             <div className="flex flex-col items-stretch w-full mt-2 border-t border-sidebar-border/50" />
           </div>
 
-          {/* Bottom */}
-         {/* Bottom Logout Button */}
-<button
-  onClick={() => {
-    // Remove user from localStorage
-    localStorage.removeItem("user")
-
-    // Redirect to home
-    router.push("/")
-  }}
-  title={isCollapsed ? "Déconnexion" : undefined}
-  className={`w-full flex items-center cursor-pointer
-    ${isCollapsed ? "justify-center h-16" : "h-16 px-3"}
-    bg-sidebar/60 hover:bg-sidebar-accent/10 text-sidebar-foreground transition-colors`}
->
-  <LogOut size={22} className="shrink-0" />
-  {!isCollapsed && <span className="ml-2 text-sm font-medium">Déconnexion</span>}
-</button>
-
+          {/* Bottom Logout Button */}
+          <button
+            onClick={() => {
+              localStorage.removeItem("user")
+              router.push("/")
+            }}
+            title={isCollapsed ? "Déconnexion" : undefined}
+            className={`w-full flex items-center cursor-pointer
+              ${isCollapsed ? "justify-center h-14" : "h-14 px-3"}
+              bg-sidebar/60 hover:bg-sidebar-accent/10 text-sidebar-foreground transition-colors`}
+          >
+            <LogOut size={20} className="shrink-0" />
+            {!isCollapsed && <span className="ml-2 text-sm font-medium">Déconnexion</span>}
+          </button>
         </div>
       </aside>
 

@@ -22,19 +22,27 @@ type CoursesApiItem = {
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([])
+  const getStudentId = () => {
+    try {
+      const userString = typeof window !== "undefined" ? localStorage.getItem("user") : null
+      const user = userString ? JSON.parse(userString) : null
+      const id = user?.id ?? user?.record?.id ?? user?.user?.id ?? ""
+      return typeof id === "string" ? id.trim() : ""
+    } catch {
+      return ""
+    }
+  }
+
 
   useEffect(() => {
     const controller = new AbortController()
 
     const load = async () => {
       try {
-        let studentId = ""
-        try {
-          const userString = typeof window !== "undefined" ? localStorage.getItem("user") : null
-          const user = userString ? JSON.parse(userString) : null
-          studentId = (user?.id as string | undefined) ?? ""
-        } catch {
-          studentId = ""
+        const studentId = getStudentId()
+        if (!studentId) {
+          setCourses([])
+          return
         }
 
         const res = await fetch(`/api/courses?studentId=${encodeURIComponent(studentId)}`, {

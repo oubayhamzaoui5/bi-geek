@@ -30,7 +30,7 @@ export function CoursesSection({
   return (
     <section className="space-y-6">
       <h2 className="text-3xl font-bold text-accent mb-2">
-        {showCompleted ? "Formations complÃ©tÃ©s" : "Formations actifs"}
+        {showCompleted ? "Formations terminées" : "Formations actives"}
       </h2>
 
       <div
