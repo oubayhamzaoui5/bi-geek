@@ -45,23 +45,27 @@ export default function CoursesPage() {
           return
         }
 
-        const res = await fetch(`/api/courses?studentId=${encodeURIComponent(studentId)}`, {
+        const res = await fetch(`/api/student-programs?studentId=${encodeURIComponent(studentId)}`, {
           signal: controller.signal,
         })
         if (!res.ok) return
         const data = await res.json()
-        const items = (data.courses ?? []) as CoursesApiItem[]
+        const items = (data.programs ?? []) as CoursesApiItem[]
         setCourses(
-          items.map((c) => ({
-            id: c.id,
-            slug: c.slug ?? c.id,
-            title: c.title,
-            progress: 0,
-            duration: c.durationLabel ?? "",
-            thumbnail: c.coverImage ?? "/placeholder-course.png",
-            hasWork: false,
-            status: "active" as CourseStatus,
-          })),
+          items.map((c: any) => {
+            const isCompleted = c.completed === true || c.status === "completed"
+            
+            return {
+              id: c.id,
+              slug: c.slug ?? c.id,
+              title: c.title,
+              progress: isCompleted ? 100 : 0, // Could be replaced by actual progress percentage in future DB iteration
+              duration: c.durationLabel ?? "",
+              thumbnail: c.coverImage ?? "/placeholder-course.png",
+              hasWork: false,
+              status: isCompleted ? "completed" : "active",
+            }
+          }),
         )
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
@@ -91,26 +95,26 @@ export default function CoursesPage() {
             </h2>
 
             <CourseSection
-              title="Prochains Formations"
-              subtitle="Inscrivez-vous avant le dÃ©but des sessions"
+              title="Prochaines Formations"
+              subtitle="Inscrivez-vous avant le début des sessions"
               courses={byStatus("upcoming")}
             />
 
             <CourseSection
-              title="Formations actifs"
-              subtitle="Reprenez lÃ  oÃ¹ vous vous Ãªtes arrÃªtÃ©"
+              title="Formations actives"
+              subtitle="Reprenez là où vous vous êtes arrêté"
               courses={byStatus("active")}
             />
 
             <CourseSection
-              title="Formations complÃ©tÃ©s"
-              subtitle="Consultez vos cours terminÃ©s"
+              title="Formations terminées"
+              subtitle="Consultez vos formations terminées"
               courses={byStatus("completed")}
             />
 
             <CourseSection
-              title="Formations enregistrÃ©s"
-              subtitle="Apprenez Ã  votre rythme â€” contenu prÃªt Ã  regarder"
+              title="Formations enregistrées"
+              subtitle="Apprenez à votre rythme — contenu prêt à regarder"
               courses={byStatus("stored")}
             />
           </div>

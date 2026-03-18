@@ -55,6 +55,7 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
       return {
         title: m.title,
         duration: m.durationLabel ?? "",
+        locked: !!m.locked,
         lessons,
       };
     });
@@ -106,6 +107,7 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
       return {
         title: m.title,
         duration: m.durationLabel ?? "",
+        locked: !!m.locked,
         lessons,
       };
     });

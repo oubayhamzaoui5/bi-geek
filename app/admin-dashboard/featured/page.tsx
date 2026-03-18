@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react"
 import FeaturedSelection from "@/components/admin/FeaturedSelection"
 import LoadingBI from "@/components/LoadingBI"
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 
 export default function AdminFeaturedPage() {
   const [loading, setLoading] = useState(true)
@@ -55,7 +56,6 @@ export default function AdminFeaturedPage() {
         throw new Error(error.error || "Failed to save")
       }
 
-      return true
     } catch (error) {
       console.error("Error saving featured items:", error)
       throw error
@@ -65,14 +65,21 @@ export default function AdminFeaturedPage() {
   if (loading) return <LoadingBI />
 
   return (
-    <div>
-      <FeaturedSelection
-        initialFeatured={featuredItems}
-        courses={courses}
-        bootcamps={bootcamps}
-        onSaveFeatured={handleSave}
-        maxItems={3}
+    <div className="flex flex-col min-h-full">
+      <AdminPageHeader
+        title="Contenu Vedette"
+        description="Sélectionner les formations et bootcamps mis en avant sur l'accueil"
+        breadcrumbs={[{ label: "Vedettes" }]}
       />
+      <div className="flex-1">
+        <FeaturedSelection
+          initialFeatured={featuredItems}
+          courses={courses}
+          bootcamps={bootcamps}
+          onSaveFeatured={handleSave}
+          maxItems={3}
+        />
+      </div>
     </div>
   )
 }

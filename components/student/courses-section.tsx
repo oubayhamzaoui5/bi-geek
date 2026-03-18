@@ -12,6 +12,7 @@ export type StudentProgram = {
   image?: string | null
   slug?: string
   completed?: boolean
+  progress?: number
   variant?: "course" | "bootcamp"
 }
 

@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 interface CourseProgressProps {
   completedLessons: number
@@ -33,63 +33,53 @@ export function CourseProgress({
 
   return (
     <div className="rounded-2xl border border-border bg-card/90 backdrop-blur shadow-[0_20px_60px_rgba(15,23,42,0.12)] p-5 md:p-6 space-y-6">
-      <div className="flex items-center gap-4 md:gap-5">
-        <div className="relative h-16 w-24 md:h-20 md:w-28 rounded-xl overflow-hidden border border-border">
-          <img
-            src={coverImage ?? "/placeholder-course.png"}
-            alt={courseTitle ?? "Course cover"}
-            className="h-full w-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
-        </div>
-
-        <div className="flex-1 space-y-2">
-          <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Progression</p>
-          <div className="flex items-center gap-3">
-            <div className="relative h-16 w-16">
-              <svg className="h-16 w-16 -rotate-90">
-                <circle
-                  cx="32"
-                  cy="32"
-                  r={radius}
-                  stroke="hsl(var(--muted))"
-                  strokeWidth="6"
-                  fill="none"
-                />
-                <circle
-                  cx="32"
-                  cy="32"
-                  r={radius}
-                  stroke="url(#progressGradient)"
-                  strokeWidth="6"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={dashOffset}
-                />
-                <defs>
-                  <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="hsl(var(--accent))" />
-                    <stop offset="100%" stopColor="hsl(var(--primary))" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-foreground">
+      <div className="flex flex-col items-center justify-center pt-2 pb-4 space-y-6">
+        <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground w-full text-center">Progression globale</p>
+        
+        <div className="relative h-40 w-40 md:h-48 md:w-48 flex-shrink-0 rounded-full border border-border/50 bg-muted/20 flex items-center justify-center shadow-inner">
+          <div className="absolute inset-0 m-4 rounded-full border border-border/80 bg-background shadow-sm flex items-center justify-center">
+            {/* The SVG is layered perfectly inside the double circles */}
+            <svg className="h-full w-full -rotate-90 scale-90" viewBox="0 0 100 100">
+              <circle
+                cx="50"
+                cy="50"
+                r={radius}
+                stroke="hsl(var(--muted))"
+                strokeWidth="5"
+                fill="none"
+              />
+              <circle
+                cx="50"
+                cy="50"
+                r={radius}
+                stroke="url(#progressGradientCard)"
+                strokeWidth="5"
+                fill="none"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={dashOffset}
+              />
+              <defs>
+                <linearGradient id="progressGradientCard" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="hsl(var(--accent))" />
+                  <stop offset="100%" stopColor="hsl(var(--primary))" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-transparent z-10">
+              <span className="text-3xl md:text-5xl font-extrabold text-foreground tabular-nums tracking-tighter">
                 {progressPercent}%
               </span>
             </div>
-
-            <div className="space-y-1">
-              <h3 className="text-lg font-semibold text-foreground">
-                {courseTitle ?? "Votre cours"}
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                {totalLessons > 0
-                  ? `${completedLessons} leçons terminées sur ${totalLessons}`
-                  : "Aucune leçon pour le moment."}
-              </p>
-            </div>
           </div>
+        </div>
+
+        <div className="text-center space-y-1">
+          <p className="text-sm font-medium text-foreground">
+            {totalLessons > 0
+              ? `${completedLessons} leçons terminées sur ${totalLessons}`
+              : "Aucune leçon pour le moment"}
+          </p>
         </div>
       </div>
 

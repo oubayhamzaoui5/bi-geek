@@ -17,9 +17,10 @@ type Toast = { id: string; type: ToastType; message: string; duration: number; c
 
 type AdminLesson = {
   id?: string; title: string; durationLabel: string; order?: number
+  locked?: boolean
   attachments?: File[]; attachmentsMeta?: AttachmentMeta[]; youtubeLinks?: YoutubeLinkItem[]
 }
-type AdminModule = { id?: string; title: string; durationLabel: string; order?: number; lessons: AdminLesson[] }
+type AdminModule = { id?: string; title: string; durationLabel: string; order?: number; locked?: boolean; lessons: AdminLesson[] }
 type CertificationItem = { title: string; issuer?: string; description?: string }
 type AttachmentMeta = { name: string; title?: string; description?: string; order?: number }
 type YoutubeLinkItem = { url: string; title?: string; description?: string; order?: number }
@@ -392,8 +393,10 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
   const handleSelectCourse = (course: AdminCourse) => {
     const normalizedModules = (course.modules ?? []).map(m => ({
       ...m,
+      locked: m.locked ?? false,
       lessons: (m.lessons ?? []).map(l => normalizeLessonResources({
         ...l,
+        locked: l.locked ?? false,
         attachments: l.attachments ?? [],
         attachmentsMeta: l.attachmentsMeta ?? [],
         youtubeLinks: l.youtubeLinks ?? [],
@@ -431,7 +434,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
   const handleAddModule = () => {
     if (!editingCourse) return
     const newIdx = (editingCourse.modules ?? []).length
-    setEditingCourse({ ...editingCourse, modules: [...(editingCourse.modules ?? []), { title: "Nouveau module", durationLabel: "", order: newIdx + 1, lessons: [] }] })
+    setEditingCourse({ ...editingCourse, modules: [...(editingCourse.modules ?? []), { title: "Nouveau module", durationLabel: "", order: newIdx + 1, locked: false, lessons: [] }] })
     setExpandedModules(prev => new Set([...prev, newIdx]))
   }
   const handleRemoveModule = (i: number) => editingCourse && setEditingCourse({ ...editingCourse, modules: editingCourse.modules.filter((_, j) => j !== i) })
@@ -442,7 +445,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
     const [item] = modules.splice(index, 1); modules.splice(target, 0, item)
     setEditingCourse({ ...editingCourse, modules: normalizeModulesOrder(modules) })
   }
-  const handleModuleChange = (index: number, field: string, value: string) => {
+  const handleModuleChange = (index: number, field: string, value: string | boolean) => {
     if (!editingCourse) return
     const modules = [...(editingCourse.modules ?? [])]
     modules[index] = { ...modules[index], [field]: value, lessons: modules[index].lessons ?? [] }
@@ -450,7 +453,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
   }
   const handleAddLesson = (mi: number) => {
     if (!editingCourse) return
-    const modules = editingCourse.modules.map((m, i) => i === mi ? { ...m, lessons: [...m.lessons, { title: "Nouvelle leçon", durationLabel: "", order: m.lessons.length + 1, attachments: [], attachmentsMeta: [], youtubeLinks: [] }] } : m)
+    const modules = editingCourse.modules.map((m, i) => i === mi ? { ...m, lessons: [...m.lessons, { title: "Nouvelle leçon", durationLabel: "", order: m.lessons.length + 1, locked: false, attachments: [], attachmentsMeta: [], youtubeLinks: [] }] } : m)
     setEditingCourse({ ...editingCourse, modules })
   }
   const handleRemoveLesson = (mi: number, li: number) => {
@@ -469,7 +472,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
     })
     setEditingCourse({ ...editingCourse, modules: normalizeModulesOrder(modules) })
   }
-  const handleLessonChange = (mi: number, li: number, field: string, value: string) => {
+  const handleLessonChange = (mi: number, li: number, field: string, value: string | boolean) => {
     if (!editingCourse) return
     const modules = editingCourse.modules.map((module, i) => i !== mi ? module : { ...module, lessons: module.lessons.map((lesson, j) => j === li ? { ...lesson, [field]: value } : lesson) })
     setEditingCourse({ ...editingCourse, modules })
@@ -882,6 +885,15 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                               style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#0f172a", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }} />
                             <input type="text" value={module.durationLabel} onChange={e => { e.stopPropagation(); handleModuleChange(mi, "durationLabel", e.target.value) }} onClick={e => e.stopPropagation()} placeholder="Durée"
                               style={{ width: 80, padding: "5px 10px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12, color: "#64748b", outline: "none", fontFamily: "inherit" }} />
+                            <label onClick={e => e.stopPropagation()} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "#64748b", fontWeight: 600, cursor: "pointer", background: "#f8fafc", border: "1px solid #e2e8f0", padding: "4px 8px", borderRadius: 8 }}>
+                              <input
+                                type="checkbox"
+                                checked={!!module.locked}
+                                onChange={e => handleModuleChange(mi, "locked", e.target.checked)}
+                                style={{ width: 14, height: 14 }}
+                              />
+                              Verrouillé
+                            </label>
                             <span style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap" }}>{module.lessons.length} leçon{module.lessons.length !== 1 ? "s" : ""}</span>
                             <div style={{ display: "flex", gap: 2 }} onClick={e => e.stopPropagation()}>
                               <IconBtn onClick={() => handleMoveModule(mi, "up")} color="#64748b"><ChevronUp style={{ width: 13, height: 13 }} /></IconBtn>
@@ -905,6 +917,15 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                                     />
                                     <input type="text" value={lesson.durationLabel} onChange={e => handleLessonChange(mi, li, "durationLabel", e.target.value)} placeholder="Durée"
                                       style={{ width: 72, padding: "7px 10px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12, color: "#64748b", outline: "none", fontFamily: "inherit" }} />
+                                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "#64748b", fontWeight: 600, cursor: "pointer", background: "#f8fafc", border: "1px solid #e2e8f0", padding: "4px 8px", borderRadius: 8 }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={!!lesson.locked}
+                                        onChange={e => handleLessonChange(mi, li, "locked", e.target.checked)}
+                                        style={{ width: 14, height: 14 }}
+                                      />
+                                      Verrouillé
+                                    </label>
                                     <div style={{ display: "flex", gap: 1 }}>
                                       <IconBtn onClick={() => handleMoveLesson(mi, li, "up")} color="#64748b"><ChevronUp style={{ width: 12, height: 12 }} /></IconBtn>
                                       <IconBtn onClick={() => handleMoveLesson(mi, li, "down")} color="#64748b"><ChevronDown style={{ width: 12, height: 12 }} /></IconBtn>

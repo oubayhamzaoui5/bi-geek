@@ -1,17 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BookOpen, Award, Clock, TrendingUp } from "lucide-react"
+import { BookOpen, Award } from "lucide-react"
 
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { WelcomeSection } from "@/components/welcome-section"
 import { CoursesSection, StudentProgram } from "@/components/student/courses-section"
-import { UpcomingSessions, Session } from "@/components/student/upcoming-sessions"
 import { Footer } from "@/components/footer"
 import { MessagesTab } from "@/components/messages-tab"
-import { RecentAnnouncements, Announcement } from "@/components/student/recent-announcements"
-import { ProgressOverview } from "@/components/student/progress-overview"
 import { SidebarProvider } from "@/components/ui/sidebar-context"
 
 type CoursesApiItem = {
@@ -66,8 +63,6 @@ function StatCard({
 export default function Dashboard() {
   const [studentName, setStudentName] = useState("Étudiant")
   const [programs, setPrograms] = useState<StudentProgram[]>([])
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [announcements, setAnnouncements] = useState<Announcement[]>([])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -83,35 +78,31 @@ export default function Dashboard() {
           studentId = ""
         }
 
-        const [coursesRes, dashboardRes] = await Promise.all([
-          fetch(`/api/student-programs?studentId=${encodeURIComponent(studentId)}`, {
-            signal: controller.signal,
-          }),
-          fetch("/api/student-dashboard", { signal: controller.signal }),
-        ])
+        const coursesRes = await fetch(`/api/student-programs?studentId=${encodeURIComponent(studentId)}`, {
+          signal: controller.signal,
+        })
 
         if (coursesRes.ok) {
           const data = await coursesRes.json()
           const items = (data.programs ?? []) as CoursesApiItem[]
           setPrograms(
-            items.map((c) => ({
-              id: c.id,
-              slug: c.slug ?? c.id,
-              title: c.title,
-              shortDescription: c.shortDescription,
-              durationLabel: c.durationLabel ?? "",
-              tags: c.tags ?? [],
-              image: c.coverImage ?? null,
-              completed: false,
-              variant: c.programType ?? "course",
-            })),
-          )
-        }
+            items.map((c: any) => {
+              const isCompleted = c.completed === true || c.status === "completed"
 
-        if (dashboardRes.ok) {
-          const data = await dashboardRes.json()
-          setSessions((data.sessions ?? []) as Session[])
-          setAnnouncements((data.announcements ?? []) as Announcement[])
+              return {
+                id: c.id,
+                slug: c.slug ?? c.id,
+                title: c.title,
+                shortDescription: c.shortDescription,
+                durationLabel: c.durationLabel ?? "",
+                tags: c.tags ?? [],
+                image: c.coverImage ?? null,
+                completed: isCompleted,
+                progress: isCompleted ? 100 : 0, // Fallback until db has progress percent
+                variant: c.programType ?? "course",
+              }
+            }),
+          )
         }
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
@@ -142,44 +133,19 @@ export default function Dashboard() {
   // Compute KPI stats
   const activeCount = programs.filter((p) => !p.completed).length
   const completedCount = programs.filter((p) => p.completed).length
-  const totalProgress = programs.length > 0
-    ? Math.round((completedCount / programs.length) * 100)
-    : 0
-
   return (
     <SidebarProvider>
       <div className="flex h-screen bg-muted/30">
         <Sidebar />
         <main className="flex-1 overflow-auto">
-          <Header variant="student" announcementCount={announcements.length} />
+          <Header variant="student" />
           <div className="p-4 md:p-8 space-y-6">
             <WelcomeSection name={studentName} variant="student" />
 
             {/* KPI Stats Row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               <StatCard icon={BookOpen} label="Formations actives" value={activeCount} accent />
               <StatCard icon={Award} label="Terminées" value={completedCount} />
-              <StatCard icon={Clock} label="Sessions à venir" value={sessions.length} />
-              <StatCard icon={TrendingUp} label="Progression" value={`${totalProgress}%`} accent />
-            </div>
-
-            {/* Main content: 3-column grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left: Sessions */}
-              <div className="lg:col-span-2">
-                <UpcomingSessions sessions={sessions} />
-              </div>
-
-              {/* Right: Announcements + Progress */}
-              <div className="space-y-6">
-                <RecentAnnouncements announcements={announcements} />
-                <ProgressOverview
-                  totalProgress={totalProgress}
-                  activeCourses={activeCount}
-                  certificates={completedCount}
-                  learningHours={activeCount * 20}
-                />
-              </div>
             </div>
 
             {/* Courses Grid */}

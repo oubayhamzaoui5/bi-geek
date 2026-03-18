@@ -6,7 +6,8 @@ type GroupRecord = {
   programType?: "course" | "bootcamp"
   course?: string | null
   bootcamp?: string | null
-  students?: string[]
+  students?: string[] | string | any
+  status?: "not_started" | "in_progress" | "completed"
 }
 
 const safeList = async <T>(
@@ -57,19 +58,37 @@ export async function GET(req: Request) {
     const pb = await getPocketBase()
     if (!pb) return NextResponse.json({ programs: [] })
 
-    const groups = await safeList<GroupRecord>(pb, "groups", { sort: "-created" })
-    const relatedGroups = groups.filter((g) =>
-      Array.isArray(g.students) && g.students.includes(studentId),
-    )
+    const groups = await safeList<GroupRecord>(pb, "groups")
+    const relatedGroups = groups.filter((g) => {
+      // Filter out 'pas encore' per the user's request
+      if (g.status === "not_started") return false
+
+      let studentArray: string[] = []
+      if (Array.isArray(g.students)) studentArray = g.students
+      else if (typeof g.students === "string") {
+        try {
+          studentArray = JSON.parse(g.students)
+        } catch {
+          studentArray = g.students.split(",").map((s) => s.trim())
+        }
+      }
+      return studentArray.includes(studentId)
+    })
+
+    const groupStatusMap = new Map<string, string>()
+    relatedGroups.forEach((g) => {
+      if (g.course) groupStatusMap.set(g.course, g.status || "in_progress")
+      if (g.bootcamp) groupStatusMap.set(g.bootcamp, g.status || "in_progress")
+    })
 
     const courseIds = new Set(
       relatedGroups
-        .filter((g) => g.programType === "course" && g.course)
+        .filter((g) => g.course) // Allow even if programType is missing
         .map((g) => g.course as string),
     )
     const bootcampIds = new Set(
       relatedGroups
-        .filter((g) => g.programType === "bootcamp" && g.bootcamp)
+        .filter((g) => g.bootcamp)
         .map((g) => g.bootcamp as string),
     )
 
@@ -78,8 +97,8 @@ export async function GET(req: Request) {
     }
 
     const [courseRecords, bootcampRecords] = await Promise.all([
-      safeList<any>(pb, "courses", { sort: "-created" }),
-      safeList<any>(pb, "bootcamps", { sort: "-created" }),
+      safeList<any>(pb, "courses"),
+      safeList<any>(pb, "bootcamps"),
     ])
 
     const courses = courseRecords
@@ -95,6 +114,8 @@ export async function GET(req: Request) {
           ? `${PB_URL}/api/files/courses/${c.id}/${c.coverImage}`
           : null,
         programType: "course" as const,
+        status: groupStatusMap.get(c.id) || "in_progress",
+        completed: groupStatusMap.get(c.id) === "completed"
       }))
 
     const bootcamps = bootcampRecords
@@ -110,6 +131,8 @@ export async function GET(req: Request) {
           ? `${PB_URL}/api/files/bootcamps/${b.id}/${b.coverImage}`
           : null,
         programType: "bootcamp" as const,
+        status: groupStatusMap.get(b.id) || "in_progress",
+        completed: groupStatusMap.get(b.id) === "completed"
       }))
 
     const programs = [...courses, ...bootcamps].sort((a, b) =>

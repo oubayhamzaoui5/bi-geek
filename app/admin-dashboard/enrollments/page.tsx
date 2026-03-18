@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react"
 import EnrollmentsCrud from "@/components/admin/EnrollmentsCrud"
 import LoadingBI from "@/components/LoadingBI"
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
+
 type EnrollmentStatus = "pending" | "contacted" | "confirmed"
 
 type AdminEnrollment = {
@@ -82,10 +84,17 @@ useEffect(() => {
 }
 
   return (
-    <EnrollmentsCrud
-      initialEnrollments={enrollments}
-      onUpdateStatus={updateStatus}
-      onDelete={deleteEnrollment}
-    />
+    <>
+      <AdminPageHeader
+        title="Inscriptions"
+        description="Suivre et gérer les inscriptions aux formations"
+        breadcrumbs={[{ label: "Inscriptions" }]}
+      />
+      <EnrollmentsCrud
+        initialEnrollments={enrollments}
+        onUpdateStatus={updateStatus}
+        onDelete={deleteEnrollment}
+      />
+    </>
   )
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import UsersCrud, { AdminUser } from "@/components/admin/UsersCrud";
 import LoadingBI from "@/components/LoadingBI";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -85,10 +86,17 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <UsersCrud
-      initialUsers={users}
-      onSave={handleSave}
-      onDelete={handleDelete}
-    />
+    <>
+      <AdminPageHeader
+        title="Utilisateurs"
+        description="Gérer les comptes utilisateurs de la plateforme"
+        breadcrumbs={[{ label: "Utilisateurs" }]}
+      />
+      <UsersCrud
+        initialUsers={users}
+        onSave={handleSave}
+        onDelete={handleDelete}
+      />
+    </>
   );
 }

@@ -11,6 +11,7 @@ type IncomingLesson = {
   title: string
   durationLabel?: string
   order?: number
+  locked?: boolean
   attachmentsMeta?: { name: string; title?: string; description?: string; order?: number }[]
   youtubeLinks?: { url: string; title?: string; description?: string; order?: number }[]
 }
@@ -20,6 +21,7 @@ type IncomingModule = {
   title: string
   durationLabel?: string
   order?: number
+  locked?: boolean
   lessons?: IncomingLesson[]
 }
 
@@ -202,11 +204,13 @@ export async function GET() {
         title: m.title,
         durationLabel: m.durationLabel ?? m.duration ?? "",
         order: m.order ?? 0,
+        locked: !!m.locked,
         lessons: (lessonsByModule.get(m.id) ?? []).map((l: any) => ({
           id: l.id,
           title: l.title,
           durationLabel: l.durationLabel ?? l.duration ?? "",
           order: l.order ?? 0,
+          locked: !!l.locked,
           attachmentsMeta: l.attachmentsMeta ?? [],
           youtubeLinks: l.youtubeLinks ?? [],
           attachments: l.attachments ?? [],
@@ -381,6 +385,7 @@ export async function POST(req: Request) {
         durationLabel: m.durationLabel ?? "",
         duration: m.durationLabel ?? "",
         order: m.order ?? i + 1,
+        locked: !!m.locked,
       }
 
       let moduleId = m.id
@@ -419,6 +424,7 @@ export async function POST(req: Request) {
         lessonForm.append("durationLabel", l.durationLabel ?? "")
         lessonForm.append("duration", l.durationLabel ?? "")
         lessonForm.append("order", String(l.order ?? j + 1))
+        lessonForm.append("locked", String(l.locked ?? false))
         lessonForm.append("attachmentsMeta", JSON.stringify(l.attachmentsMeta ?? []))
         lessonForm.append("youtubeLinks", JSON.stringify(l.youtubeLinks ?? []))
         for (const file of attachmentFiles) {
@@ -443,6 +449,7 @@ export async function POST(req: Request) {
           retryForm.append("durationLabel", l.durationLabel ?? "")
           retryForm.append("duration", l.durationLabel ?? "")
           retryForm.append("order", String(l.order ?? j + 1))
+          retryForm.append("locked", String(l.locked ?? false))
           retryForm.append("attachmentsMeta", JSON.stringify(l.attachmentsMeta ?? []))
           retryForm.append("youtubeLinks", JSON.stringify(l.youtubeLinks ?? []))
           retryForm.append("attachments", attachmentFiles[0])
@@ -486,6 +493,7 @@ export async function POST(req: Request) {
             retryForm.append("durationLabel", l.durationLabel ?? "")
             retryForm.append("duration", l.durationLabel ?? "")
             retryForm.append("order", String(l.order ?? j + 1))
+            retryForm.append("locked", String(l.locked ?? false))
             retryForm.append("attachmentsMeta", JSON.stringify(l.attachmentsMeta ?? []))
             retryForm.append("youtubeLinks", JSON.stringify(l.youtubeLinks ?? []))
             retryForm.append("attachments", attachmentFiles[0])

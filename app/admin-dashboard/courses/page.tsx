@@ -66,11 +66,13 @@ export default function AdminCoursesPage() {
     title: m.title,
     durationLabel: m.durationLabel,
     order: m.order,
+    locked: !!m.locked,
     lessons: (m.lessons ?? []).map((l: any) => ({
       id: l.id,
       title: l.title,
       durationLabel: l.durationLabel,
       order: l.order,
+      locked: !!l.locked,
       attachmentsMeta: l.attachmentsMeta ?? [],
       youtubeLinks: l.youtubeLinks ?? [],
     })),

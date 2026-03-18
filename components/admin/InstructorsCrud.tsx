@@ -8,7 +8,7 @@ import {
 } from "lucide-react"
 
 // Types
-type AdminInstructor = {
+export type AdminInstructor = {
   id?: string
   avatar: string | null
   firstName: string
