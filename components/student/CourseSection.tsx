@@ -13,7 +13,7 @@ interface CourseSectionProps {
 
 const titleVariants = {
   hidden: { opacity: 0, y: 24 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" as const } },
 }
 
 const gridVariants = {
@@ -26,7 +26,7 @@ const gridVariants = {
 
 const cardVariants = {
   hidden: { opacity: 0, y: 14 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" as const } },
 }
 
 export function CourseSection({ title, subtitle, courses }: CourseSectionProps) {

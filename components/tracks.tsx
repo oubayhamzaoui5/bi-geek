@@ -54,7 +54,7 @@ const tracks: Track[] = [
 
 const titleVariants = {
   hidden: { opacity: 0, y: 28 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" as const } },
 }
 
 const cardVariants = {
@@ -62,7 +62,7 @@ const cardVariants = {
   show: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.55, ease: "easeOut", delay: 0.4 + i * 0.18 },
+    transition: { duration: 0.55, ease: "easeOut" as const, delay: 0.4 + i * 0.18 },
   }),
 }
 
@@ -157,7 +157,7 @@ export function Tracks() {
             className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto text-pretty"
             initial={{ opacity: 0, y: 16 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
+            transition={{ duration: 0.5, ease: "easeOut" as const, delay: 0.2 }}
           >
             Des parcours structurés pour vous guider de débutant à expert.
           </motion.p>
@@ -173,7 +173,7 @@ export function Tracks() {
                 initial={{ opacity: 0, x: 40 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -40 }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
+                transition={{ duration: 0.35, ease: "easeOut" as const }}
                 className="w-full"
               >
                 {/* Also enforce min height on the card itself */}

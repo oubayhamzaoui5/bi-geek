@@ -76,15 +76,15 @@ const TrueFocus = ({
         return (
           <span
             key={index}
-            ref={(el) => (wordRefs.current[index] = el)}
+            ref={(el) => { wordRefs.current[index] = el }}
             className={`focus-word ${manualMode ? "manual" : ""} ${
               isActive && !manualMode ? "active" : ""
             }`}
             style={{
               filter: isActive ? "blur(0px)" : `blur(${blurAmount}px)`,
-              // @ts-expect-error custom CSS vars
+              // @ts-ignore custom CSS vars
               "--border-color": borderColor,
-              // @ts-expect-error custom CSS vars
+              // @ts-ignore custom CSS vars
               "--glow-color": glowColor,
               transition: `filter ${animationDuration}s ease`,
             }}
@@ -107,9 +107,9 @@ const TrueFocus = ({
         }}
         transition={{ duration: animationDuration }}
         style={{
-          // @ts-expect-error custom CSS vars
+          // @ts-ignore custom CSS vars
           "--border-color": borderColor,
-          // @ts-expect-error custom CSS vars
+          // @ts-ignore custom CSS vars
           "--glow-color": glowColor,
         }}
       >

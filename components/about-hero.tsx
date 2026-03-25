@@ -12,7 +12,7 @@ const imageVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { duration: 0.6, ease: "easeOut" },
+    transition: { duration: 0.6, ease: "easeOut" as const },
   },
 }
 
@@ -21,7 +21,7 @@ const textVariants = {
   visible: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.5, ease: "easeOut", delay: 0.3 },
+    transition: { duration: 0.5, ease: "easeOut" as const, delay: 0.3 },
   },
 }
 

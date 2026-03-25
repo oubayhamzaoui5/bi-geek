@@ -14,7 +14,7 @@ const teachers: Teacher[] = [
 
 type ChatMsg = { from: "me" | "teacher"; text: string }
 
-const spring = { type: "spring", stiffness: 420, damping: 34, mass: 0.8 }
+const spring = { type: "spring" as const, stiffness: 420, damping: 34, mass: 0.8 }
 const fadeUpIn  = { opacity: 1, scale: 1 }
 const fadeUpOut = { opacity: 0, scale: 0.98 }
 

@@ -168,7 +168,7 @@ export default function LoginPage() {
                     initial="hidden"
                     animate="visible"
                     exit="exit"
-                    transition={{ duration: 0.35, ease: "easeInOut" }}
+                    transition={{ duration: 0.35, ease: "easeInOut" as const }}
                     className="space-y-6"
                   >
                     <div>
@@ -212,7 +212,7 @@ export default function LoginPage() {
                     initial="hidden"
                     animate="visible"
                     exit="exit"
-                    transition={{ duration: 0.35, ease: "easeInOut" }}
+                    transition={{ duration: 0.35, ease: "easeInOut" as const }}
                     className="space-y-6"
                   >
                     <PasswordInput

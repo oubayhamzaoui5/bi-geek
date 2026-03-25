@@ -17,13 +17,13 @@ async function getAdminPb() {
 }
 
 type RouteParams = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export async function DELETE(_req: Request, { params }: RouteParams) {
   try {
     const pb = await getAdminPb()
-    const courseId = params.id
+    const { id: courseId } = await params
 
     // Delete lessons inside modules
     const modules = await pb.collection("course_modules").getFullList({

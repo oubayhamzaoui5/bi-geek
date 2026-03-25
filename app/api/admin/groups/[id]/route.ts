@@ -15,10 +15,11 @@ async function getAdminPb() {
   return pb
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const pb = await getAdminPb()
-    await pb.collection("groups").delete(params.id)
+    const { id } = await params
+    await pb.collection("groups").delete(id)
     return NextResponse.json({ ok: true })
   } catch (err: any) {
     console.error("ADMIN GROUPS DELETE ERROR:", err)

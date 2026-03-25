@@ -11,7 +11,7 @@ type Program = {
   id: string
   title: string
   shortDescription: string
-  durationLabel: string
+  durationLabel?: string
   tags?: string[]
   image?: string | null
   slug?: string

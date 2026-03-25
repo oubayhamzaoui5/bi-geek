@@ -17,13 +17,13 @@ async function getAdminPb() {
 }
 
 type RouteParams = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export async function DELETE(_req: Request, { params }: RouteParams) {
   try {
     const pb = await getAdminPb()
-    const bootcampId = params.id
+    const { id: bootcampId } = await params
 
     const pivots = await pb.collection("bootcamp_courses").getFullList({
       filter: `bootcamp="${bootcampId}"`,

@@ -4,9 +4,9 @@ import { NextResponse } from "next/server";
 type LessonLink = { url?: string; title?: string; description?: string; order?: number };
 type LessonAttachmentMeta = { name?: string; title?: string; description?: string; order?: number };
 
-export async function GET(req: Request, { params }: { params: { slug: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
-    const { slug } = params;
+    const { slug } = await params;
     const { searchParams } = new URL(req.url);
     const studentId = searchParams.get("studentId");
     const PB_URL = process.env.NEXT_PUBLIC_PB_URL ?? "http://127.0.0.1:8090";

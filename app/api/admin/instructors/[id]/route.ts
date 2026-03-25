@@ -19,7 +19,7 @@ async function getAdminPb() {
 }
 
 type RouteContext = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 /* ---------- DELETE: remove one instructor ---------- */
@@ -29,7 +29,7 @@ Response: { ok: true }
 */
 
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
-  const { id } = params
+  const { id } = await params
 
   if (!id) {
     return NextResponse.json(

@@ -27,7 +27,7 @@ export function ProgramsGrid() {
   // Title: reveal early (bottom -> top)
   const titleVariants = {
     hidden: { opacity: 0, y: 28 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
+    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" as const } },
   }
 
   // Category buttons: soft fade/scale in with stagger
@@ -37,7 +37,7 @@ export function ProgramsGrid() {
       opacity: 1,
       y: 0,
       scale: 1,
-      transition: { duration: 0.35, ease: "easeOut", delay: 0.15 + i * 0.06 },
+      transition: { duration: 0.35, ease: "easeOut" as const, delay: 0.15 + i * 0.06 },
     }),
   }
 
@@ -56,7 +56,7 @@ export function ProgramsGrid() {
   // Card child animation (all at once when parent goes "show")
   const cardVariants = {
     hidden: { opacity: 0, y: 16 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
+    show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" as const } },
   }
 
   const handleCategoryClick = (category: "All" | Program["category"]) => {
@@ -83,7 +83,7 @@ export function ProgramsGrid() {
             className="text-lg text-muted-foreground max-w-2xl mx-auto text-pretty"
             initial={{ opacity: 0, y: 14 }}
             animate={started ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.45, ease: "easeOut", delay: 0.1 }}
+            transition={{ duration: 0.45, ease: "easeOut" as const, delay: 0.1 }}
           >
             Des formations complètes et pratiques pour développer vos compétences.
           </motion.p>

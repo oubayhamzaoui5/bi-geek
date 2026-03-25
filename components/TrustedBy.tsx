@@ -52,7 +52,7 @@ export default function TrustedBy() {
                   transition={{
                     duration: 0.5,
                     delay: index * 0.08,
-                    ease: "easeOut",
+                    ease: "easeOut" as const,
                   }}
                   className="relative w-20 h-20 sm:w-1/2 sm:h-28 md:w-35 md:h-35"
                 >

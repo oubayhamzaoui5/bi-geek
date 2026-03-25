@@ -34,7 +34,7 @@ function RightHeroImage() {
           duration: 8,
           repeat: Infinity,
           repeatType: "mirror",
-          ease: "easeInOut",
+          ease: "easeInOut" as const,
         }}
       >
         <div
@@ -103,7 +103,7 @@ export function Hero() {
       timeoutRef.current = setTimeout(() => setPhase("deleting"), PAUSE_MS)
     }
 
-    return () => timeoutRef.current && clearTimeout(timeoutRef.current)
+    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current) }
   }, [displayText, courseIndex, phase, startTyping])
 
   const appear = {
@@ -111,7 +111,7 @@ export function Hero() {
     show: (d: number = 0) => ({
       opacity: 1,
       y: 0,
-      transition: { duration: 0.55, ease: "easeOut", delay: d },
+      transition: { duration: 0.55, ease: "easeOut" as const, delay: d },
     }),
   }
 
@@ -124,7 +124,7 @@ export function Hero() {
           className="w-full max-w-[780px]"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
+          transition={{ duration: 0.6, ease: "easeOut" as const }}
         >
           {/* Title */}
           <div className="mb-1 md:mb-2">
@@ -214,7 +214,7 @@ export function Hero() {
                     opacity: 1,
                     scale: 1,
                     y: 0,
-                    transition: { duration: 0.3, ease: "easeOut" },
+                    transition: { duration: 0.3, ease: "easeOut" as const },
                   },
                 }}
               >

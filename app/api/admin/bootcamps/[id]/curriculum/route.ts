@@ -15,10 +15,10 @@ async function getAdminPb() {
   return pb
 }
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const pb = await getAdminPb()
-    const bootcampId = params.id
+    const { id: bootcampId } = await params
 
     const pivots = await pb.collection("bootcamp_courses").getFullList({
       filter: `bootcamp="${bootcampId}"`,

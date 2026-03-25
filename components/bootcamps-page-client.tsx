@@ -94,7 +94,7 @@ export default function BootcampsPage() {
   /* 🎬 Animations */
   const titleVariants = {
     hidden: { opacity: 0, y: 28 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
+    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" as const } },
   }
 
   const filterItemVariants = {
@@ -103,7 +103,7 @@ export default function BootcampsPage() {
       opacity: 1,
       y: 0,
       scale: 1,
-      transition: { duration: 0.35, ease: "easeOut", delay: 0.15 + i * 0.06 },
+      transition: { duration: 0.35, ease: "easeOut" as const, delay: 0.15 + i * 0.06 },
     }),
   }
 
@@ -133,7 +133,7 @@ export default function BootcampsPage() {
               className="text-lg text-muted-foreground max-w-2xl mx-auto text-pretty"
               initial={{ opacity: 0, y: 14 }}
               animate={started ? { opacity: 1, y: 0 } : { opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, ease: "easeOut", delay: 0.1 }}
+              transition={{ duration: 0.45, ease: "easeOut" as const, delay: 0.1 }}
             >
               Des parcours intensifs et filtrables par catégories de formation.
             </motion.p>
@@ -221,7 +221,7 @@ export default function BootcampsPage() {
                   key={b.id}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.45, ease: "easeOut" }}
+                  transition={{ duration: 0.45, ease: "easeOut" as const }}
                 >
                   <ProgramCard
                     program={{

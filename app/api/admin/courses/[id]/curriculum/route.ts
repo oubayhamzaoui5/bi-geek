@@ -15,10 +15,10 @@ async function getAdminPb() {
   return pb
 }
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const pb = await getAdminPb()
-    const courseId = params.id
+    const { id: courseId } = await params
 
     const modules = await pb.collection("course_modules").getFullList({
       filter: `course="${courseId}"`,

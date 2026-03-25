@@ -70,8 +70,8 @@ const parsePocketBasePdf = (href: string) => {
 
 /* ─── animation variants ─────────────────────────── */
 const moduleBodyVariants = {
-  open:      { height: "auto", opacity: 1,  transition: { duration: 0.38, ease: [0.4, 0, 0.2, 1] } },
-  collapsed: { height: 0,      opacity: 0,  transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } },
+  open:      { height: "auto", opacity: 1,  transition: { duration: 0.38, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] } },
+  collapsed: { height: 0,      opacity: 0,  transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] } },
 }
 
 const staggerList = {
@@ -85,8 +85,8 @@ const lessonItem = {
 }
 
 const contentListVariants = {
-  open:      { height: "auto", opacity: 1,  transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] } },
-  collapsed: { height: 0,      opacity: 0,  transition: { duration: 0.2,  ease: [0.4, 0, 0.2, 1] } },
+  open:      { height: "auto", opacity: 1,  transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] } },
+  collapsed: { height: 0,      opacity: 0,  transition: { duration: 0.2,  ease: [0.4, 0, 0.2, 1] as [number, number, number, number] } },
 }
 
 /* ─── content type config ────────────────────────── */
@@ -253,7 +253,7 @@ export function CurriculumSection({
                         className="module-progress-fill"
                         initial={{ width: 0 }}
                         animate={{ width: `${progress}%` }}
-                        transition={{ duration: 0.7, ease: "easeOut", delay: 0.1 }}
+                        transition={{ duration: 0.7, ease: "easeOut" as const, delay: 0.1 }}
                       />
                     </div>
                   </div>

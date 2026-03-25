@@ -6,6 +6,7 @@ export interface Program {
   hours: number
   shortDescription: string
   slug: string
+  durationLabel?: string
 }
 
 export const programs: Program[] = [

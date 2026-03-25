@@ -19,7 +19,7 @@ export function Testimonials() {
       setIndex((i) => (i + 1) % testimonials.length)
     }, ROTATE_MS)
 
-    return () => timeoutRef.current && clearTimeout(timeoutRef.current)
+    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current) }
   }, [index])
 
   const variants = {
@@ -29,14 +29,14 @@ export function Testimonials() {
     center: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.45, ease: "easeOut" },
+      transition: { duration: 0.45, ease: "easeOut" as const },
     },
     exit: prefersReducedMotion
       ? { opacity: 0 }
       : {
           opacity: 0,
           y: -24,
-          transition: { duration: 0.3, ease: "easeIn" },
+          transition: { duration: 0.3, ease: "easeIn" as const },
         },
   }
 
@@ -122,7 +122,7 @@ export function Testimonials() {
               viewport={{ once: true, margin: "-80px" }}
               transition={{
                 duration: 0.4,
-                ease: "easeIn",
+                ease: "easeIn" as const,
                 delay: 0.25, // 👈 little late
               }}
             >

@@ -102,7 +102,7 @@ const initialCategory =
   // Animations
   const titleVariants = {
     hidden: { opacity: 0, y: 28 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
+    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" as const } },
   }
 
   const filterItemVariants = {
@@ -111,7 +111,7 @@ const initialCategory =
       opacity: 1,
       y: 0,
       scale: 1,
-      transition: { duration: 0.35, ease: "easeOut", delay: 0.15 + i * 0.06 },
+      transition: { duration: 0.35, ease: "easeOut" as const, delay: 0.15 + i * 0.06 },
     }),
   }
 
@@ -148,7 +148,7 @@ const initialCategory =
               className="text-lg text-muted-foreground max-w-2xl mx-auto"
               initial={{ opacity: 0, y: 14 }}
               animate={started ? { opacity: 1, y: 0 } : { opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, ease: "easeOut", delay: 0.1 }}
+              transition={{ duration: 0.45, ease: "easeOut" as const, delay: 0.1 }}
             >
               Explorez l&apos;ensemble de nos parcours de formation par catégorie et par niveau.
             </motion.p>
@@ -236,7 +236,7 @@ const initialCategory =
                   key={course.id}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.45, ease: "easeOut" }}
+                  transition={{ duration: 0.45, ease: "easeOut" as const }}
                 >
                   <ProgramCard program={course} />
                 </motion.div>

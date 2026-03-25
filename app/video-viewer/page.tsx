@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo } from "react"
+import { Suspense, useMemo } from "react"
+import { useSearchParams } from "next/navigation"
 import "@mux/mux-player"
 import { ArrowLeft, FileText } from "lucide-react"
 
@@ -13,19 +14,12 @@ import MuxPlayerClient from "@/components/MuxPlayerClient"
 import { InstructorSection } from "@/components/student/instructor-section"
 import { SidebarProvider } from "@/components/ui/sidebar-context"
 
-type PageProps = {
-  searchParams?: {
-    pid?: string
-    title?: string
-    desc?: string
-  }
-}
-
-export default function VideoViewerPage({ searchParams }: PageProps) {
-  const playbackId = searchParams?.pid
-  const title = searchParams?.title || "Lecture vidéo"
+function VideoViewerContent() {
+  const searchParams = useSearchParams()
+  const playbackId = searchParams.get("pid") ?? undefined
+  const title = searchParams.get("title") || "Lecture vidéo"
   const description =
-    searchParams?.desc ||
+    searchParams.get("desc") ||
     "Dans cette leçon, vous apprendrez les bases de l’analyse de données avec Pandas. Nous explorerons comment importer des fichiers CSV, manipuler des DataFrames et nettoyer efficacement vos données pour les étapes de visualisation."
 
   const poster = useMemo(
@@ -129,5 +123,13 @@ export default function VideoViewerPage({ searchParams }: PageProps) {
         <MessagesTab />
       </div>
     </SidebarProvider>
+  )
+}
+
+export default function VideoViewerPage() {
+  return (
+    <Suspense>
+      <VideoViewerContent />
+    </Suspense>
   )
 }

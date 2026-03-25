@@ -18,14 +18,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // Fetch courses
-  const coursesRes = await fetch(`${siteUrl}/api/courses`)
-  const coursesData = await coursesRes.json()
-  const courses: Course[] = coursesData.courses ?? []
-
-  // Fetch bootcamps
-  const bootcampsRes = await fetch(`${siteUrl}/api/bootcamps`)
-  const bootcampsData = await bootcampsRes.json()
-  const bootcamps: Bootcamp[] = bootcampsData.bootcamps ?? []
+  let courses: Course[] = []
+  let bootcamps: Bootcamp[] = []
+  try {
+    const coursesRes = await fetch(`${siteUrl}/api/courses`)
+    if (coursesRes.ok) {
+      const coursesData = await coursesRes.json()
+      courses = coursesData.courses ?? []
+    }
+  } catch {}
+  try {
+    const bootcampsRes = await fetch(`${siteUrl}/api/bootcamps`)
+    if (bootcampsRes.ok) {
+      const bootcampsData = await bootcampsRes.json()
+      bootcamps = bootcampsData.bootcamps ?? []
+    }
+  } catch {}
 
   const courseUrls = courses.map((c) => ({
     url: `${siteUrl}/course/${c.id}`,

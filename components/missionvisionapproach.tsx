@@ -20,7 +20,7 @@ const leftItemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.6, ease: "easeOut" },
+    transition: { duration: 0.6, ease: "easeOut" as const },
   },
 };
 
@@ -29,7 +29,7 @@ const rightItemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.6, ease: "easeOut", delay: 0.1 },
+    transition: { duration: 0.6, ease: "easeOut" as const, delay: 0.1 },
   },
 };
 
@@ -46,7 +46,7 @@ const approachLeftColumnVariants = {
   visible: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.6, ease: "easeOut" },
+    transition: { duration: 0.6, ease: "easeOut" as const },
   },
 };
 
@@ -55,7 +55,7 @@ const approachRightColumnVariants = {
   visible: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.6, ease: "easeOut" },
+    transition: { duration: 0.6, ease: "easeOut" as const },
   },
 };
 
@@ -64,7 +64,7 @@ const approachChildVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.4, ease: "easeOut" },
+    transition: { duration: 0.4, ease: "easeOut" as const },
   },
 };
 

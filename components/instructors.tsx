@@ -108,7 +108,7 @@ export function Instructors() {
   // ---- Animations ----
   const titleVariants = {
     hidden: { opacity: 0, y: 28 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
+    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" as const } },
   }
 
   const cardVariants = {
@@ -116,7 +116,7 @@ export function Instructors() {
     show: (i: number) => ({
       opacity: 1,
       y: 0,
-      transition: { duration: 0.45, ease: "easeOut", delay: 0.25 + i * 0.12 },
+      transition: { duration: 0.45, ease: "easeOut" as const, delay: 0.25 + i * 0.12 },
     }),
   }
 
@@ -164,7 +164,7 @@ export function Instructors() {
             className="text-lg text-muted-foreground max-w-2xl mx-auto text-pretty"
             initial={{ opacity: 0, y: 14 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.45, ease: "easeOut", delay: 0.12 }}
+            transition={{ duration: 0.45, ease: "easeOut" as const, delay: 0.12 }}
           >
             Apprenez avec des professionnels passionnés et expérimentés
           </motion.p>
@@ -179,7 +179,7 @@ export function Instructors() {
                 initial={{ opacity: 0, x: 40 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -40 }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
+                transition={{ duration: 0.35, ease: "easeOut" as const }}
                 className="w-full"
               >
                 {renderInstructorCard(instructors[mobileIndex])}
@@ -259,7 +259,7 @@ export function Instructors() {
                     initial={{ opacity: 0, x: 60 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -60 }}
-                    transition={{ duration: 0.4, ease: "easeOut" }}
+                    transition={{ duration: 0.4, ease: "easeOut" as const }}
                   >
                     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                       {instructors

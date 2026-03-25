@@ -17,7 +17,7 @@ async function getAdminPb() {
 }
 
 type RouteParams = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 type EnrollmentStatus = "pending" | "contacted" | "confirmed"
@@ -25,6 +25,7 @@ type EnrollmentStatus = "pending" | "contacted" | "confirmed"
 export async function PATCH(req: Request, { params }: RouteParams) {
   try {
     const pb = await getAdminPb()
+    const { id } = await params
     const body = await req.json().catch(() => ({}))
     const status = body.status as EnrollmentStatus | undefined
 
@@ -35,7 +36,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       )
     }
 
-    await pb.collection("enrollments").update(params.id, { status })
+    await pb.collection("enrollments").update(id, { status })
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
@@ -48,7 +49,8 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 export async function DELETE(_req: Request, { params }: RouteParams) {
   try {
     const pb = await getAdminPb()
-    await pb.collection("enrollments").delete(params.id)
+    const { id } = await params
+    await pb.collection("enrollments").delete(id)
     return NextResponse.json({ ok: true })
   } catch (err: any) {
     console.error("ADMIN ENROLLMENTS DELETE ERROR:", err)

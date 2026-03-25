@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(grep -n \"params\" app/api/admin/bootcamps/[id]/curriculum/route.ts app/api/admin/courses/[id]/curriculum/route.ts app/api/admin/users/reset-password/route.ts app/api/student/change-password/route.ts app/api/student/profile/route.ts)",
+      "Bash(grep -rn 'ease: \"\"\"\"easeOut\"\"\"\"' components/ app/ --include=\"*.tsx\" --include=\"*.ts\")",
+      "Bash(grep -rn 'ease: \"\"\"\"easeIn\"\"\"\"' components/ app/ --include=\"*.tsx\" --include=\"*.ts\")",
+      "Bash(xargs sed:*)",
+      "Bash(grep -rn 'type: \"\"\"\"spring\"\"\"\"' components/ app/ --include=\"*.tsx\" --include=\"*.ts\")",
+      "Bash(cd:*)",
+      "Bash(xargs grep:*)"
+    ]
+  }
+}

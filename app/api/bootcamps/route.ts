@@ -55,7 +55,7 @@ export async function GET() {
     }
 
     // 4) Merge final bootcamp cards
-    const bootcampCards: BootcampCard[] = boots.map((b) => {
+    const bootcampCards: BootcampCard[] = (boots as any[]).map((b) => {
       const rawTags = tagsMap.get(b.id) ?? []
       const m = new Map<string, string>()
       rawTags.forEach((t) => {
