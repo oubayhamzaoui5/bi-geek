@@ -56,11 +56,6 @@ export function Sidebar({ variant = "student" }: { variant?: "student" | "admin"
 
   const studentLinks = [
     { icon: Home, label: "Accueil", href: "/student-dashboard" },
-    { icon: BookOpen, label: "Formations", href: "/student-dashboard/courses" },
-    { icon: Calendar, label: "Calendrier", href: "/student-dashboard/calendar" },
-    { icon: MessageSquare, label: "Messages", href: "/student-dashboard/messages" },
-    { icon: Megaphone, label: "Annonces", href: "/student-dashboard/announcements" },
-    { icon: Award, label: "Certificats", href: "/student-dashboard/certificates" },
     { icon: Settings, label: "Paramètres", href: "/student-dashboard/settings" },
   ]
 

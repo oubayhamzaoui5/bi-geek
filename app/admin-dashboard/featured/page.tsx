@@ -4,7 +4,6 @@
 import { useState, useEffect } from "react"
 import FeaturedSelection from "@/components/admin/FeaturedSelection"
 import LoadingBI from "@/components/LoadingBI"
-import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 
 export default function AdminFeaturedPage() {
   const [loading, setLoading] = useState(true)
@@ -66,11 +65,6 @@ export default function AdminFeaturedPage() {
 
   return (
     <div className="flex flex-col min-h-full">
-      <AdminPageHeader
-        title="Contenu Vedette"
-        description="Sélectionner les formations et bootcamps mis en avant sur l'accueil"
-        breadcrumbs={[{ label: "Vedettes" }]}
-      />
       <div className="flex-1">
         <FeaturedSelection
           initialFeatured={featuredItems}

@@ -432,52 +432,41 @@ export default function UsersCrud({
 
   const handleResetPassword = async () => {
     if (!editingUser?.id) return
-    const plain = (editingUser.plainPassword || "").trim()
-    if (!plain) {
-      setError("Aucun mot de passe en clair disponible pour la rÃ©initialisation")
-      return
-    }
 
-    if (!confirm("RÃ©initialiser le mot de passe de cet utilisateur ?")) return
+    if (!confirm("Réinitialiser le mot de passe de cet utilisateur ? Un nouveau mot de passe temporaire sera généré.")) return
 
     setLoading(true)
     setError(null)
 
     try {
-      const username = generateUniqueUsername(
-        editingUser.name || "",
-        editingUser.surname || "",
-        editingUser.email || "",
-        editingUser.id
-      )
+      const res = await fetch("/api/admin/users/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: editingUser.id }),
+      })
 
-      const userToSave = {
-        ...editingUser,
-        username,
-        usePassword: false,
-        password: plain,
-        plainPassword: plain
-      }
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || "Erreur lors de la réinitialisation")
 
-      if (onSave) {
-        await onSave(userToSave, avatarFile || undefined)
-      }
+      const newPlainPassword = data.plainPassword as string
 
       const updatedUser = {
         ...editingUser,
-        username,
-        usePassword: false
+        usePassword: false,
+        plainPassword: newPlainPassword,
       }
 
-      setUsers(prev => prev.map(u => 
+      setUsers(prev => prev.map(u =>
         u.id === editingUser.id ? updatedUser : u
       ))
       setEditingUser(updatedUser)
+      setGeneratedPassword("")
+      setPasswordCopied(false)
 
-      setError("Mot de passe rÃ©initialisÃ© avec succÃ¨s!")
-      setTimeout(() => setError(null), 3000)
+      setError("Mot de passe réinitialisé avec succès! Communiquez le nouveau mot de passe à l'utilisateur.")
+      setTimeout(() => setError(null), 5000)
     } catch (err: any) {
-      setError(err.message || "Erreur lors de la rÃ©initialisation du mot de passe")
+      setError(err.message || "Erreur lors de la réinitialisation du mot de passe")
     } finally {
       setLoading(false)
     }
@@ -755,10 +744,12 @@ export default function UsersCrud({
 
                 <FormCard title="Informations personnelles" icon={<Mail style={{ width: 16, height: 16 }} />}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                    <div>
-                      <FieldLabel>Nom d'utilisateur</FieldLabel>
-                      <Input value={editingUser.username || ""} readOnly />
-                    </div>
+                    {!isCreating && (
+                      <div>
+                        <FieldLabel>Nom d'utilisateur</FieldLabel>
+                        <Input value={editingUser.username || ""} readOnly />
+                      </div>
+                    )}
                     <div>
                       <FieldLabel required>Prenom</FieldLabel>
                       <Input value={editingUser.name || ""} onChange={v => setEditingUser({ ...editingUser, name: v })} placeholder="John" disabled={editingUser.role === "instructor"} />
@@ -812,7 +803,7 @@ export default function UsersCrud({
                   {!editingUser.usePassword && !isCreating && !!editingUser.plainPassword && (
                     <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}>
                       <div>
-                        <FieldLabel>Mot de passe en clair</FieldLabel>
+                        <FieldLabel>Mot de passe temporaire</FieldLabel>
                         <Input value={editingUser.plainPassword ?? ""} readOnly />
                       </div>
                       <div style={{ display: "flex", alignItems: "flex-end" }}>
@@ -822,9 +813,32 @@ export default function UsersCrud({
                           disabled={!editingUser.plainPassword}
                           style={{ padding: "9px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 12, fontWeight: 600, color: editingUser.plainPassword ? "#475569" : "#94a3b8", cursor: editingUser.plainPassword ? "pointer" : "not-allowed" }}
                         >
-                          <Copy style={{ width: 14, height: 14 }} /> {passwordCopied ? "Copie" : "Copier"}
+                          <Copy style={{ width: 14, height: 14 }} /> {passwordCopied ? "Copié" : "Copier"}
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {isCreating && !editingUser.usePassword && !!generatedPassword && (
+                    <div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}>
+                        <div>
+                          <FieldLabel>Mot de passe temporaire généré</FieldLabel>
+                          <Input value={generatedPassword} readOnly style={{ fontFamily: "monospace", letterSpacing: "0.05em" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "flex-end" }}>
+                          <button
+                            type="button"
+                            onClick={handleCopyPassword}
+                            style={{ padding: "9px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 12, fontWeight: 600, color: "#475569", cursor: "pointer" }}
+                          >
+                            <Copy style={{ width: 14, height: 14 }} /> {passwordCopied ? "Copié" : "Copier"}
+                          </button>
+                        </div>
+                      </div>
+                      <p style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>
+                        Ce mot de passe temporaire sera communiqué à l'utilisateur. Il devra le changer à sa première connexion.
+                      </p>
                     </div>
                   )}
 
@@ -833,10 +847,10 @@ export default function UsersCrud({
                       <button
                         type="button"
                         onClick={handleResetPassword}
-                        disabled={loading || !editingUser.plainPassword}
-                        style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #fde68a", background: "#fef3c7", color: "#92400e", fontSize: 12, fontWeight: 600, cursor: loading || !editingUser.plainPassword ? "not-allowed" : "pointer" }}
+                        disabled={loading}
+                        style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #fde68a", background: "#fef3c7", color: "#92400e", fontSize: 12, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}
                       >
-                        Reinitialiser le mot de passe
+                        {loading ? "Réinitialisation..." : "Réinitialiser le mot de passe"}
                       </button>
                     </div>
                   )}

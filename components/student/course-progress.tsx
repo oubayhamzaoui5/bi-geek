@@ -52,22 +52,16 @@ export function CourseProgress({
                 cx="50"
                 cy="50"
                 r={radius}
-                stroke="url(#progressGradientCard)"
+                className="stroke-accent"
                 strokeWidth="5"
                 fill="none"
                 strokeLinecap="round"
                 strokeDasharray={circumference}
                 strokeDashoffset={dashOffset}
               />
-              <defs>
-                <linearGradient id="progressGradientCard" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="hsl(var(--accent))" />
-                  <stop offset="100%" stopColor="hsl(var(--primary))" />
-                </linearGradient>
-              </defs>
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-transparent z-10">
-              <span className="text-3xl md:text-5xl font-extrabold text-foreground tabular-nums tracking-tighter">
+              <span className="text-3xl md:text-5xl font-extrabold tabular-nums tracking-tighter text-accent">
                 {progressPercent}%
               </span>
             </div>
@@ -77,7 +71,7 @@ export function CourseProgress({
         <div className="text-center space-y-1">
           <p className="text-sm font-medium text-foreground">
             {totalLessons > 0
-              ? `${completedLessons} leçons terminées sur ${totalLessons}`
+              ? `${completedLessons} leçon${completedLessons !== 1 ? "s" : ""} débloquée${completedLessons !== 1 ? "s" : ""} sur ${totalLessons}`
               : "Aucune leçon pour le moment"}
           </p>
         </div>

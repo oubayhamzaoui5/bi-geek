@@ -7,12 +7,23 @@ type LessonAttachmentMeta = { name?: string; title?: string; description?: strin
 export async function GET(req: Request, { params }: { params: { slug: string } }) {
   try {
     const { slug } = params;
+    const { searchParams } = new URL(req.url);
+    const studentId = searchParams.get("studentId");
     const PB_URL = process.env.NEXT_PUBLIC_PB_URL ?? "http://127.0.0.1:8090";
     const pb = new PocketBase(PB_URL);
 
     const courseRecord = await pb
       .collection("courses")
       .getFirstListItem(`slug="${slug}"`);
+
+    let group: any = null;
+    if (studentId && courseRecord) {
+      try {
+        group = await pb.collection("groups").getFirstListItem(`course="${courseRecord.id}" && students~"${studentId}"`);
+      } catch (err) {
+        // no-op, student has no group assigned
+      }
+    }
 
     const coverImageUrl = courseRecord.coverImage
       ? courseRecord.coverImage.startsWith("http")
@@ -61,6 +72,11 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
     });
 
     const studentModules = moduleRecords.map((m: any) => {
+      let isModuleLocked = true;
+      if (group) {
+        if (Array.isArray(group.unlockedModules) && group.unlockedModules.includes(m.id)) isModuleLocked = false;
+      }
+
       const lessonsForModule = lessonRecords.filter((l: any) => l.module === m.id);
       const lessons = lessonsForModule.map((l: any) => {
         const attachmentFiles = Array.isArray(l.attachments)
@@ -94,10 +110,15 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
           href: link.url,
         }));
 
+        let isLessonLocked = true;
+        if (group) {
+          if (Array.isArray(group.unlockedLessons) && group.unlockedLessons.includes(l.id)) isLessonLocked = false;
+        }
+
         return {
           title: l.title,
           duration: l.durationLabel ?? "",
-          locked: !!l.locked,
+          locked: isLessonLocked,
           contents: [...videoContents, ...attachmentContents]
             .sort((a, b) => (a.order || 0) - (b.order || 0))
             .map(({ order, ...rest }) => rest),
@@ -107,7 +128,7 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
       return {
         title: m.title,
         duration: m.durationLabel ?? "",
-        locked: !!m.locked,
+        locked: isModuleLocked,
         lessons,
       };
     });

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import {
   Search, Plus, Edit, Trash2, Save, X,
   Users, CheckCircle, AlertCircle, Loader2,
-  Layers, BookOpen
+  Layers, BookOpen, Lock, Unlock
 } from "lucide-react"
 
 // ---- Types ----
@@ -25,6 +25,16 @@ type AdminGroup = {
   courseId?: string | null
   bootcampId?: string | null
   studentIds: string[]
+  lockedModules?: string[]
+  unlockedModules?: string[]
+  lockedLessons?: string[]
+  unlockedLessons?: string[]
+}
+
+type CurriculumData = {
+  courses?: { id: string, title: string }[],
+  modules: { id: string, title: string, courseId?: string, locked: boolean }[],
+  lessons: { id: string, title: string, moduleId: string, locked: boolean }[]
 }
 
 type GroupsCrudProps = {
@@ -155,6 +165,9 @@ export default function GroupsCrud({
   const [searchTerm, setSearchTerm] = useState("")
   const [studentSearch, setStudentSearch] = useState("")
   const [loading, setLoading] = useState(false)
+  
+  const [curriculum, setCurriculum] = useState<CurriculumData | null>(null)
+  const [loadingCurriculum, setLoadingCurriculum] = useState(false)
 
   const showToast = (type: ToastType, message: string, duration = 4500) => {
     const id = `toast_${Date.now()}_${Math.random()}`
@@ -177,6 +190,35 @@ export default function GroupsCrud({
   useEffect(() => { if (initialBootcamps.length) setBootcamps(initialBootcamps) }, [initialBootcamps])
   useEffect(() => { if (initialStudents.length) setStudents(initialStudents) }, [initialStudents])
 
+  useEffect(() => {
+    let active = true
+    const loadCurriculum = async () => {
+      setLoadingCurriculum(true)
+      try {
+        let res;
+        if (editingGroup?.programType === "course" && editingGroup.courseId) {
+          res = await fetch(`/api/admin/courses/${editingGroup.courseId}/curriculum`)
+        } else if (editingGroup?.programType === "bootcamp" && editingGroup.bootcampId) {
+          res = await fetch(`/api/admin/bootcamps/${editingGroup.bootcampId}/curriculum`)
+        } else {
+          if (active) setCurriculum(null)
+          return
+        }
+        
+        if (res?.ok) {
+          const data = await res.json()
+          if (data.ok && active) setCurriculum(data.curriculum)
+        }
+      } catch (err) {
+        if (active) setCurriculum(null)
+      } finally {
+        if (active) setLoadingCurriculum(false)
+      }
+    }
+    loadCurriculum()
+    return () => { active = false }
+  }, [editingGroup?.courseId, editingGroup?.bootcampId, editingGroup?.programType])
+
   const createBlankGroup = (): AdminGroup => ({
     title: "",
     status: "not_started",
@@ -184,6 +226,10 @@ export default function GroupsCrud({
     courseId: "",
     bootcampId: "",
     studentIds: [],
+    lockedModules: [],
+    unlockedModules: [],
+    lockedLessons: [],
+    unlockedLessons: [],
   })
 
   const filteredGroups = groups.filter(g =>
@@ -266,6 +312,39 @@ export default function GroupsCrud({
       ? editingGroup.studentIds.filter(sid => sid !== id)
       : [...editingGroup.studentIds, id]
     setEditingGroup({ ...editingGroup, studentIds: next })
+  }
+
+  const getIsUnlocked = (id: string, type: "module" | "lesson") => {
+    if (!editingGroup) return false
+    if (type === "module") {
+      return !!editingGroup.unlockedModules?.includes(id)
+    } else {
+      return !!editingGroup.unlockedLessons?.includes(id)
+    }
+  }
+
+  const toggleLockState = (id: string, type: "module" | "lesson") => {
+    if (!editingGroup) return
+    const nextGroup = { ...editingGroup }
+    nextGroup.unlockedModules = nextGroup.unlockedModules || []
+    nextGroup.unlockedLessons = nextGroup.unlockedLessons || []
+
+    if (type === "module") {
+      const isUnlocked = nextGroup.unlockedModules.includes(id)
+      if (isUnlocked) {
+        nextGroup.unlockedModules = nextGroup.unlockedModules.filter(x => x !== id)
+      } else {
+        nextGroup.unlockedModules.push(id)
+      }
+    } else {
+      const isUnlocked = nextGroup.unlockedLessons.includes(id)
+      if (isUnlocked) {
+        nextGroup.unlockedLessons = nextGroup.unlockedLessons.filter(x => x !== id)
+      } else {
+        nextGroup.unlockedLessons.push(id)
+      }
+    }
+    setEditingGroup(nextGroup)
   }
 
   return (
@@ -485,6 +564,74 @@ export default function GroupsCrud({
                     )}
                   </div>
                 </FormCard>
+
+                {curriculum && (
+                  <FormCard title="Verrouillage du contenu" icon={<BookOpen style={{ width: 16, height: 16 }} />}>
+                    {loadingCurriculum ? (
+                      <div style={{ padding: 20, textAlign: "center", color: "#94a3b8" }}>
+                        <Loader2 style={{ width: 24, height: 24, animation: "spin 1s linear infinite", margin: "0 auto 10px" }} />
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                        <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 8px" }}>Forcez le verrouillage ou le déverrouillage de modules et leçons spécifiquement pour ce groupe.</p>
+                        
+                        {(curriculum.courses?.length ? curriculum.courses : [{ id: "default_course", title: "" }]).map(course => {
+                          const courseModules = curriculum.courses?.length ? curriculum.modules.filter(m => m.courseId === course.id) : curriculum.modules;
+                          if (courseModules.length === 0) return null;
+                          return (
+                            <div key={course.id || "default"} style={{ marginBottom: 16 }}>
+                              {course.title && <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid #e2e8f0" }}>Formation: {course.title}</h4>}
+                              {courseModules.map(mod => (
+                                <div key={mod.id} style={{ background: "#f8fafc", border: "1px solid #e8ecf3", borderRadius: 12, padding: "16px", marginBottom: 8 }}>
+                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                                    <div style={{ fontWeight: 600, fontSize: 13, color: "#0f172a", flex: 1 }}>Module: {mod.title}</div>
+                                    <div style={{ flexShrink: 0 }}>
+                                      <button
+                                        onClick={() => toggleLockState(mod.id, "module")}
+                                        title={getIsUnlocked(mod.id, "module") ? "Verrouiller le module" : "Déverrouiller le module"}
+                                        style={{
+                                          display: "flex", alignItems: "center", justifyContent: "center",
+                                          padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+                                          background: getIsUnlocked(mod.id, "module") ? "rgba(34,197,94,0.1)" : "rgba(244,63,94,0.1)",
+                                          color: getIsUnlocked(mod.id, "module") ? "#22c55e" : "#f43f5e",
+                                          transition: "all 0.15s"
+                                        }}
+                                      >
+                                        {getIsUnlocked(mod.id, "module") ? <Unlock style={{ width: 16, height: 16 }} /> : <Lock style={{ width: 16, height: 16 }} />}
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 16, borderLeft: "2px solid #e2e8f0" }}>
+                                    {curriculum.lessons.filter((l: any) => l.moduleId === mod.id).map((lesson: any) => (
+                                      <div key={lesson.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                        <div style={{ fontSize: 13, color: "#475569", flex: 1 }}>{lesson.title}</div>
+                                        <div style={{ flexShrink: 0 }}>
+                                          <button
+                                            onClick={() => toggleLockState(lesson.id, "lesson")}
+                                            title={getIsUnlocked(lesson.id, "lesson") ? "Verrouiller la leçon" : "Déverrouiller la leçon"}
+                                            style={{
+                                              display: "flex", alignItems: "center", justifyContent: "center",
+                                              padding: "4px 8px", borderRadius: 6, border: "none", cursor: "pointer",
+                                              background: getIsUnlocked(lesson.id, "lesson") ? "rgba(34,197,94,0.1)" : "rgba(244,63,94,0.1)",
+                                              color: getIsUnlocked(lesson.id, "lesson") ? "#22c55e" : "#f43f5e",
+                                              transition: "all 0.15s"
+                                            }}
+                                          >
+                                            {getIsUnlocked(lesson.id, "lesson") ? <Unlock style={{ width: 14, height: 14 }} /> : <Lock style={{ width: 14, height: 14 }} />}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </FormCard>
+                )}
 
                 <FormCard title="Resume" icon={<Layers style={{ width: 16, height: 16 }} />}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

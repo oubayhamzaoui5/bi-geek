@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { KeyRound, ShieldCheck, Eye, EyeOff } from "lucide-react"
+import { KeyRound, ShieldCheck, Eye, EyeOff, Loader2 } from "lucide-react"
 
 /* ---------- Stable subcomponent (outside to avoid remount/focus loss) ---------- */
 type InputProps = {
@@ -14,15 +14,7 @@ type InputProps = {
   testId?: string
 }
 
-function PasswordInput({
-  label,
-  value,
-  onChange,
-  shown,
-  toggle,
-  autoComplete = "new-password",
-  testId,
-}: InputProps) {
+function PasswordInput({ label, value, onChange, shown, toggle, autoComplete = "new-password", testId }: InputProps) {
   return (
     <div>
       <label className="block text-xs text-muted-foreground mb-1">{label}</label>
@@ -51,6 +43,17 @@ function PasswordInput({
   )
 }
 
+/* --------------------------------- Helpers --------------------------------- */
+
+function getUserId(): string {
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem("user") : null
+    return raw ? (JSON.parse(raw)?.id ?? "") : ""
+  } catch {
+    return ""
+  }
+}
+
 /* --------------------------------- Main card --------------------------------- */
 
 export default function PasswordCard() {
@@ -60,8 +63,9 @@ export default function PasswordCard() {
   const [confirm, setConfirm] = useState("")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState<null | "ok" | "err">(null)
+  const [errorMsg, setErrorMsg] = useState("")
 
-  // Symbols NOT required: length + upper + lower + digit (max 4)
+  // Strength: length + upper + lower + digit (max 4)
   const strength = useMemo(() => {
     let s = 0
     if (next.length >= 8) s++
@@ -77,14 +81,45 @@ export default function PasswordCard() {
     e.preventDefault()
     setSaving(true)
     setSaved(null)
+    setErrorMsg("")
+
+    const userId = getUserId()
+    if (!userId) {
+      setErrorMsg("Session expirée, veuillez vous reconnecter.")
+      setSaved("err")
+      setSaving(false)
+      return
+    }
+
     try {
-      // TODO: call your API route to change password
-      await new Promise((r) => setTimeout(r, 900))
+      const res = await fetch("/api/student/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          currentPassword: current,
+          newPassword: next,
+          newPasswordConfirm: confirm,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error ?? "Erreur.")
+
+      // Update usePassword flag in localStorage so the UI reflects the change
+      try {
+        const raw = localStorage.getItem("user")
+        if (raw) {
+          const u = JSON.parse(raw)
+          localStorage.setItem("user", JSON.stringify({ ...u, usePassword: true }))
+        }
+      } catch {}
+
       setSaved("ok")
       setCurrent("")
       setNext("")
       setConfirm("")
-    } catch {
+    } catch (err: any) {
+      setErrorMsg(err?.message ?? "Erreur serveur.")
       setSaved("err")
     } finally {
       setSaving(false)
@@ -92,13 +127,7 @@ export default function PasswordCard() {
   }
 
   const barWidth = ["0%", "25%", "50%", "75%", "100%"][strength]
-  const barColor = [
-    "bg-muted",
-    "bg-red-500/80",
-    "bg-yellow-500/80",
-    "bg-green-500/80",
-    "bg-accent",
-  ][strength]
+  const barColor = ["bg-muted", "bg-red-500/80", "bg-yellow-500/80", "bg-green-500/80", "bg-accent"][strength]
 
   return (
     <form
@@ -108,14 +137,14 @@ export default function PasswordCard() {
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
           <KeyRound className="text-accent" size={20} />
-          Sécurité & Mot de passe
+          Sécurité &amp; Mot de passe
         </h3>
         {saved === "ok" && (
           <span className="text-xs px-2 py-1 rounded bg-accent text-accent-foreground">Mis à jour ✓</span>
         )}
         {saved === "err" && (
-          <span className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive border border-destructive/20">
-            Erreur
+          <span className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive border border-destructive/20 max-w-[200px] truncate">
+            {errorMsg || "Erreur"}
           </span>
         )}
       </div>
@@ -141,7 +170,7 @@ export default function PasswordCard() {
           testId="pwd-next"
         />
 
-        {/* Strength meter (appears smoothly when typing) */}
+        {/* Strength meter */}
         <div
           className={`transition-all duration-500 ease-out overflow-hidden ${
             next.length > 0 ? "opacity-100 max-h-10 translate-y-0" : "opacity-0 max-h-0 translate-y-1"
@@ -149,10 +178,7 @@ export default function PasswordCard() {
         >
           <div className="space-y-1 mt-1">
             <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className={`h-full ${barColor} transition-all duration-300 ease-in-out`}
-                style={{ width: barWidth }}
-              />
+              <div className={`h-full ${barColor} transition-all duration-300 ease-in-out`} style={{ width: barWidth }} />
             </div>
             <p className="text-xs text-muted-foreground">
               Utilisez au moins 8 caractères, avec lettres majuscules/minuscules et chiffres.
@@ -175,10 +201,7 @@ export default function PasswordCard() {
         )}
 
         <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-          <ShieldCheck
-            size={16}
-            className={match && strength >= 3 ? "text-accent" : "text-muted-foreground"}
-          />
+          <ShieldCheck size={16} className={match && strength >= 3 ? "text-accent" : "text-muted-foreground"} />
           <span>
             {match && strength >= 3
               ? "Mot de passe fort et confirmé"
@@ -190,10 +213,11 @@ export default function PasswordCard() {
       <div className="mt-5 flex justify-end">
         <button
           type="submit"
-          disabled={!match || strength < 2 || saving}
-          className="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          disabled={!match || strength < 2 || !current || saving}
+          className="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {saving ? "Mise à jour..." : "Mettre à jour"}
+          {saving && <Loader2 size={16} className="animate-spin" />}
+          {saving ? "Mise à jour…" : "Mettre à jour"}
         </button>
       </div>
     </form>

@@ -49,9 +49,9 @@ export function CoursesSection({
           filteredPrograms.map((program) => {
             const variant = program.variant ?? "course"
             const hrefOverride =
-              variant === "course"
-                ? `/student-dashboard/course/${program.slug ?? program.id}`
-                : undefined
+              variant === "bootcamp"
+                ? `/student-dashboard/bootcamp/${program.slug ?? program.id}`
+                : `/student-dashboard/course/${program.slug ?? program.id}`
 
             return (
               <ProgramCard

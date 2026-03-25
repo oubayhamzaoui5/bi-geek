@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import CoursesCrud from "@/components/admin/CoursesCrud"
 import LoadingBI from "@/components/LoadingBI"
-import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 
 export default function AdminCoursesPage() {
   const [courses, setCourses] = useState<any[]>([])
@@ -74,7 +73,7 @@ export default function AdminCoursesPage() {
       order: l.order,
       locked: !!l.locked,
       attachmentsMeta: l.attachmentsMeta ?? [],
-      youtubeLinks: l.youtubeLinks ?? [],
+      youtubeLinks: (l.youtubeLinks ?? []).filter((link: any) => link.url?.trim()),
     })),
   }))
 
@@ -84,16 +83,18 @@ export default function AdminCoursesPage() {
   }
   formData.set("modules", JSON.stringify(modulesPayload))
 
-  // lesson attachments (Files)
+  // lesson attachments (Files) and keep-list (existing filenames to retain)
   for (let mi = 0; mi < (course.modules ?? []).length; mi++) {
     const module = course.modules[mi]
     for (let li = 0; li < (module.lessons ?? []).length; li++) {
       const lesson = module.lessons[li]
-      const files = Array.isArray(lesson.attachments)
-        ? lesson.attachments.filter((f: any) => f instanceof File)
-        : []
-      for (const file of files) {
-        formData.append(`lessonAttachments-${mi}-${li}`, file)
+      const attachments = Array.isArray(lesson.attachments) ? lesson.attachments : []
+      for (const f of attachments) {
+        if (f instanceof File) {
+          formData.append(`lessonAttachments-${mi}-${li}`, f)
+        } else if (typeof f === "string" && f) {
+          formData.append(`lessonAttachmentsKeep-${mi}-${li}`, f)
+        }
       }
     }
   }
@@ -106,18 +107,18 @@ export default function AdminCoursesPage() {
   const data = await res.json()
   if (!res.ok) throw new Error(data.error)
 
-  // 🔹 MERGE MODULES & LESSONS TO PRESERVE THEM
   const updatedCourse = {
-  ...data.course,
-  modules: data.course.modules ?? course.modules ?? [],
-}
-
+    ...data.course,
+    modules: data.course.modules ?? course.modules ?? [],
+  }
 
   setCourses(prev =>
     prev.some(c => c.id === updatedCourse.id)
       ? prev.map(c => (c.id === updatedCourse.id ? updatedCourse : c))
       : [...prev, updatedCourse],
   )
+
+  return updatedCourse
 }
 
 
@@ -138,11 +139,6 @@ export default function AdminCoursesPage() {
 
   return (
     <>
-      <AdminPageHeader
-        title="Formations"
-        description="Gérer les formations de la plateforme"
-        breadcrumbs={[{ label: "Formations" }]}
-      />
       <CoursesCrud
         initialCourses={courses}
         onSave={handleSave}

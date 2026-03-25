@@ -9,6 +9,10 @@ type IncomingGroup = {
   courseId?: string | null
   bootcampId?: string | null
   studentIds?: string[]
+  lockedModules?: string[]
+  unlockedModules?: string[]
+  lockedLessons?: string[]
+  unlockedLessons?: string[]
 }
 
 async function getAdminPb() {
@@ -91,6 +95,10 @@ export async function GET() {
       courseId: g.course || "",
       bootcampId: g.bootcamp || "",
       studentIds: Array.isArray(g.students) ? g.students : [],
+      lockedModules: Array.isArray(g.lockedModules) ? g.lockedModules : [],
+      unlockedModules: Array.isArray(g.unlockedModules) ? g.unlockedModules : [],
+      lockedLessons: Array.isArray(g.lockedLessons) ? g.lockedLessons : [],
+      unlockedLessons: Array.isArray(g.unlockedLessons) ? g.unlockedLessons : [],
     }))
 
     const courses = (courseRecords as any[]).map((c) => ({
@@ -132,6 +140,10 @@ export async function POST(req: Request) {
     const courseId = payload.courseId || ""
     const bootcampId = payload.bootcampId || ""
     const studentIds = Array.isArray(payload.studentIds) ? payload.studentIds : []
+    const lockedModules = Array.isArray(payload.lockedModules) ? payload.lockedModules : []
+    const unlockedModules = Array.isArray(payload.unlockedModules) ? payload.unlockedModules : []
+    const lockedLessons = Array.isArray(payload.lockedLessons) ? payload.lockedLessons : []
+    const unlockedLessons = Array.isArray(payload.unlockedLessons) ? payload.unlockedLessons : []
 
     if (!title) {
       return NextResponse.json({ error: "Le nom du groupe est obligatoire." }, { status: 400 })
@@ -153,6 +165,10 @@ export async function POST(req: Request) {
       course: programType === "course" ? courseId : null,
       bootcamp: programType === "bootcamp" ? bootcampId : null,
       students: studentIds,
+      lockedModules,
+      unlockedModules,
+      lockedLessons,
+      unlockedLessons,
     }
 
     let record: any
@@ -170,6 +186,10 @@ export async function POST(req: Request) {
       courseId: record.course || "",
       bootcampId: record.bootcamp || "",
       studentIds: Array.isArray(record.students) ? record.students : [],
+      lockedModules: Array.isArray(record.lockedModules) ? record.lockedModules : [],
+      unlockedModules: Array.isArray(record.unlockedModules) ? record.unlockedModules : [],
+      lockedLessons: Array.isArray(record.lockedLessons) ? record.lockedLessons : [],
+      unlockedLessons: Array.isArray(record.unlockedLessons) ? record.unlockedLessons : [],
     }
 
     return NextResponse.json({ ok: true, group })

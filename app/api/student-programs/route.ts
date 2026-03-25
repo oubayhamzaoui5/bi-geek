@@ -8,6 +8,8 @@ type GroupRecord = {
   bootcamp?: string | null
   students?: string[] | string | any
   status?: "not_started" | "in_progress" | "completed"
+  unlockedLessons?: string[]
+  unlockedModules?: string[]
 }
 
 const safeList = async <T>(
@@ -96,27 +98,52 @@ export async function GET(req: Request) {
       return NextResponse.json({ programs: [] })
     }
 
-    const [courseRecords, bootcampRecords] = await Promise.all([
+    const [courseRecords, bootcampRecords, allLessons] = await Promise.all([
       safeList<any>(pb, "courses"),
       safeList<any>(pb, "bootcamps"),
+      courseIds.size > 0
+        ? safeList<any>(pb, "course_lessons", { fields: "id,course" })
+        : Promise.resolve([]),
     ])
+
+    // Build a map: courseId → total lesson count
+    const lessonCountByCourse = new Map<string, number>()
+    for (const lesson of allLessons) {
+      if (lesson.course) {
+        lessonCountByCourse.set(lesson.course, (lessonCountByCourse.get(lesson.course) ?? 0) + 1)
+      }
+    }
+
+    // Build a map: courseId → group (to access unlocked lessons)
+    const groupByCourse = new Map<string, GroupRecord>()
+    for (const g of relatedGroups) {
+      if (g.course) groupByCourse.set(g.course, g)
+    }
 
     const courses = courseRecords
       .filter((c) => courseIds.has(c.id))
-      .map((c: any) => ({
-        id: c.id,
-        slug: c.slug ?? c.id,
-        title: c.title,
-        shortDescription: c.shortDescription,
-        durationLabel: c.durationLabel,
-        tags: Array.isArray(c.tags) ? c.tags : [],
-        coverImage: c.coverImage
-          ? `${PB_URL}/api/files/courses/${c.id}/${c.coverImage}`
-          : null,
-        programType: "course" as const,
-        status: groupStatusMap.get(c.id) || "in_progress",
-        completed: groupStatusMap.get(c.id) === "completed"
-      }))
+      .map((c: any) => {
+        const group = groupByCourse.get(c.id)
+        const totalLessons = lessonCountByCourse.get(c.id) ?? 0
+        const unlockedLessons = Array.isArray(group?.unlockedLessons) ? group.unlockedLessons.length : 0
+        const isCompleted = groupStatusMap.get(c.id) === "completed"
+        const progress = isCompleted ? 100 : totalLessons > 0 ? Math.round((unlockedLessons / totalLessons) * 100) : 0
+        return {
+          id: c.id,
+          slug: c.slug ?? c.id,
+          title: c.title,
+          shortDescription: c.shortDescription,
+          durationLabel: c.durationLabel,
+          tags: Array.isArray(c.tags) ? c.tags : [],
+          coverImage: c.coverImage
+            ? `${PB_URL}/api/files/courses/${c.id}/${c.coverImage}`
+            : null,
+          programType: "course" as const,
+          status: groupStatusMap.get(c.id) || "in_progress",
+          completed: isCompleted,
+          progress,
+        }
+      })
 
     const bootcamps = bootcampRecords
       .filter((b) => bootcampIds.has(b.id))

@@ -16,6 +16,8 @@ export async function GET(
   try {
     const { slug } = await params
     const safeSlug = decodeURIComponent(slug)
+    const { searchParams } = new URL(req.url);
+    const studentId = searchParams.get("studentId");
     const pb = new PocketBase(PB_URL)
 
     // 1) Bootcamp
@@ -37,6 +39,15 @@ export async function GET(
       ...bootcampRaw,
       image: getFileUrl(bootcampRaw, bootcampRaw.coverImage ?? bootcampRaw.image),
       prerequis: bootcampRaw.prerequis ?? null,
+    }
+
+    let group: any = null;
+    if (studentId && bootcampRaw) {
+      try {
+        group = await pb.collection("groups").getFirstListItem(`bootcamp="${bootcampRaw.id}" && students~"${studentId}"`);
+      } catch (err) {
+        // no-op, student has no group assigned
+      }
     }
 
     // 2) Pivot courses inside bootcamp
@@ -63,22 +74,38 @@ export async function GET(
       }))
 
     // 3) Modules for all courses
-    const courseFilter = courses.map(c => `course="${c.id}"`).join(" || ")
-    const modules = courseFilter
+    const courseFilter = courses.map((c: any) => `course="${c.id}"`).join(" || ")
+    let modules = courseFilter
       ? await pb.collection("course_modules").getFullList({
           filter: courseFilter,
           sort: "course,order",
         })
       : []
 
+    modules = modules.map((m: any) => {
+      let isModuleLocked = true;
+      if (group) {
+        if (Array.isArray(group.unlockedModules) && group.unlockedModules.includes(m.id)) isModuleLocked = false;
+      }
+      return { ...m, locked: isModuleLocked };
+    })
+
     // 4) Lessons for all modules
-    const moduleFilter = modules.map(m => `module="${m.id}"`).join(" || ")
-    const lessons = moduleFilter
+    const moduleFilter = modules.map((m: any) => `module="${m.id}"`).join(" || ")
+    let lessons = moduleFilter
       ? await pb.collection("course_lessons").getFullList({
           filter: moduleFilter,
           sort: "module,order",
         })
       : []
+
+    lessons = lessons.map((l: any) => {
+      let isLessonLocked = true;
+      if (group) {
+        if (Array.isArray(group.unlockedLessons) && group.unlockedLessons.includes(l.id)) isLessonLocked = false;
+      }
+      return { ...l, locked: isLessonLocked };
+    })
 
     return NextResponse.json({ bootcamp, courses, modules, lessons })
   } catch (err: any) {

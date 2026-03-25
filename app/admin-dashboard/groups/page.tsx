@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import GroupsCrud from "@/components/admin/GroupsCrud"
 import LoadingBI from "@/components/LoadingBI"
-import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 
 export default function AdminGroupsPage() {
   const [groups, setGroups] = useState<any[]>([])
@@ -62,11 +61,6 @@ export default function AdminGroupsPage() {
 
   return (
     <>
-      <AdminPageHeader
-        title="Groupes"
-        description="Organiser les groupes d'étudiants"
-        breadcrumbs={[{ label: "Groupes" }]}
-      />
       <GroupsCrud
         initialGroups={groups}
         initialCourses={courses}

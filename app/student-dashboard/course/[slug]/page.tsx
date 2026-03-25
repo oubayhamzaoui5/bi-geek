@@ -63,7 +63,17 @@ export default function CourseDetailsPageBySlug() {
 
     const load = async () => {
       try {
-        const res = await fetch(`/api/courses/${slug}`, { signal: controller.signal })
+        let studentId = ""
+        try {
+          const userString = typeof window !== "undefined" ? localStorage.getItem("user") : null
+          const user = userString ? JSON.parse(userString) : null
+          studentId = (user?.id as string | undefined) ?? ""
+        } catch {
+          studentId = ""
+        }
+
+        const url = studentId ? `/api/courses/${slug}?studentId=${encodeURIComponent(studentId)}` : `/api/courses/${slug}`
+        const res = await fetch(url, { signal: controller.signal })
         if (!res.ok) return
         const data = await res.json()
 
@@ -86,8 +96,11 @@ export default function CourseDetailsPageBySlug() {
     () => modules.reduce((sum, m) => sum + (m.lessons?.length ?? 0), 0),
     [modules],
   )
-  const completedLessons = 0
-  const progressPercent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
+  const unlockedLessons = useMemo(
+    () => modules.reduce((sum, m) => sum + (m.lessons?.filter(l => !l.locked).length ?? 0), 0),
+    [modules],
+  )
+  const progressPercent = totalLessons > 0 ? Math.round((unlockedLessons / totalLessons) * 100) : 0
 
   const { totalVideos, totalArticles } = useMemo(() => {
     let videos = 0
@@ -215,7 +228,7 @@ export default function CourseDetailsPageBySlug() {
 
                 <aside className="lg:w-[35%] xl:w-[30%] space-y-6 lg:sticky lg:top-24 h-fit pb-12">
                   <CourseProgress
-                    completedLessons={completedLessons}
+                    completedLessons={unlockedLessons}
                     totalLessons={totalLessons}
                     coverImage={course.coverImage}
                     courseTitle={course.title}

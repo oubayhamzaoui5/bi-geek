@@ -5,7 +5,6 @@ import InstructorsCrud, {
   AdminInstructor,
 } from "@/components/admin/InstructorsCrud"
 import LoadingBI from "@/components/LoadingBI"
-import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 
 export default function AdminInstructorsPage() {
   const [instructors, setInstructors] = useState<AdminInstructor[]>([])
@@ -80,11 +79,6 @@ export default function AdminInstructorsPage() {
 
   return (
     <>
-      <AdminPageHeader
-        title="Formateurs"
-        description="Gérer le corps professoral"
-        breadcrumbs={[{ label: "Formateurs" }]}
-      />
       <InstructorsCrud
         initialInstructors={instructors}
         onSave={handleSave}

@@ -16,6 +16,7 @@ export interface Course {
   startDate?: string
   applyUrl?: string
   slug?: string
+  programType?: "course" | "bootcamp"
 }
 
 export function CourseCard({ course }: { course: Course }) {
@@ -23,7 +24,9 @@ export function CourseCard({ course }: { course: Course }) {
   const isUpcoming = course.status === "upcoming"
   const isActive = course.status === "active"
   const isStored = course.status === "stored"
-  const courseHref = `/student-dashboard/course/${course.slug ?? course.id}`
+  const courseHref = course.programType === "bootcamp"
+    ? `/student-dashboard/bootcamp/${course.slug ?? course.id}`
+    : `/student-dashboard/course/${course.slug ?? course.id}`
 
   return (
     <div className="glass-dark p-4 rounded-lg border border-white/10 hover:border-accent/50 transition-all duration-300 group flex flex-col">

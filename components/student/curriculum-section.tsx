@@ -176,8 +176,7 @@ export function CurriculumSection({
   const moduleStatus = (module: Module) => {
     if (module.locked) return "locked"
     const lockedCount = module.lessons.filter((l) => l.locked).length
-    if (lockedCount === module.lessons.length) return "locked"
-    if (lockedCount === 0)                      return "completed"
+    if (lockedCount === 0 && module.lessons.length > 0) return "completed"
     return "in_progress"
   }
 
@@ -341,8 +340,8 @@ export function CurriculumSection({
                                         {lesson.contents.map((c, ci) => {
                                           const cfg      = contentConfig[c.type]
                                           const CIcon    = cfg.Icon
-                                          const label    = c.filename ?? c.title ?? (c.href ? c.href.split("/").pop() : "Ressource")
-                                          const clickable = !isGuest && !isBootcamp && !!(c.playbackId || c.href)
+                                          const label    = c.title ?? c.filename ?? (c.href ? c.href.split("/").pop() : "Ressource")
+                                          const clickable = !isGuest && !!(c.playbackId || c.href)
 
                                           return (
                                             <li key={ci}>

@@ -48,6 +48,14 @@ type IncomingCourse = {
 }
 
 
+// PocketBase single-file fields return a string; multi-file return an array.
+// Always normalise to array so the rest of the code can use .map / .filter safely.
+function toFileArray(v: unknown): string[] {
+  if (!v) return []
+  if (Array.isArray(v)) return v.filter(Boolean)
+  return [v as string]
+}
+
 function slugify(text: string) {
   return text
     .toLowerCase()
@@ -213,7 +221,7 @@ export async function GET() {
           locked: !!l.locked,
           attachmentsMeta: l.attachmentsMeta ?? [],
           youtubeLinks: l.youtubeLinks ?? [],
-          attachments: l.attachments ?? [],
+          attachments: toFileArray(l.attachments),
         })),
       }))
 
@@ -416,104 +424,92 @@ export async function POST(req: Request) {
         const attachmentFiles = lessonAttachments.filter(
           (f): f is File => f instanceof File && f.size > 0
         )
+        const keepAttachments = formData.getAll(`lessonAttachmentsKeep-${i}-${j}`) as string[]
 
-        const lessonForm = new FormData()
-        lessonForm.append("course", courseId)
-        lessonForm.append("module", moduleId)
-        lessonForm.append("title", l.title || `Lecon ${j + 1}`)
-        lessonForm.append("durationLabel", l.durationLabel ?? "")
-        lessonForm.append("duration", l.durationLabel ?? "")
-        lessonForm.append("order", String(l.order ?? j + 1))
-        lessonForm.append("locked", String(l.locked ?? false))
-        lessonForm.append("attachmentsMeta", JSON.stringify(l.attachmentsMeta ?? []))
-        lessonForm.append("youtubeLinks", JSON.stringify(l.youtubeLinks ?? []))
-        for (const file of attachmentFiles) {
-          lessonForm.append("attachments", file)
+        const pbUrl = process.env.POCKETBASE_URL!
+        const authHeader = { Authorization: pb.authStore.token ?? "" }
+
+        const pbFetch = async (method: "POST" | "PATCH", url: string, fd: FormData): Promise<any> => {
+          const res = await fetch(url, { method, headers: authHeader, body: fd })
+          const json = await res.json()
+          if (!res.ok) throw new Error(json?.message || `PocketBase error ${res.status}`)
+          return json
         }
 
-        const hasAttachments = (rec: any) => {
-          if (!rec) return false
-          if (Array.isArray(rec.attachments)) return rec.attachments.length > 0
-          return !!rec.attachments
-        }
+        // Step 1: create/update lesson with metadata only (no file uploads yet)
+        const metaForm = new FormData()
+        metaForm.append("course", courseId)
+        metaForm.append("module", moduleId!)
+        metaForm.append("title", l.title || `Lecon ${j + 1}`)
+        metaForm.append("durationLabel", l.durationLabel ?? "")
+        metaForm.append("duration", l.durationLabel ?? "")
+        metaForm.append("order", String(l.order ?? j + 1))
+        metaForm.append("locked", String(l.locked ?? false))
+        metaForm.append("attachmentsMeta", JSON.stringify(l.attachmentsMeta ?? []))
+        metaForm.append("youtubeLinks", JSON.stringify((l.youtubeLinks ?? []).filter((y: any) => y.url?.trim())))
 
-        const ensureAttachmentsSaved = async (rec: any, lessonId: string) => {
-          if (attachmentFiles.length === 0) return rec
-          if (hasAttachments(rec)) return rec
-
-          // Retry for single-file fields
-          const retryForm = new FormData()
-          retryForm.append("course", courseId)
-          retryForm.append("module", moduleId)
-          retryForm.append("title", l.title || `Lecon ${j + 1}`)
-          retryForm.append("durationLabel", l.durationLabel ?? "")
-          retryForm.append("duration", l.durationLabel ?? "")
-          retryForm.append("order", String(l.order ?? j + 1))
-          retryForm.append("locked", String(l.locked ?? false))
-          retryForm.append("attachmentsMeta", JSON.stringify(l.attachmentsMeta ?? []))
-          retryForm.append("youtubeLinks", JSON.stringify(l.youtubeLinks ?? []))
-          retryForm.append("attachments", attachmentFiles[0])
-          const retryRec = await pb.collection("course_lessons").update(lessonId, retryForm)
-          if (hasAttachments(retryRec)) return retryRec
-
-          const keys = rec ? Object.keys(rec) : []
-          const hasAttachmentsField = keys.includes("attachments")
-          const hasMetaField = keys.includes("attachmentsMeta")
-          const hasYoutubeField = keys.includes("youtubeLinks")
-          console.error("Attachments not saved. Record keys:", keys)
-
-          if (!hasAttachmentsField) {
-            throw new Error(
-              "PocketBase schema missing file field 'attachments' on collection 'course_lessons'. " +
-              "Add a File field named 'attachments' (max files >= 1), then retry."
-            )
-          }
-          if (!hasMetaField || !hasYoutubeField) {
-            throw new Error(
-              "PocketBase schema missing fields on 'course_lessons': " +
-              `${!hasMetaField ? "attachmentsMeta " : ""}${!hasYoutubeField ? "youtubeLinks" : ""}`.trim() +
-              ". Add JSON fields with those names, then retry."
-            )
-          }
-          throw new Error(`Attachments failed to save for lesson ${lessonId}`)
-        }
-
+        // Delete removed files in the same metadata step
         if (l.id && existingLessonsById.has(l.id)) {
-          const updated = await pb.collection("course_lessons").update(l.id, lessonForm)
-          await ensureAttachmentsSaved(updated, l.id)
-        } else {
-          const created = await pb.collection("course_lessons").create(lessonForm)
-          const lessonId = created?.id ?? "new"
-          if (attachmentFiles.length > 0 && !hasAttachments(created)) {
-            // Retry for newly created records too
-            const retryForm = new FormData()
-            retryForm.append("course", courseId)
-            retryForm.append("module", moduleId)
-            retryForm.append("title", l.title || `Lecon ${j + 1}`)
-            retryForm.append("durationLabel", l.durationLabel ?? "")
-            retryForm.append("duration", l.durationLabel ?? "")
-            retryForm.append("order", String(l.order ?? j + 1))
-            retryForm.append("locked", String(l.locked ?? false))
-            retryForm.append("attachmentsMeta", JSON.stringify(l.attachmentsMeta ?? []))
-            retryForm.append("youtubeLinks", JSON.stringify(l.youtubeLinks ?? []))
-            retryForm.append("attachments", attachmentFiles[0])
-            const retryRec = await pb.collection("course_lessons").update(created.id, retryForm)
-            if (!hasAttachments(retryRec)) {
-              const keys = created ? Object.keys(created) : []
-              console.error("Attachments not saved on create. Record keys:", keys)
-              throw new Error(`Attachments failed to save for new lesson ${lessonId}`)
-            }
+          const existingLesson = existingLessonsById.get(l.id)
+          const currentAttachments = toFileArray(existingLesson.attachments)
+          for (const fname of currentAttachments) {
+            if (!keepAttachments.includes(fname)) metaForm.append("attachments-", fname)
           }
+        }
+
+        let lessonId: string
+        if (l.id && existingLessonsById.has(l.id)) {
+          await pbFetch("PATCH", `${pbUrl}/api/collections/course_lessons/records/${l.id}`, metaForm)
+          lessonId = l.id
+        } else {
+          const created = await pbFetch("POST", `${pbUrl}/api/collections/course_lessons/records`, metaForm)
+          lessonId = created.id
+        }
+
+        // Step 2: upload each new file using "attachments+" so PocketBase
+        // appends rather than replaces (PocketBase v0.22+ replace-by-default behavior).
+        for (const file of attachmentFiles) {
+          const fileForm = new FormData()
+          fileForm.append("attachments+", file)
+          await pbFetch("PATCH", `${pbUrl}/api/collections/course_lessons/records/${lessonId}`, fileForm)
         }
       }
     }
-    const finalCourse = await pb.collection("courses").getOne(courseId)
+    const [finalCourse, savedModules, savedLessons] = await Promise.all([
+      pb.collection("courses").getOne(courseId),
+      pb.collection("course_modules").getFullList({ filter: `course="${courseId}"`, sort: "order" }),
+      pb.collection("course_lessons").getFullList({ filter: `course="${courseId}"`, sort: "module,order" }),
+    ])
+
+    const lessonsByModule = savedLessons.reduce((map: Map<string, any[]>, l: any) => {
+      map.set(l.module, [...(map.get(l.module) ?? []), l])
+      return map
+    }, new Map<string, any[]>())
+
+    const finalModules = savedModules.map((m: any) => ({
+      id: m.id,
+      title: m.title,
+      durationLabel: m.durationLabel ?? "",
+      order: m.order ?? 0,
+      locked: !!m.locked,
+      lessons: (lessonsByModule.get(m.id) ?? []).map((l: any) => ({
+        id: l.id,
+        title: l.title,
+        durationLabel: l.durationLabel ?? "",
+        order: l.order ?? 0,
+        locked: !!l.locked,
+        attachmentsMeta: l.attachmentsMeta ?? [],
+        youtubeLinks: l.youtubeLinks ?? [],
+        attachments: toFileArray(l.attachments),
+      })),
+    }))
 
     return NextResponse.json({
       ok: true,
       course: {
         ...finalCourse,
-        coverImage: finalCourse.coverImage?.[0] ?? null,
+        coverImage: Array.isArray(finalCourse.coverImage) ? (finalCourse.coverImage[0] ?? null) : (finalCourse.coverImage || null),
+        modules: finalModules,
       },
     })
 

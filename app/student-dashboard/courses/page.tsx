@@ -54,16 +54,16 @@ export default function CoursesPage() {
         setCourses(
           items.map((c: any) => {
             const isCompleted = c.completed === true || c.status === "completed"
-            
             return {
               id: c.id,
               slug: c.slug ?? c.id,
               title: c.title,
-              progress: isCompleted ? 100 : 0, // Could be replaced by actual progress percentage in future DB iteration
+              progress: c.progress ?? (isCompleted ? 100 : 0),
               duration: c.durationLabel ?? "",
               thumbnail: c.coverImage ?? "/placeholder-course.png",
               hasWork: false,
               status: isCompleted ? "completed" : "active",
+              programType: c.programType,
             }
           }),
         )

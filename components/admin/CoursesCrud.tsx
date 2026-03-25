@@ -45,7 +45,7 @@ type AdminCourse = {
 
 type CoursesCrudProps = {
   initialCourses?: AdminCourse[]
-  onSave?: (course: AdminCourse) => Promise<void>
+  onSave?: (course: AdminCourse) => Promise<AdminCourse>
   onDelete?: (id: string) => Promise<void>
   onView?: (id: string) => void
 }
@@ -59,18 +59,24 @@ const getFileName = (file: File | string) => typeof file === "string" ? file : f
 const stripFileExtension = (name: string) => name.replace(/\.[^.]+$/, "")
 
 const normalizeLessonResources = (lesson: AdminLesson): AdminLesson => {
-  const attachments = lesson.attachments ?? []
+  const raw = lesson.attachments ?? []
+  const attachments: (File | string)[] = Array.isArray(raw) ? raw : raw ? [raw as any] : []
   const existingMeta = lesson.attachmentsMeta ?? []
-  const normalizedMeta: AttachmentMeta[] = attachments.map((file, idx) => {
-    const name = getFileName(file)
-    const prev = existingMeta[idx] ?? { name }
-    return {
-      name,
-      title: prev.title ?? stripFileExtension(prev.name ?? name),
-      description: prev.description ?? "",
-      order: prev.order,
-    }
-  })
+  // If attachments is empty, preserve existingMeta as-is so server-side files
+  // saved in attachmentsMeta are not wiped out when the file field returns nothing.
+  const normalizedMeta: AttachmentMeta[] = attachments.length === 0
+    ? existingMeta
+    : attachments.map((file, idx) => {
+        const name = getFileName(file)
+        // Try name match first (handles PocketBase-renamed files), fall back to index
+        const prev = existingMeta.find(m => m.name === name) ?? existingMeta[idx] ?? { name }
+        return {
+          name,
+          title: prev.title ?? stripFileExtension(prev.name ?? name),
+          description: prev.description ?? "",
+          order: prev.order,
+        }
+      })
 
   const youtubeLinks: YoutubeLinkItem[] = (lesson.youtubeLinks ?? []).map((link, idx) => ({
     url: link.url ?? "",
@@ -79,9 +85,13 @@ const normalizeLessonResources = (lesson: AdminLesson): AdminLesson => {
     order: link.order,
   }))
 
+  // Work on copies so we never mutate existingMeta in place
+  const metaCopy = normalizedMeta.map(m => ({ ...m }))
+  const linksCopy = youtubeLinks.map(l => ({ ...l }))
+
   const resources = [
-    ...normalizedMeta.map((m, i) => ({ kind: "attachment" as const, index: i, order: m.order ?? 0, fallback: i })),
-    ...youtubeLinks.map((l, i) => ({ kind: "youtube" as const, index: i, order: l.order ?? 0, fallback: i + normalizedMeta.length })),
+    ...metaCopy.map((m, i) => ({ kind: "attachment" as const, index: i, order: m.order ?? 0, fallback: i })),
+    ...linksCopy.map((l, i) => ({ kind: "youtube" as const, index: i, order: l.order ?? 0, fallback: i + metaCopy.length })),
   ]
   const hasAnyOrder = resources.some(r => r.order > 0)
   const sorted = resources.slice().sort((a, b) => {
@@ -93,11 +103,11 @@ const normalizeLessonResources = (lesson: AdminLesson): AdminLesson => {
 
   sorted.forEach((r, idx) => {
     const order = idx + 1
-    if (r.kind === "attachment") normalizedMeta[r.index] = { ...normalizedMeta[r.index], order }
-    else youtubeLinks[r.index] = { ...youtubeLinks[r.index], order }
+    if (r.kind === "attachment") metaCopy[r.index] = { ...metaCopy[r.index], order }
+    else linksCopy[r.index] = { ...linksCopy[r.index], order }
   })
 
-  return { ...lesson, attachmentsMeta: normalizedMeta, youtubeLinks }
+  return { ...lesson, attachmentsMeta: metaCopy, youtubeLinks: linksCopy }
 }
 
 const buildLessonResources = (lesson: AdminLesson): LessonResource[] => {
@@ -413,9 +423,21 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
     if (!editingCourse.title.trim()) { showToast("error", "Le titre est obligatoire"); return }
     setLoading(true); const lid = showToast("loading", "Enregistrement en cours…")
     try {
-      if (onSave) await onSave(editingCourse)
-      if (editingCourse.id) { setCourses(prev => prev.map(c => c.id === editingCourse.id ? { ...editingCourse, coverImage: c.coverImage } : c)) }
-      else { const nc = { ...editingCourse, id: `course_${Date.now()}` }; setCourses(prev => [...prev, nc]); setEditingCourse(nc); setIsCreating(false) }
+      const saved = onSave ? await onSave(editingCourse) : null
+      if (saved) {
+        const merged: AdminCourse = {
+          ...saved,
+          coverPreview: editingCourse.coverPreview,
+          coverImage: saved.coverImage ?? editingCourse.coverImage,
+        }
+        setEditingCourse(merged)
+        setCourses(prev =>
+          prev.some(c => c.id === saved.id)
+            ? prev.map(c => (c.id === saved.id ? merged : c))
+            : [...prev, merged],
+        )
+        setIsCreating(false)
+      }
       removeToast(lid); showToast("success", "Formation enregistrée avec succès !")
     } catch (err: any) { removeToast(lid); showToast("error", err.message || "Erreur lors de l'enregistrement") }
     finally { setLoading(false) }
@@ -885,15 +907,6 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                               style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#0f172a", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }} />
                             <input type="text" value={module.durationLabel} onChange={e => { e.stopPropagation(); handleModuleChange(mi, "durationLabel", e.target.value) }} onClick={e => e.stopPropagation()} placeholder="Durée"
                               style={{ width: 80, padding: "5px 10px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12, color: "#64748b", outline: "none", fontFamily: "inherit" }} />
-                            <label onClick={e => e.stopPropagation()} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "#64748b", fontWeight: 600, cursor: "pointer", background: "#f8fafc", border: "1px solid #e2e8f0", padding: "4px 8px", borderRadius: 8 }}>
-                              <input
-                                type="checkbox"
-                                checked={!!module.locked}
-                                onChange={e => handleModuleChange(mi, "locked", e.target.checked)}
-                                style={{ width: 14, height: 14 }}
-                              />
-                              Verrouillé
-                            </label>
                             <span style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap" }}>{module.lessons.length} leçon{module.lessons.length !== 1 ? "s" : ""}</span>
                             <div style={{ display: "flex", gap: 2 }} onClick={e => e.stopPropagation()}>
                               <IconBtn onClick={() => handleMoveModule(mi, "up")} color="#64748b"><ChevronUp style={{ width: 13, height: 13 }} /></IconBtn>
@@ -917,15 +930,6 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                                     />
                                     <input type="text" value={lesson.durationLabel} onChange={e => handleLessonChange(mi, li, "durationLabel", e.target.value)} placeholder="Durée"
                                       style={{ width: 72, padding: "7px 10px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12, color: "#64748b", outline: "none", fontFamily: "inherit" }} />
-                                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "#64748b", fontWeight: 600, cursor: "pointer", background: "#f8fafc", border: "1px solid #e2e8f0", padding: "4px 8px", borderRadius: 8 }}>
-                                      <input
-                                        type="checkbox"
-                                        checked={!!lesson.locked}
-                                        onChange={e => handleLessonChange(mi, li, "locked", e.target.checked)}
-                                        style={{ width: 14, height: 14 }}
-                                      />
-                                      Verrouillé
-                                    </label>
                                     <div style={{ display: "flex", gap: 1 }}>
                                       <IconBtn onClick={() => handleMoveLesson(mi, li, "up")} color="#64748b"><ChevronUp style={{ width: 12, height: 12 }} /></IconBtn>
                                       <IconBtn onClick={() => handleMoveLesson(mi, li, "down")} color="#64748b"><ChevronDown style={{ width: 12, height: 12 }} /></IconBtn>
@@ -1017,7 +1021,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                                                   {isYoutube ? (
                                                     <input
                                                       type="url"
-                                                      placeholder="URL YouTubeâ€¦"
+                                                      placeholder="URL YouTube…"
                                                       value={res.url || ""}
                                                       onChange={e => updateLessonYoutubeMeta(mi, li, res.index, "url", e.target.value)}
                                                       style={{ width: "100%", fontSize: 11, padding: "5px 8px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 7, outline: "none", color: "#0f172a" }}

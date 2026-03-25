@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import BootcampsCrud from "@/components/admin/BootcampsCrud"
 import LoadingBI from "@/components/LoadingBI"
-import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 
 export default function AdminBootcampsPage() {
   const [bootcamps, setBootcamps] = useState<any[]>([])
@@ -100,11 +99,6 @@ export default function AdminBootcampsPage() {
 
   return (
     <>
-      <AdminPageHeader
-        title="Bootcamps"
-        description="Gérer les programmes intensifs"
-        breadcrumbs={[{ label: "Bootcamps" }]}
-      />
       <BootcampsCrud
         initialBootcamps={bootcamps}
         initialCourses={courses}

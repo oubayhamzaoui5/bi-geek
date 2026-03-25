@@ -55,9 +55,10 @@ export async function POST(req: Request) {
       ok: true,
       user: {
         id: user?.id,
-        username: user?.username ?? "", // built-in username (may be empty)
+        username: user?.username ?? "",
         email: user?.email ?? "",
         role: user?.role ?? "student",
+        usePassword: user?.usePassword ?? false,
       },
     })
   } catch (err: any) {

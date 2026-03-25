@@ -33,15 +33,19 @@ const stepVariants = {
 export default function LoginPage() {
   const router = useRouter()
 
-    useEffect(() => {
+  useEffect(() => {
     const userString = localStorage.getItem("user")
     const user = userString ? JSON.parse(userString) : null
 
-    if (user && user.role === "admin") {
+    if (!user) return
+
+    if (user.usePassword === false) {
+      router.push("/force-change-password")
+    } else if (user.role === "admin") {
       router.push("/admin-dashboard")
-    } else if (user && user.role === "instructor") {
+    } else if (user.role === "instructor") {
       router.push("/instructor-dashboard")
-    } else if (user && user.role === "student") {
+    } else {
       router.push("/student-dashboard")
     }
   }, [router])
@@ -109,9 +113,15 @@ export default function LoginPage() {
         localStorage.setItem("user", JSON.stringify(authUser))
       }
 
-      if (role === "admin") router.push("/admin-dashboard")
-      else if (role === "instructor") router.push("/instructor-dashboard")
-      else router.push("/student-dashboard")
+      if (authUser?.usePassword === false) {
+        router.push("/force-change-password")
+      } else if (role === "admin") {
+        router.push("/admin-dashboard")
+      } else if (role === "instructor") {
+        router.push("/instructor-dashboard")
+      } else {
+        router.push("/student-dashboard")
+      }
     } catch (err) {
       console.error(err)
       setLoginErr("Erreur lors de la connexion. Réessayez.")
