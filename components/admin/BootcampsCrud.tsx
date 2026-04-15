@@ -1,12 +1,14 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
-import { 
-  Search, Plus, Edit, Trash2, Eye, 
-  ChevronUp, ChevronDown, Save, X, Users,
+import {
+  Search, Plus, Edit, Trash2, ExternalLink,
+  ChevronUp, ChevronDown, Save, X,
   BookOpen, Star, ChevronRight, Layers, ImagePlus,
-  CheckCircle, AlertCircle, Loader2
+  CheckCircle, AlertCircle, Loader2,
+  Archive, RotateCcw
 } from "lucide-react"
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 
 // 🔔 TOAST SYSTEM - Types
 type ToastType = "success" | "error" | "loading"
@@ -38,6 +40,7 @@ type AdminBootcamp = {
   reviewsCount: number
   isPublished: boolean
   courseIds: string[]
+  tags: string[]
   coverImage?: File | string | null
   coverPreview?: string | null
 }
@@ -58,11 +61,10 @@ const PREREQUIS_OPTIONS = [
 // ---- UI primitives (matching CoursesCrud style) ----
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6, letterSpacing: "0.02em" }}>
-      {children}{required && <span style={{ color: "#f43f5e", marginLeft: 3 }}>*</span>}
+    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#64748b", marginBottom: 7, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+      {children}{required && <span style={{ color: "#ef4444", marginLeft: 4 }}>*</span>}
     </label>
   )
-
 }
 
 function Input({ value, onChange, placeholder, type = "text", style }: {
@@ -74,9 +76,9 @@ function Input({ value, onChange, placeholder, type = "text", style }: {
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      style={{ width: "100%", padding: "10px 14px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, color: "#0f172a", outline: "none", boxSizing: "border-box", fontFamily: "inherit", ...style }}
-      onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; e.target.style.background = "#fff" }}
-      onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none"; e.target.style.background = "#f8fafc" }}
+      style={{ width: "100%", padding: "10px 14px", background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, color: "#0f172a", outline: "none", boxSizing: "border-box", fontFamily: "inherit", transition: "border-color 0.15s, box-shadow 0.15s", ...style }}
+      onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.1)" }}
+      onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none" }}
     />
   )
 }
@@ -88,9 +90,9 @@ function Textarea({ value, onChange, placeholder, rows = 3 }: { value: string; o
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      style={{ width: "100%", padding: "10px 14px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, color: "#0f172a", outline: "none", resize: "none", fontFamily: "inherit", boxSizing: "border-box" }}
-      onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)"; e.target.style.background = "#fff" }}
-      onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none"; e.target.style.background = "#f8fafc" }}
+      style={{ width: "100%", padding: "10px 14px", background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, color: "#0f172a", outline: "none", resize: "none", fontFamily: "inherit", boxSizing: "border-box", transition: "border-color 0.15s, box-shadow 0.15s", lineHeight: 1.6 }}
+      onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.1)" }}
+      onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none" }}
     />
   )
 }
@@ -101,8 +103,8 @@ function SelectField({ value, onChange, children }: { value: string; onChange: (
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
-        style={{ width: "100%", padding: "10px 36px 10px 14px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, color: "#0f172a", outline: "none", appearance: "none", cursor: "pointer", fontFamily: "inherit" }}
-        onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)" }}
+        style={{ width: "100%", padding: "10px 36px 10px 14px", background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, color: "#0f172a", outline: "none", appearance: "none", cursor: "pointer", fontFamily: "inherit", transition: "border-color 0.15s, box-shadow 0.15s" }}
+        onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.1)" }}
         onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none" }}
       >
         {children}
@@ -131,17 +133,17 @@ function IconBtn({ onClick, title, color = "#64748b", hoverBg = "#f1f5f9", child
 
 function FormCard({ title, icon, children, action }: { title: string; icon?: React.ReactNode; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #e8ecf3", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
-      <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(180deg,#fafbfd 0%,#fff 100%)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 9, background: "linear-gradient(135deg,rgba(99,102,241,0.12),rgba(129,140,248,0.06))", color: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #edf0f7", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.04)" }}>
+      <div style={{ padding: "14px 22px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(180deg,#fafbfe 0%,#fff 100%)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg,rgba(99,102,241,0.1),rgba(129,140,248,0.05))", color: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {icon}
           </div>
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: 0, letterSpacing: "-0.01em" }}>{title}</h3>
         </div>
         {action}
       </div>
-      <div style={{ padding: 20 }}>{children}</div>
+      <div style={{ padding: "20px 22px" }}>{children}</div>
     </div>
   )
 }
@@ -164,6 +166,14 @@ export default function BootcampsCrud({
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(false)
   
+  // Archive / tag state
+  const [viewMode, setViewMode] = useState<"active" | "archived">("active")
+  const [archivedBootcamps, setArchivedBootcamps] = useState<AdminBootcamp[]>([])
+  const [archivedLoading, setArchivedLoading] = useState(false)
+  const [filterTag, setFilterTag] = useState<string>("all")
+  const [hoveredTagsBootcampId, setHoveredTagsBootcampId] = useState<string | null>(null)
+  const [tagsTooltipPos, setTagsTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+
   // Course selection state
   const [courseSearch, setCourseSearch] = useState("")
   const [selectedCourseId, setSelectedCourseId] = useState<string>("")
@@ -240,15 +250,19 @@ export default function BootcampsCrud({
     reviewsCount: 0,
     isPublished: true,
     courseIds: [],
+    tags: [],
     coverImage: null,
     coverPreview: null,
   })
 
+  const allTags = Array.from(new Set(bootcamps.flatMap(b => b.tags ?? [])))
+
   // Filter bootcamps
   const filteredBootcamps = bootcamps.filter(bootcamp => {
-    const matchesSearch = bootcamp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bootcamp.shortDescription.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesSearch
+    const q = searchTerm.toLowerCase()
+    if (q && !bootcamp.title.toLowerCase().includes(q) && !bootcamp.shortDescription.toLowerCase().includes(q)) return false
+    if (filterTag !== "all" && !(bootcamp.tags ?? []).includes(filterTag)) return false
+    return true
   })
 
   // Filter available courses for dropdown
@@ -347,21 +361,54 @@ export default function BootcampsCrud({
     }
   }
 
-  const handleDeleteBootcamp = async (id: string) => {
-    if (!confirm("Supprimer ce bootcamp ? Cette action est irréversible.")) return
-    
+  const handleArchiveBootcamp = async (id: string) => {
+    if (!confirm("Archiver ce bootcamp ?")) return
     try {
-      if (onDelete) {
-        await onDelete(id)
-      }
-      
+      if (onDelete) await onDelete(id)
       setBootcamps(prev => prev.filter(b => b.id !== id))
-      if (editingBootcamp?.id === id) {
-        setEditingBootcamp(null)
-      }
-      showToast("success", "Bootcamp supprimé avec succès!")
+      if (editingBootcamp?.id === id) setEditingBootcamp(null)
+      showToast("success", "Bootcamp archivé.")
+    } catch (err: any) {
+      showToast("error", err.message || "Erreur lors de l'archivage")
+    }
+  }
+
+  const handleRestoreBootcamp = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/bootcamps/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "restore" }) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setArchivedBootcamps(prev => prev.filter(b => b.id !== id))
+      showToast("success", "Bootcamp restauré.")
+    } catch (err: any) {
+      showToast("error", err.message || "Erreur lors de la restauration")
+    }
+  }
+
+  const handlePermanentDeleteBootcamp = async (id: string) => {
+    if (!confirm("Supprimer définitivement ce bootcamp ? Cette action est irréversible.")) return
+    try {
+      const res = await fetch(`/api/admin/bootcamps/${id}?permanent=true`, { method: "DELETE" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setArchivedBootcamps(prev => prev.filter(b => b.id !== id))
+      showToast("success", "Bootcamp supprimé définitivement.")
     } catch (err: any) {
       showToast("error", err.message || "Erreur lors de la suppression")
+    }
+  }
+
+  const loadArchivedBootcamps = async () => {
+    setArchivedLoading(true)
+    try {
+      const res = await fetch("/api/admin/bootcamps?archived=true")
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setArchivedBootcamps(data.bootcamps)
+    } catch (err: any) {
+      showToast("error", err.message || "Erreur lors du chargement des archives")
+    } finally {
+      setArchivedLoading(false)
     }
   }
 
@@ -433,145 +480,240 @@ export default function BootcampsCrud({
   }
 
   return (
-    <div style={{ height: "100vh", display: "flex", background: "#f0f2f8", fontFamily: "'DM Sans','Inter',sans-serif", overflow: "hidden" }}>
+    <div style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "'DM Sans','Inter',sans-serif" }}>
 
-      {/* Left panel */}
-      <div style={{ width: 420, minWidth: 420, background: "#fff", borderRight: "1px solid #e8ecf3", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ padding: "24px 22px 16px", borderBottom: "1px solid #f1f5f9" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8", marginBottom: 2 }}>Gestion</p>
-              <h1 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", margin: 0 }}>Bootcamps</h1>
-            </div>
-            <div style={{ background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", borderRadius: 12, padding: "6px 16px", fontSize: 22, fontWeight: 800 }}>{bootcamps.length}</div>
-          </div>
-          <div style={{ position: "relative" }}>
-            <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 15, height: 15, color: "#94a3b8" }} />
-            <input
-              type="text"
-              placeholder="Rechercher un bootcamp..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              style={{ width: "100%", padding: "9px 12px 9px 36px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit" }}
-              onFocus={e => { e.currentTarget.style.borderColor = "var(--accent,#6366f1)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.1)" }}
-              onBlur={e => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.boxShadow = "none" }}
-            />
-          </div>
-        </div>
-
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9" }}>
-          <button
-            onClick={handleNewBootcamp}
-            style={{ width: "100%", padding: "10px 16px", background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 14px rgba(99,102,241,0.3)", transition: "opacity 0.15s,transform 0.15s" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.9"; (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)" }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; (e.currentTarget as HTMLButtonElement).style.transform = "none" }}
-          >
-            <Plus style={{ width: 15, height: 15 }} /> Nouveau bootcamp
-          </button>
-        </div>
-
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px 8px" }}>
-          {filteredBootcamps.length === 0 ? (
-            <div style={{ padding: "48px 24px", textAlign: "center" }}>
-              <Users style={{ width: 40, height: 40, color: "#cbd5e1", margin: "0 auto 12px" }} />
-              <p style={{ fontSize: 13, color: "#94a3b8" }}>Aucun bootcamp trouve</p>
-            </div>
-          ) : filteredBootcamps.map(bootcamp => {
-            const isActive = editingBootcamp?.id === bootcamp.id
-            return (
-              <div
-                key={bootcamp.id}
-                onClick={() => handleSelectBootcamp(bootcamp)}
-                style={{ padding: "13px 14px", borderRadius: 12, cursor: "pointer", marginBottom: 4, background: isActive ? "linear-gradient(135deg,rgba(99,102,241,0.08),rgba(129,140,248,0.05))" : "transparent", border: isActive ? "1.5px solid rgba(99,102,241,0.2)" : "1.5px solid transparent", transition: "all 0.15s", position: "relative" }}
-                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = "#f8fafc" }}
-                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = "transparent" }}
+      <AdminPageHeader
+        title={viewMode === "active" ? "Bootcamps" : "Archives"}
+        description="Gérez le catalogue de bootcamps"
+        breadcrumbs={[{ label: "Bootcamps" }]}
+        actions={
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              onClick={() => {
+                if (viewMode === "active") { setViewMode("archived"); loadArchivedBootcamps() }
+                else setViewMode("active")
+              }}
+              style={{ padding: "9px 20px", background: viewMode === "archived" ? "rgba(99,102,241,0.08)" : "#f8fafc", color: viewMode === "archived" ? "var(--accent,#6366f1)" : "#64748b", border: `1.5px solid ${viewMode === "archived" ? "var(--accent,#6366f1)" : "#e8ecf3"}`, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s" }}
+            >
+              <Archive style={{ width: 15, height: 15 }} /> Archives
+            </button>
+            {viewMode === "active" && (
+              <button
+                onClick={handleNewBootcamp}
+                style={{ padding: "9px 20px", background: "var(--accent,#6366f1)", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "opacity 0.15s" }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = "0.88")}
+                onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
               >
-                {isActive && <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 28, background: "var(--accent,#6366f1)", borderRadius: "0 3px 3px 0" }} />}
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: isActive ? "var(--accent,#6366f1)" : "#0f172a", margin: "0 0 3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {bootcamp.title || "Sans titre"}
-                    </p>
-                    <p style={{ fontSize: 12, color: "#94a3b8", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bootcamp.shortDescription}</p>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7 }}>
-                      <span style={{ fontSize: 11, color: "#64748b" }}>{bootcamp.durationLabel || "Dur?e"}</span>
-                      <span style={{ fontSize: 11, color: "#64748b" }}>{bootcamp.courseIds.length} formations</span>
-                      <span style={{ fontSize: 11, color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}>
-                        <Star style={{ width: 11, height: 11, color: "#f59e0b" }} />{bootcamp.rating.toFixed(1)}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-                    {onView && (
-                      <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && onView(bootcamp.id) }} color="#64748b"><Eye style={{ width: 13, height: 13 }} /></IconBtn>
-                    )}
-                    <IconBtn onClick={e => { e.stopPropagation(); handleSelectBootcamp(bootcamp) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)"><Edit style={{ width: 13, height: 13 }} /></IconBtn>
-                    <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && handleDeleteBootcamp(bootcamp.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)"><Trash2 style={{ width: 13, height: 13 }} /></IconBtn>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+                <Plus style={{ width: 15, height: 15 }} /> Nouveau bootcamp
+              </button>
+            )}
+          </div>
+        }
+      />
+
+      {/* ── Filters bar ── */}
+      <div style={{ padding: "14px 32px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, borderBottom: "1px solid #f1f5f9", background: "#fff" }}>
+        <div style={{ position: "relative", flex: 1 }}>
+          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#94a3b8" }} />
+          <input
+            type="text"
+            placeholder="Rechercher un bootcamp..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            style={{ width: "100%", padding: "7px 12px 7px 34px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit" }}
+            onFocus={e => { e.currentTarget.style.borderColor = "var(--accent,#6366f1)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.08)" }}
+            onBlur={e => { e.currentTarget.style.borderColor = "#e8ecf3"; e.currentTarget.style.boxShadow = "none" }}
+          />
+        </div>
+        {allTags.length > 0 && (
+          <select value={filterTag} onChange={e => setFilterTag(e.target.value)}
+            style={{ padding: "7px 12px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, color: filterTag !== "all" ? "var(--accent,#6366f1)" : "#64748b", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
+            <option value="all">Tag: tous</option>
+            {allTags.map(tag => <option key={tag} value={tag}>{tag}</option>)}
+          </select>
+        )}
+        <div style={{ fontSize: 13, color: "#94a3b8", marginLeft: "auto" }}>
+          <span style={{ fontWeight: 600, color: "#0f172a" }}>{filteredBootcamps.length}</span> bootcamp{filteredBootcamps.length !== 1 ? "s" : ""}
         </div>
       </div>
 
-      {/* Right panel */}
-      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        {editingBootcamp ? (
-          <>
-            <div style={{ background: "#fff", borderBottom: "1px solid #e8ecf3", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-              <div>
-                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8", margin: 0 }}>{isCreating ? "Nouveau bootcamp" : "Modifier le bootcamp"}</p>
-                <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>{editingBootcamp.title || "Sans titre"}</h2>
+      {/* ── Table ── */}
+      {(() => {
+        const displayBootcamps = viewMode === "active"
+          ? filteredBootcamps
+          : archivedBootcamps.filter(b => b.title.toLowerCase().includes(searchTerm.toLowerCase()))
+        const isEmpty = displayBootcamps.length === 0
+
+        return (
+          <div style={{ padding: "0px 0px" }}>
+            {archivedLoading ? (
+              <div style={{ background: "#fff", padding: "64px 24px", textAlign: "center" }}>
+                <Loader2 style={{ width: 32, height: 32, color: "#94a3b8", margin: "0 auto", animation: "spin 1s linear infinite" }} />
               </div>
-              <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={handleCancelEdit}
-                  style={{ padding: "8px 16px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 13, fontWeight: 600, color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s" }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#f43f5e"; (e.currentTarget as HTMLButtonElement).style.color = "#f43f5e" }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#e2e8f0"; (e.currentTarget as HTMLButtonElement).style.color = "#64748b" }}
-                >
-                  <X style={{ width: 14, height: 14 }} /> Annuler
-                </button>
+            ) : isEmpty ? (
+              <div style={{ background: "#fff", padding: "64px 24px", textAlign: "center" }}>
+                <Layers style={{ width: 40, height: 40, color: "#e2e8f0", margin: "0 auto 12px" }} />
+                <p style={{ fontSize: 15, fontWeight: 600, color: "#64748b", margin: "0 0 4px" }}>
+                  {viewMode === "archived" ? "Aucun bootcamp archivé" : "Aucun bootcamp trouvé"}
+                </p>
+                <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>
+                  {viewMode === "active" ? "Créez votre premier bootcamp avec le bouton ci-dessus." : "Les bootcamps archivés apparaîtront ici."}
+                </p>
+              </div>
+            ) : (
+              <div style={{ background: "#fff", overflow: "hidden" }}>
+                {/* Table header */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 180px 150px", padding: "18px 36px", borderBottom: "1px solid #f1f5f9", background: "#fafbfd" }}>
+                  {["Bootcamp", "Tags", "Actions"].map(h => (
+                    <span key={h} style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
+                  ))}
+                </div>
+                {/* Rows */}
+                {displayBootcamps.map((bootcamp, idx) => (
+                  <div
+                    key={bootcamp.id}
+                    style={{ display: "grid", gridTemplateColumns: "1fr 180px 150px", padding: "32px 36px", borderBottom: idx < displayBootcamps.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", transition: "background 0.15s", opacity: viewMode === "archived" ? 0.85 : 1 }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#fafbfd")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  >
+                    {/* Title + description */}
+                    <div style={{ minWidth: 0, paddingRight: 24 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 20 }}>
+                        {bootcamp.coverPreview || (bootcamp.coverImage && typeof bootcamp.coverImage === "string") ? (
+                          <img
+                            src={bootcamp.coverPreview || `${process.env.NEXT_PUBLIC_PB_URL}/api/files/bootcamps/${bootcamp.id}/${bootcamp.coverImage}`}
+                            onClick={() => viewMode === "active" && handleSelectBootcamp(bootcamp)}
+                            style={{ width: 320, height: 180, borderRadius: 4, objectFit: "cover", flexShrink: 0, border: "1px solid #f1f5f9", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", cursor: viewMode === "active" ? "pointer" : "default" }}
+                            alt=""
+                          />
+                        ) : (
+                          <div onClick={() => viewMode === "active" && handleSelectBootcamp(bootcamp)} style={{ width: 320, height: 180, borderRadius: 4, background: "rgba(99,102,241,0.08)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: viewMode === "active" ? "pointer" : "default" }}>
+                            <Layers style={{ width: 30, height: 30, color: "var(--accent,#6366f1)" }} />
+                          </div>
+                        )}
+                        <div style={{ minWidth: 0 }}>
+                          <p
+                            onClick={() => viewMode === "active" && handleSelectBootcamp(bootcamp)}
+                            onMouseEnter={e => viewMode === "active" && (e.currentTarget.style.color = "var(--accent,#6366f1)")}
+                            onMouseLeave={e => (e.currentTarget.style.color = "#0f172a")}
+                            style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", margin: "0 0 6px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", cursor: viewMode === "active" ? "pointer" : "default", transition: "color 0.15s" }}
+                          >{bootcamp.title || "Sans titre"}</p>
+                          <p style={{ fontSize: 14, color: "#94a3b8", margin: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical" }}>{bootcamp.longDescription || bootcamp.shortDescription}</p>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Tags */}
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", overflow: "hidden", alignContent: "flex-start", alignSelf: "stretch" }}>
+                      {(bootcamp.tags ?? []).slice(0, 4).map((tag, i) => (
+                        <span key={`${tag}-${i}`} style={{ fontSize: 13, padding: "5px 13px", borderRadius: 8, background: "rgba(99,102,241,0.08)", color: "var(--accent,#6366f1)", fontWeight: 600 }}>{tag}</span>
+                      ))}
+                      {(bootcamp.tags?.length || 0) > 4 && (
+                        <span
+                          style={{ fontSize: 13, padding: "5px 10px", borderRadius: 8, background: "#f1f5f9", color: "#94a3b8", fontWeight: 600, cursor: "default" }}
+                          onMouseEnter={e => { setTagsTooltipPos({ x: e.clientX, y: e.clientY + 16 }); setHoveredTagsBootcampId(bootcamp.id ?? null) }}
+                          onMouseLeave={() => setHoveredTagsBootcampId(null)}
+                        >+{bootcamp.tags!.length - 4}</span>
+                      )}
+                    </div>
+                    {/* Actions */}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {viewMode === "active" ? (
+                        <>
+                          {onView && <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && onView(bootcamp.id) }} color="#64748b" title="Voir"><ExternalLink style={{ width: 22, height: 22 }} /></IconBtn>}
+                          <IconBtn onClick={e => { e.stopPropagation(); handleSelectBootcamp(bootcamp) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)" title="Modifier"><Edit style={{ width: 22, height: 22 }} /></IconBtn>
+                          <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && handleArchiveBootcamp(bootcamp.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Archiver"><Archive style={{ width: 22, height: 22 }} /></IconBtn>
+                        </>
+                      ) : (
+                        <>
+                          <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && handleRestoreBootcamp(bootcamp.id) }} color="#22c55e" hoverBg="rgba(34,197,94,0.08)" title="Restaurer"><RotateCcw style={{ width: 22, height: 22 }} /></IconBtn>
+                          <IconBtn onClick={e => { e.stopPropagation(); handleSelectBootcamp(bootcamp) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)" title="Modifier"><Edit style={{ width: 22, height: 22 }} /></IconBtn>
+                          <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && handlePermanentDeleteBootcamp(bootcamp.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Supprimer définitivement"><Trash2 style={{ width: 22, height: 22 }} /></IconBtn>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* ── Modal overlay ── */}
+      {editingBootcamp && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,0.5)", backdropFilter: "blur(6px)" }} onClick={handleCancelEdit} />
+          <div className="bootcamp-modal-inner" style={{ position: "relative", background: "#fff", borderRadius: 20, boxShadow: "0 24px 64px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.06)", width: "100%", maxWidth: 880, maxHeight: "94vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            {/* Accent strip */}
+            <div style={{ height: 3, background: "linear-gradient(90deg,var(--accent,#6366f1),#818cf8,#a78bfa)", flexShrink: 0 }} />
+            {/* Modal header */}
+            <div style={{ padding: "20px 28px 18px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, background: "#fff" }}>
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#a5b4fc", margin: "0 0 4px" }}>{isCreating ? "Nouveau bootcamp" : "Modifier"}</p>
+                <h2 style={{ fontSize: 19, fontWeight: 700, color: "#0f172a", margin: 0, letterSpacing: "-0.02em" }}>{editingBootcamp.title || "Sans titre"}</h2>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <button onClick={handleSaveBootcamp} disabled={loading}
-                  style={{ padding: "8px 20px", borderRadius: 10, border: "none", background: loading ? "#e2e8f0" : "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: loading ? "#94a3b8" : "#fff", fontSize: 13, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: loading ? "none" : "0 4px 14px rgba(99,102,241,0.3)" }}
+                  style={{ padding: "9px 22px", borderRadius: 10, border: "none", background: loading ? "#f1f5f9" : "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: loading ? "#94a3b8" : "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 7, boxShadow: loading ? "none" : "0 4px 14px rgba(99,102,241,0.35)", transition: "all 0.2s" }}
+                  onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 20px rgba(99,102,241,0.5)" }}
+                  onMouseLeave={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 14px rgba(99,102,241,0.35)" }}
                 >
                   {loading ? <Loader2 style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
                   {loading ? "Enregistrement..." : "Enregistrer"}
                 </button>
+                <button onClick={handleCancelEdit}
+                  style={{ width: 34, height: 34, borderRadius: 9, border: "1.5px solid #e8ecf3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", transition: "all 0.15s" }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#fca5a5"; (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; (e.currentTarget as HTMLButtonElement).style.background = "#fff5f5" }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#e8ecf3"; (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8"; (e.currentTarget as HTMLButtonElement).style.background = "#fff" }}
+                >
+                  <X style={{ width: 15, height: 15 }} />
+                </button>
               </div>
             </div>
 
-            <div style={{ flex: 1, overflowY: "auto", padding: "28px" }}>
-              <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: 28 }}>
+            {/* Modal body */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "28px 32px", background: "#f7f9fc" }}>
+              <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
 
-                <FormCard title="Couverture" icon={<ImagePlus style={{ width: 16, height: 16 }} />}>
-                  <div>
-                    <FieldLabel>Image de couverture</FieldLabel>
-                    <div
-                      style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 12, border: "2px dashed #e2e8f0", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", position: "relative" }}
-                      onClick={() => document.getElementById("coverInput")?.click()}
-                    >
+                {/* Cover image */}
+                <div style={{ position: "relative" }}>
+                  <div
+                    onClick={() => document.getElementById("coverInput")?.click()}
+                    style={{ width: "100%", paddingTop: "42%", position: "relative", borderRadius: 16, border: "2px dashed #dde3f0", background: editingBootcamp.coverPreview ? "none" : "linear-gradient(135deg,#f0f4ff,#fafbfe)", cursor: "pointer", overflow: "hidden", transition: "border-color 0.15s, background 0.15s" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--accent,#6366f1)"; (e.currentTarget as HTMLDivElement).style.background = editingBootcamp.coverPreview ? "none" : "linear-gradient(135deg,#eef2ff,#f5f3ff)" }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "#dde3f0"; (e.currentTarget as HTMLDivElement).style.background = editingBootcamp.coverPreview ? "none" : "linear-gradient(135deg,#f0f4ff,#fafbfe)" }}
+                  >
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                       {editingBootcamp.coverPreview ? (
-                        <img src={editingBootcamp.coverPreview} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="Cover preview" />
+                        <>
+                          <img src={editingBootcamp.coverPreview} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="Cover" />
+                          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, opacity: 0, transition: "opacity 0.2s" }}
+                            onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.opacity = "1"}
+                            onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.opacity = "0"}
+                          >
+                            <ImagePlus style={{ width: 28, height: 28, color: "#fff" }} />
+                            <p style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: 0 }}>Changer l'image</p>
+                          </div>
+                        </>
                       ) : (
                         <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 28, color: "#94a3b8", marginBottom: 6 }}>+</div>
-                          <p style={{ fontSize: 12, color: "#94a3b8", margin: 0 }}>Resolution recommandee : 1920x1080</p>
+                          <div style={{ width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg,rgba(99,102,241,0.12),rgba(129,140,248,0.06))", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", boxShadow: "0 4px 16px rgba(99,102,241,0.15)" }}>
+                            <ImagePlus style={{ width: 26, height: 26, color: "var(--accent,#6366f1)" }} />
+                          </div>
+                          <p style={{ fontSize: 14, fontWeight: 600, color: "#475569", margin: 0 }}>Ajouter une image de couverture</p>
+                          <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 5 }}>Format recommandé : 1280 × 720 (16:9)</p>
                         </div>
                       )}
-                      <input
-                        id="coverInput"
-                        type="file"
-                        accept="image/*"
-                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer" }}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) handleImageChange(file)
-                        }}
-                      />
                     </div>
+                    <input id="coverInput" type="file" accept="image/*" style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
+                      onChange={e => { const file = e.target.files?.[0]; if (file) handleImageChange(file) }}
+                    />
                   </div>
-                </FormCard>
+                  {/* 16:9 badge */}
+                  <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.5)", color: "#fff", fontSize: 10, fontWeight: 800, letterSpacing: "0.08em", padding: "3px 9px", borderRadius: 7, backdropFilter: "blur(4px)" }}>
+                    16 : 9
+                  </div>
+                </div>
 
                 <FormCard title="Informations de base" icon={<BookOpen style={{ width: 16, height: 16 }} />}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -604,54 +746,36 @@ export default function BootcampsCrud({
                   </div>
                 </FormCard>
 
-                <FormCard title="Statistiques" icon={<Star style={{ width: 16, height: 16 }} />}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                    <div>
-                      <FieldLabel>Note</FieldLabel>
-                      <Input
-                        type="number"
-                        value={editingBootcamp.rating}
-                        onChange={v => setEditingBootcamp({ ...editingBootcamp, rating: parseFloat(v) || 0 })}
-                      />
-                    </div>
-                    <div>
-                      <FieldLabel>Nombre d'avis</FieldLabel>
-                      <Input
-                        type="number"
-                        value={editingBootcamp.reviewsCount}
-                        onChange={v => setEditingBootcamp({ ...editingBootcamp, reviewsCount: parseInt(v) || 0 })}
-                      />
-                    </div>
-                  </div>
-                </FormCard>
-
                 <FormCard title="Formations incluses" icon={<Layers style={{ width: 16, height: 16 }} />}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
                       <FieldLabel>Ajouter une formation</FieldLabel>
                       <div style={{ position: "relative" }} ref={courseDropdownRef}>
                         <div style={{ position: "relative" }}>
-                          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#94a3b8" }} />
+                          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#94a3b8", zIndex: 1 }} />
                           <input
                             type="text"
-                            style={{ width: "100%", padding: "9px 12px 9px 36px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit" }}
+                            style={{ width: "100%", padding: "10px 14px 10px 36px", background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit", transition: "border-color 0.15s, box-shadow 0.15s" }}
                             placeholder="Rechercher une formation..."
                             value={courseSearch}
                             onChange={(e) => {
                               setCourseSearch(e.target.value)
                               setShowCourseDropdown(true)
                             }}
-                            onFocus={() => setShowCourseDropdown(true)}
+                            onFocus={e => { setShowCourseDropdown(true); e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.1)" }}
+                            onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none" }}
                             onKeyDown={handleKeyPress}
                           />
                         </div>
 
                         {showCourseDropdown && availableCourses.length > 0 && (
-                          <div style={{ position: "absolute", zIndex: 10, width: "100%", marginTop: 6, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 8px 20px rgba(15,23,42,0.08)", maxHeight: 260, overflowY: "auto" }}>
-                            {availableCourses.map(course => (
+                          <div style={{ position: "absolute", zIndex: 10, width: "100%", marginTop: 6, background: "#fff", border: "1.5px solid #e8ecf3", borderRadius: 12, boxShadow: "0 8px 24px rgba(15,23,42,0.1)", maxHeight: 260, overflowY: "auto" }}>
+                            {availableCourses.map((course, i) => (
                               <div
                                 key={course.id}
-                                style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9", cursor: "pointer" }}
+                                style={{ padding: "10px 14px", borderBottom: i < availableCourses.length - 1 ? "1px solid #f1f5f9" : "none", cursor: "pointer", transition: "background 0.12s" }}
+                                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = "#f8fafc"}
+                                onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
                                 onClick={() => {
                                   if (!editingBootcamp) return
                                   if (!editingBootcamp.courseIds.includes(course.id!)) {
@@ -666,9 +790,9 @@ export default function BootcampsCrud({
                                 }}
                               >
                                 <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{course.title}</div>
-                                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{course.shortDescription}</div>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-                                  <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 6, background: "#f1f5f9", color: "#475569" }}>{course.levelLabel}</span>
+                                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{course.shortDescription}</div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>
+                                  <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "rgba(99,102,241,0.08)", color: "var(--accent,#6366f1)", fontWeight: 600 }}>{course.levelLabel}</span>
                                   <span style={{ fontSize: 11, color: "#94a3b8" }}>{course.durationLabel}</span>
                                 </div>
                               </div>
@@ -711,22 +835,22 @@ export default function BootcampsCrud({
                 </FormCard>
               </div>
             </div>
-          </>
-        ) : (
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
-            <div style={{ width: 80, height: 80, borderRadius: 24, background: "linear-gradient(135deg,rgba(99,102,241,0.12),rgba(129,140,248,0.06))", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Users style={{ width: 36, height: 36, color: "var(--accent,#6366f1)" }} />
-            </div>
-            <div style={{ textAlign: "center" }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", margin: "0 0 6px" }}>Aucun bootcamp selectionne</h3>
-              <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>Choisissez un bootcamp dans la liste ou creez-en un nouveau.</p>
-            </div>
-            <button onClick={handleNewBootcamp} style={{ marginTop: 8, padding: "10px 24px", background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 4px 14px rgba(99,102,241,0.3)" }}>
-              <Plus style={{ width: 16, height: 16 }} /> Creer un bootcamp
-            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Tags tooltip */}
+      {hoveredTagsBootcampId && (() => {
+        const bootcamp = bootcamps.find(b => b.id === hoveredTagsBootcampId)
+        if (!bootcamp || (bootcamp.tags?.length || 0) <= 4) return null
+        return (
+          <div style={{ position: "fixed", zIndex: 9999, left: tagsTooltipPos.x, top: tagsTooltipPos.y, transform: "translateX(-50%)", background: "#fafbfd", border: "1px solid #f1f5f9", borderRadius: 10, padding: "10px 12px", boxShadow: "0 8px 24px rgba(0,0,0,0.10)", display: "flex", flexWrap: "wrap", gap: 6, maxWidth: 240, pointerEvents: "none" }}>
+            {bootcamp.tags.slice(4).map((tag, i) => (
+              <span key={`tooltip-${tag}-${i}`} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 6, background: "rgba(99,102,241,0.08)", color: "var(--accent,#6366f1)", fontWeight: 600, whiteSpace: "nowrap" }}>{tag}</span>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Toasts */}
       <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -748,12 +872,16 @@ export default function BootcampsCrud({
       </div>
 
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes modalIn{from{opacity:0;transform:scale(0.97) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
         @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-        ::-webkit-scrollbar{width:5px;height:5px}
-        ::-webkit-scrollbar-track{background:transparent}
-        ::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:99px}
-        ::-webkit-scrollbar-thumb:hover{background:#cbd5e1}
+        .bootcamp-modal-inner{animation:modalIn 0.22s cubic-bezier(0.22,1,0.36,1) forwards;font-family:'Plus Jakarta Sans',sans-serif}
+        .bootcamp-modal-inner ::-webkit-scrollbar{width:5px}
+        .bootcamp-modal-inner ::-webkit-scrollbar-track{background:transparent}
+        .bootcamp-modal-inner ::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:99px}
+        .bootcamp-modal-inner ::-webkit-scrollbar-thumb:hover{background:#cbd5e1}
+        .bootcamp-modal-inner input::placeholder,.bootcamp-modal-inner textarea::placeholder{color:#c0ccdc}
       `}</style>
     </div>
   )

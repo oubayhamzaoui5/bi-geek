@@ -9,6 +9,7 @@ export default function AdminGroupsPage() {
   const [courses, setCourses] = useState<any[]>([])
   const [bootcamps, setBootcamps] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
+  const [instructors, setInstructors] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -22,6 +23,7 @@ export default function AdminGroupsPage() {
         setCourses(data.courses || [])
         setBootcamps(data.bootcamps || [])
         setStudents(data.students || [])
+        setInstructors(data.instructors || [])
       } catch (err) {
         console.error(err)
       } finally {
@@ -66,6 +68,7 @@ export default function AdminGroupsPage() {
         initialCourses={courses}
         initialBootcamps={bootcamps}
         initialStudents={students}
+        initialInstructors={instructors}
         onSave={handleSave}
         onDelete={handleDelete}
       />

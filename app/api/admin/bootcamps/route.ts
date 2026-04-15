@@ -55,11 +55,23 @@ async function getAdminPb() {
   return pb
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const pb = await getAdminPb()
+    const { searchParams } = new URL(req.url)
+    const archived = searchParams.get("archived") === "true"
 
-    const bootcampRecords = await pb.collection("bootcamps").getFullList({ sort: "title" })
+    let bootcampRecords: any[]
+    try {
+      bootcampRecords = await pb.collection("bootcamps").getFullList({
+        sort: "title",
+        filter: archived ? "archived=true" : "archived!=true",
+      })
+    } catch {
+      // archived field may not exist yet — return all (unarchived) records
+      bootcampRecords = await pb.collection("bootcamps").getFullList({ sort: "title" })
+      if (archived) return NextResponse.json({ ok: true, bootcamps: [] })
+    }
 
     // 🔥 Fix missing slugs automatically
     for (const b of bootcampRecords as any[]) {
@@ -70,31 +82,46 @@ export async function GET() {
       }
     }
 
-    // Now fetch pivot records
-    const pivotRecords = await pb.collection("bootcamp_courses").getFullList({ sort: "bootcamp,order" })
+    // Fetch pivot records and all courses (for tags)
+    const [pivotRecords, courseRecords] = await Promise.all([
+      pb.collection("bootcamp_courses").getFullList({ sort: "bootcamp,order" }),
+      pb.collection("courses").getFullList({ fields: "id,tags" }),
+    ])
 
     const coursesByBootcamp = new Map<string, string[]>()
-
     for (const p of pivotRecords as any[]) {
       const arr = coursesByBootcamp.get(p.bootcamp) ?? []
       arr.push(p.course)
       coursesByBootcamp.set(p.bootcamp, arr)
     }
 
-    const bootcamps = (bootcampRecords as any[]).map((b) => ({
-      id: b.id,
-      title: b.title,
-      shortDescription: b.shortDescription,
-      longDescription: b.longDescription || "",
-      durationLabel: b.durationLabel,
-      prerequis: b.prerequis || "Aucun",
-      coverImage: b.coverImage || null,
-      rating: b.rating ?? 4.8,
-      reviewsCount: b.reviewsCount ?? 0,
-      isPublished: !!b.isPublished,
-      courseIds: coursesByBootcamp.get(b.id) ?? [],
-      slug: b.slug || "", // include slug
-    }))
+    // Build courseId → tags map
+    const courseTagsMap = new Map<string, string[]>()
+    for (const c of courseRecords as any[]) {
+      const tags = Array.isArray(c.tags) ? c.tags : (c.tags ? (() => { try { return JSON.parse(c.tags) } catch { return [] } })() : [])
+      courseTagsMap.set(c.id, tags)
+    }
+
+    const bootcamps = (bootcampRecords as any[]).map((b) => {
+      const courseIds = coursesByBootcamp.get(b.id) ?? []
+      // Aggregate unique tags from assigned courses
+      const tags = Array.from(new Set(courseIds.flatMap(id => courseTagsMap.get(id) ?? [])))
+      return {
+        id: b.id,
+        title: b.title,
+        shortDescription: b.shortDescription,
+        longDescription: b.longDescription || "",
+        durationLabel: b.durationLabel,
+        prerequis: b.prerequis || "Aucun",
+        coverImage: b.coverImage || null,
+        rating: b.rating ?? 4.8,
+        reviewsCount: b.reviewsCount ?? 0,
+        isPublished: !!b.isPublished,
+        courseIds,
+        tags,
+        slug: b.slug || "",
+      }
+    })
 
     return NextResponse.json({ ok: true, bootcamps })
   } catch (err: any) {
@@ -125,11 +152,18 @@ export async function POST(req: Request) {
     let courseIds: string[] = []
     try {
       const courseIdsStr = formData.get("courseIds")?.toString()
-      if (courseIdsStr) {
-        courseIds = JSON.parse(courseIdsStr)
-      }
+      if (courseIdsStr) courseIds = JSON.parse(courseIdsStr)
     } catch (e) {
       courseIds = []
+    }
+
+    // Parse tags
+    let tags: string[] = []
+    try {
+      const tagsStr = formData.get("tags")?.toString()
+      if (tagsStr) tags = JSON.parse(tagsStr)
+    } catch (e) {
+      tags = []
     }
 
     // Validation
@@ -152,6 +186,7 @@ export async function POST(req: Request) {
       rating,
       reviewsCount,
       isPublished,
+      tags,
     }
 
     // Handle cover image
@@ -208,6 +243,7 @@ export async function POST(req: Request) {
       reviewsCount: bootcampRecord.reviewsCount ?? 0,
       isPublished: !!bootcampRecord.isPublished,
       courseIds,
+      tags: Array.isArray(bootcampRecord.tags) ? bootcampRecord.tags : tags,
       slug: bootcampRecord.slug || "",
     }
 

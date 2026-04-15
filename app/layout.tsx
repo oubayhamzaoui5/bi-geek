@@ -1,15 +1,33 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Syne, DM_Sans, JetBrains_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import Script from "next/script"
 import { MetaPixel } from "@/components/MetaPixel"
-
 import { GoogleTag } from "@/components/GoogleTag"
 
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
+const syne = Syne({
+  subsets: ["latin"],
+  variable: "--ff-display",
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+})
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--ff-body",
+  weight: ["300", "400", "500", "600"],
+  style: ["normal", "italic"],
+  display: "swap",
+})
+
+const jbMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--ff-mono",
+  weight: ["400", "500"],
+  display: "swap",
+})
 
 export const metadata: Metadata = {
   title: "BI Geek | Centre de formation en technologie (Data, IA, Cloud, Cyber)",
@@ -45,16 +63,14 @@ export const metadata: Metadata = {
   },
 }
 
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
   return (
-    <html lang="fr" >
-       <head>
-        {/* ✅ JSON-LD Structured Data */}
+    <html lang="fr">
+      <head>
         <Script id="ld-json" type="application/ld+json" strategy="afterInteractive">
           {JSON.stringify({
             "@context": "https://schema.org",
@@ -76,14 +92,12 @@ export default function RootLayout({
           })}
         </Script>
       </head>
-      <body className={`font-sans antialiased bg-background text-foreground`}>
-  <MetaPixel />
-  <GoogleTag />
+      <body className={`${syne.variable} ${dmSans.variable} ${jbMono.variable} font-sans antialiased bg-background text-foreground`}>
+        <MetaPixel />
+        <GoogleTag />
         {children}
         <Analytics />
       </body>
-      
-
     </html>
   )
 }

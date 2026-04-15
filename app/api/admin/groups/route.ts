@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
 
+type ScheduleSlot = {
+  day: string
+  start_time: string
+  duration: number
+  start_date?: string
+  end_date?: string
+}
+
 type IncomingGroup = {
   id?: string
   title: string
@@ -8,11 +16,15 @@ type IncomingGroup = {
   programType: "course" | "bootcamp"
   courseId?: string | null
   bootcampId?: string | null
+  instructorId?: string | null
   studentIds?: string[]
   lockedModules?: string[]
   unlockedModules?: string[]
   lockedLessons?: string[]
   unlockedLessons?: string[]
+  schedules?: ScheduleSlot[]
+  schedule_start_date?: string | null
+  schedule_end_date?: string | null
 }
 
 async function getAdminPb() {
@@ -35,17 +47,17 @@ export async function GET() {
 
     const groupFetch = async () => {
       try {
-        return await pb.collection("groups").getFullList({ sort: "-created" })
+        return await pb.collection("groups").getFullList({ sort: "-created", expand: "instructor" })
       } catch (err) {
         console.error("ADMIN GROUPS GET WARN: groups fetch with sort failed", err)
       }
       try {
-        return await pb.collection("groups").getFullList()
+        return await pb.collection("groups").getFullList({ expand: "instructor" })
       } catch (err) {
         console.error("ADMIN GROUPS GET WARN: groups fetch without sort failed", err)
       }
       // Last resort: fetch first page only
-      const page = await pb.collection("groups").getList(1, 200)
+      const page = await pb.collection("groups").getList(1, 200, { expand: "instructor" })
       return page.items
     }
 
@@ -81,10 +93,32 @@ export async function GET() {
     }
 
     let studentRecords: any[] = []
+    let instructorRecords: any[] = []
     try {
-      studentRecords = await pb.collection("users").getFullList({ filter: 'role="student"', sort: "name" })
+      ;[studentRecords, instructorRecords] = await Promise.all([
+        pb.collection("users").getFullList({ filter: 'role="student"', sort: "name" }).catch(() =>
+          pb.collection("users").getFullList({ sort: "name" })
+        ),
+        pb.collection("users").getFullList({ filter: 'role="instructor"', fields: "id,name,surname", sort: "name" }).catch(() => []),
+      ])
     } catch {
-      studentRecords = await pb.collection("users").getFullList({ sort: "name" })
+      studentRecords = []
+      instructorRecords = []
+    }
+
+    const instructorMap = new Map(instructorRecords.map((u: any) => [u.id, u]))
+
+    const resolveInstructor = (g: any) => {
+      // Prefer expand (most reliable), fall back to instructorMap lookup
+      if (g.expand?.instructor) {
+        const i = g.expand.instructor
+        return { id: i.id, name: i.name || "", surname: i.surname || "" }
+      }
+      if (g.instructor) {
+        const i = instructorMap.get(g.instructor)
+        if (i) return { id: i.id, name: i.name || "", surname: i.surname || "" }
+      }
+      return null
     }
 
     const groups = (groupRecords as any[]).map((g) => ({
@@ -95,22 +129,37 @@ export async function GET() {
       courseId: g.course || "",
       bootcampId: g.bootcamp || "",
       studentIds: Array.isArray(g.students) ? g.students : [],
+      instructorId: g.instructor || null,
+      instructor: resolveInstructor(g),
       lockedModules: Array.isArray(g.lockedModules) ? g.lockedModules : [],
       unlockedModules: Array.isArray(g.unlockedModules) ? g.unlockedModules : [],
       lockedLessons: Array.isArray(g.lockedLessons) ? g.lockedLessons : [],
       unlockedLessons: Array.isArray(g.unlockedLessons) ? g.unlockedLessons : [],
+      schedules: (() => {
+        const raw = g.schedules
+        if (!raw) return []
+        if (typeof raw === "string") { try { return JSON.parse(raw) } catch { return [] } }
+        if (Array.isArray(raw)) return raw
+        return []
+      })(),
+      schedule_start_date: g.schedule_start_date ? g.schedule_start_date.slice(0, 10) : null,
+      schedule_end_date: g.schedule_end_date ? g.schedule_end_date.slice(0, 10) : null,
     }))
 
     const courses = (courseRecords as any[]).map((c) => ({
       id: c.id,
       title: c.title,
       shortDescription: c.shortDescription || "",
+      longDescription: c.longDescription || "",
+      coverImage: c.coverImage || null,
     }))
 
     const bootcamps = (bootcampRecords as any[]).map((b) => ({
       id: b.id,
       title: b.title,
       shortDescription: b.shortDescription || "",
+      longDescription: b.longDescription || "",
+      coverImage: b.coverImage || null,
     }))
 
     const students = (studentRecords as any[]).map((u) => ({
@@ -121,7 +170,13 @@ export async function GET() {
       username: u.username || "",
     }))
 
-    return NextResponse.json({ ok: true, groups, courses, bootcamps, students, warnings })
+    const instructors = instructorRecords.map((u: any) => ({
+      id: u.id,
+      name: u.name || "",
+      surname: u.surname || "",
+    }))
+
+    return NextResponse.json({ ok: true, groups, courses, bootcamps, students, instructors, warnings })
   } catch (err: any) {
     console.error("ADMIN GROUPS GET ERROR:", err)
     const msg = err?.data?.message || err?.message || "Erreur serveur"
@@ -139,6 +194,7 @@ export async function POST(req: Request) {
     const programType = payload.programType
     const courseId = payload.courseId || ""
     const bootcampId = payload.bootcampId || ""
+    const instructorId = payload.instructorId || null
     const studentIds = Array.isArray(payload.studentIds) ? payload.studentIds : []
     const lockedModules = Array.isArray(payload.lockedModules) ? payload.lockedModules : []
     const unlockedModules = Array.isArray(payload.unlockedModules) ? payload.unlockedModules : []
@@ -164,6 +220,7 @@ export async function POST(req: Request) {
       programType,
       course: programType === "course" ? courseId : null,
       bootcamp: programType === "bootcamp" ? bootcampId : null,
+      instructor: instructorId,
       students: studentIds,
       lockedModules,
       unlockedModules,
@@ -171,12 +228,22 @@ export async function POST(req: Request) {
       unlockedLessons,
     }
 
+    if (payload.schedules !== undefined) {
+      dataToSave.schedules = Array.isArray(payload.schedules) ? payload.schedules : []
+    }
+    if (payload.schedule_start_date !== undefined) dataToSave.schedule_start_date = payload.schedule_start_date || null
+    if (payload.schedule_end_date !== undefined) dataToSave.schedule_end_date = payload.schedule_end_date || null
+
     let record: any
     if (payload.id) {
-      record = await pb.collection("groups").update(payload.id, dataToSave)
+      record = await pb.collection("groups").update(payload.id, dataToSave, { expand: "instructor" })
     } else {
-      record = await pb.collection("groups").create(dataToSave)
+      record = await pb.collection("groups").create(dataToSave, { expand: "instructor" })
     }
+
+    const resolvedInstructor = record.expand?.instructor
+      ? { id: record.expand.instructor.id, name: record.expand.instructor.name || "", surname: record.expand.instructor.surname || "" }
+      : null
 
     const group = {
       id: record.id,
@@ -185,11 +252,22 @@ export async function POST(req: Request) {
       programType: record.programType,
       courseId: record.course || "",
       bootcampId: record.bootcamp || "",
+      instructorId: record.instructor || null,
+      instructor: resolvedInstructor,
       studentIds: Array.isArray(record.students) ? record.students : [],
       lockedModules: Array.isArray(record.lockedModules) ? record.lockedModules : [],
       unlockedModules: Array.isArray(record.unlockedModules) ? record.unlockedModules : [],
       lockedLessons: Array.isArray(record.lockedLessons) ? record.lockedLessons : [],
       unlockedLessons: Array.isArray(record.unlockedLessons) ? record.unlockedLessons : [],
+      schedules: (() => {
+        const raw = record.schedules
+        if (!raw) return []
+        if (typeof raw === "string") { try { return JSON.parse(raw) } catch { return [] } }
+        if (Array.isArray(raw)) return raw
+        return []
+      })(),
+      schedule_start_date: record.schedule_start_date ? record.schedule_start_date.slice(0, 10) : null,
+      schedule_end_date: record.schedule_end_date ? record.schedule_end_date.slice(0, 10) : null,
     }
 
     return NextResponse.json({ ok: true, group })

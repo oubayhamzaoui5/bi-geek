@@ -2,10 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "./badge"
-import { Clock, TrendingUp } from "lucide-react"
+import { Clock, ArrowRight } from "lucide-react"
 
 type Program = {
   id: string
@@ -27,94 +24,81 @@ interface ProgramCardProps {
 }
 
 export function ProgramCard({ program, variant = "course", hrefOverride }: ProgramCardProps) {
-  const safeTags = Array.isArray(program.tags) ? program.tags : []
+  const safeTags   = Array.isArray(program.tags) ? program.tags : []
   const primaryTag = safeTags[0]?.trim() || "Formation"
-
   const [slug, setSlug] = useState<string>(program.slug ?? program.id)
 
   useEffect(() => {
     if (program.slug) return
-
     fetch(`/api/slug/${variant}/${program.id}`)
-      .then(res => res.json())
-      .then(data => setSlug(data.slug ?? program.id))
+      .then((r) => r.json())
+      .then((d) => setSlug(d.slug ?? program.id))
       .catch(() => setSlug(program.id))
   }, [program.id, program.slug, variant])
 
   const href =
-    hrefOverride ??
-    (variant === "bootcamp"
-      ? `/bootcamp/${slug}`
-      : `/course/${slug}`)
+    hrefOverride ?? (variant === "bootcamp" ? `/bootcamp/${slug}` : `/course/${slug}`)
 
   return (
-    <Link href={href} className="block h-full">
-      <Card
-        className="
-          group h-full w-full flex flex-col
-          border border-gray
-          hover:border-accent hover:shadow-lg hover:scale-103
-          transition-transform duration-300 ease-out
-          cursor-pointer
-        "
-      >
-        <CardHeader className="flex flex-col gap-1 px-2 md:px-4  ">
-          <Badge className="bg-accent/10 text-accent text-xs md:text-sm w-fit">
-            {primaryTag}
-          </Badge>
+    <Link href={href} className="block h-full group">
+      <div className="h-full flex flex-col bg-white border border-border hover:border-accent hover:shadow-lg hover:shadow-accent/10 transition-all duration-300 rounded-none">
 
-          <div className="w-full aspect-video overflow-hidden rounded-sm mb-2">
-            <img
-              src={program.image || "/placeholder-course.png"}
-              alt={program.title}
-              className="object-cover w-full h-full"
-            />
+        {/* Image */}
+        <div className="relative w-full aspect-video overflow-hidden bg-muted">
+          <img
+            src={program.image || "/placeholder-course.png"}
+            alt={program.title}
+            className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
+          />
+          {/* Tag overlay */}
+          <div className="absolute top-3 left-3">
+            <span className="font-mono text-[10px] uppercase tracking-wider px-2 py-1 bg-white/90 text-accent border border-accent/20 backdrop-blur-sm">
+              {primaryTag}
+            </span>
           </div>
+        </div>
 
-          <h3 className="text-base md:text-xl font-semibold md:font-bold text-slate-900 dark:text-white group-hover:text-accent transition-colors duration-300 leading-snug w-full text-center md:text-left">
+        {/* Content */}
+        <div className="flex flex-col flex-1 p-4 gap-2">
+          <h3 className="font-display font-bold text-base text-foreground group-hover:text-accent transition-colors leading-snug">
             {program.title}
           </h3>
-        </CardHeader>
-
-        <CardContent className="flex-1 px-2 py-1 md:px-4 md:py-2">
-          <p className="text-sm md:text-base text-muted-foreground leading-relaxed text-center md:text-left">
+          <p className="text-sm text-muted-foreground leading-relaxed flex-1">
             {program.shortDescription}
           </p>
-        </CardContent>
 
-        {/* Progress bar (optional) */}
-        {typeof program.progress === "number" && (
-          <div className="px-2 md:px-4 pb-1">
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
-              <span>Progression</span>
-              <span className="font-semibold text-foreground">{Math.round(program.progress)}%</span>
+          {/* Progress */}
+          {typeof program.progress === "number" && (
+            <div className="mt-1">
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
+                <span>Progression</span>
+                <span className="font-semibold text-foreground">{Math.round(program.progress)}%</span>
+              </div>
+              <div className="h-1 w-full bg-muted rounded-none overflow-hidden">
+                <div
+                  className="h-full bg-accent transition-all duration-700"
+                  style={{ width: `${program.progress}%` }}
+                />
+              </div>
             </div>
-            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-accent to-accent/70 rounded-full transition-all duration-700"
-                style={{ width: `${program.progress}%` }}
-              />
+          )}
+
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-3 border-t border-border mt-auto">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" />
+              <span>{program.durationLabel}</span>
             </div>
+            <span className="flex items-center gap-1 text-xs font-semibold text-accent opacity-0 group-hover:opacity-100 transition-opacity">
+              Voir le programme
+              <ArrowRight className="h-3.5 w-3.5" />
+            </span>
           </div>
-        )}
+        </div>
 
-        <CardFooter className="flex gap-2 items-center px-2 py-1 md:px-4 md:py-2 justify-between border-t border-accent/20">
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>{program.durationLabel}</span>
-          </div>
-
-          {/* Visual button only (no nested Link) */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="pointer-events-none text-accent hover:text-[#7d3d9f]"
-          >
-            Voir le programme
-            <TrendingUp className="ml-1 h-4 w-4" />
-          </Button>
-        </CardFooter>
-      </Card>
+        {/* Bottom accent line */}
+        <div className="h-[2px] w-0 bg-accent group-hover:w-full transition-all duration-400 ease-out" />
+      </div>
     </Link>
   )
 }

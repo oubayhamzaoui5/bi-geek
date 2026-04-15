@@ -14,6 +14,9 @@ export default function AdminCoursesPage() {
       const start = Date.now()
 
       try {
+        // Ensure schema migrations are applied (adds `archived` field if missing)
+        await fetch("/api/admin/migrate", { method: "POST" })
+
         const res = await fetch("/api/admin/courses")
         const data = await res.json()
 
@@ -124,7 +127,11 @@ export default function AdminCoursesPage() {
 
   // ---------------- DELETE ----------------
   async function handleDelete(id: string) {
-    await fetch(`/api/admin/courses/${id}`, { method: "DELETE" })
+    const res = await fetch(`/api/admin/courses/${id}`, { method: "DELETE" })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(data?.error || "Erreur lors de l'archivage")
+    }
     setCourses(prev => prev.filter(c => c.id !== id))
   }
 

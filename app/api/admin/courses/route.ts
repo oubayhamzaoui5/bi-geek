@@ -171,19 +171,33 @@ export async function GET() {
  */
 
 // ---------------- GET ----------------
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const pb = await getAdminPb()
+    const { searchParams } = new URL(req.url)
+    const archived = searchParams.get("archived") === "true"
 
-    // 1) Fetch all courses
-    const courseRecords = await pb.collection("courses").getFullList({ sort: "title" })
+    // 1) Fetch courses filtered by archived status
+    let courseRecords: any[]
+    try {
+      courseRecords = await pb.collection("courses").getFullList({
+        sort: "title",
+        filter: archived ? "archived=true" : "archived!=true",
+      })
+    } catch {
+      // archived field may not exist yet — fall back to fetching all (active view) or empty (archive view)
+      if (archived) return NextResponse.json({ ok: true, courses: [] })
+      courseRecords = await pb.collection("courses").getFullList({ sort: "title" })
+    }
 
-    // 2) Fix missing slugs
-    for (const course of courseRecords) {
-      if (!course.slug || course.slug.trim() === "") {
-        const slug = await generateUniqueSlug(pb, course.title)
-        await pb.collection("courses").update(course.id, { slug })
-        console.log(`Generated slug for course "${course.title}" → ${slug}`)
+    // 2) Fix missing slugs (active courses only)
+    if (!archived) {
+      for (const course of courseRecords) {
+        if (!course.slug || course.slug.trim() === "") {
+          const slug = await generateUniqueSlug(pb, course.title)
+          await pb.collection("courses").update(course.id, { slug })
+          console.log(`Generated slug for course "${course.title}" → ${slug}`)
+        }
       }
     }
 

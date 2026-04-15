@@ -32,9 +32,9 @@ export default function AdminDashboardLayout({
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen bg-muted/30">
+      <div className="h-screen bg-[#fafafa]">
         <Sidebar variant="admin" />
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="md:ml-[60px] h-screen overflow-auto">{children}</main>
       </div>
     </SidebarProvider>
   )

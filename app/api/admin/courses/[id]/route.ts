@@ -20,12 +20,38 @@ type RouteParams = {
   params: Promise<{ id: string }>
 }
 
-export async function DELETE(_req: Request, { params }: RouteParams) {
+export async function PATCH(req: Request, { params }: RouteParams) {
   try {
     const pb = await getAdminPb()
     const { id: courseId } = await params
+    const body = await req.json()
 
-    // Delete lessons inside modules
+    if (body.action === "restore") {
+      await pb.collection("courses").update(courseId, { archived: false })
+      return NextResponse.json({ ok: true })
+    }
+
+    return NextResponse.json({ error: "Action inconnue" }, { status: 400 })
+  } catch (err: any) {
+    console.error("ADMIN COURSES PATCH ERROR:", err)
+    return NextResponse.json({ error: err?.message || "Erreur serveur" }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: Request, { params }: RouteParams) {
+  try {
+    const pb = await getAdminPb()
+    const { id: courseId } = await params
+    const { searchParams } = new URL(req.url)
+    const permanent = searchParams.get("permanent") === "true"
+
+    if (!permanent) {
+      // Soft delete — archive
+      await pb.collection("courses").update(courseId, { archived: true })
+      return NextResponse.json({ ok: true })
+    }
+
+    // Permanent delete — cascade lessons and modules
     const modules = await pb.collection("course_modules").getFullList({
       filter: `course="${courseId}"`,
     })
@@ -40,7 +66,6 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
       await pb.collection("course_modules").delete(m.id)
     }
 
-    // Delete the course
     await pb.collection("courses").delete(courseId)
 
     return NextResponse.json({ ok: true })

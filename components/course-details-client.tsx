@@ -40,22 +40,17 @@ export default function CourseDetailsPage() {
   if (!guestCourse) return <div className="p-6">Course not found</div>
 
   return (
-    <div className="flex h-screen bg-muted/30">
-<MetaPixel />
-
-      <main className="flex-1 overflow-auto">
-        <Navbar />
-
-        <div className="space-y-6">
-          <CourseDetailsSection
-            variant="guest"
-            context="course"
-            courseFromPb={guestCourse}
-          />
-        </div>
-
-        <Footer />
+    <>
+      <MetaPixel />
+      <Navbar />
+      <main className="px-4 md:px-16">
+        <CourseDetailsSection
+          variant="guest"
+          context="course"
+          courseFromPb={guestCourse}
+        />
       </main>
-    </div>
+      <Footer />
+    </>
   )
 }

@@ -20,7 +20,7 @@ type RouteParams = {
   params: Promise<{ id: string }>
 }
 
-type EnrollmentStatus = "pending" | "contacted" | "confirmed"
+type EnrollmentStatus = "pending" | "contacted" | "confirmed" | "cancelled"
 
 export async function PATCH(req: Request, { params }: RouteParams) {
   try {
@@ -29,7 +29,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     const body = await req.json().catch(() => ({}))
     const status = body.status as EnrollmentStatus | undefined
 
-    if (!status || !["pending", "contacted", "confirmed"].includes(status)) {
+    if (!status || !["pending", "contacted", "confirmed", "cancelled"].includes(status)) {
       return NextResponse.json(
         { error: "Statut invalide (pending, contacted, confirmed)." },
         { status: 400 },

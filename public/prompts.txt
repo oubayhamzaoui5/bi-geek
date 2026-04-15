@@ -1,0 +1,121 @@
+============================================================
+BI GEEK — Nano Banana Pro Image Prompts
+============================================================
+
+------------------------------------------------------------
+HOME PAGE (/)
+------------------------------------------------------------
+
+1. hero.webp — Hero section, right-side float
+------------------------------------------------------------
+A young North African professional woman seated at a sleek dark desk with
+dual curved monitors displaying glowing data dashboards and code,
+looking slightly off-camera with quiet confidence, dramatic cinematic
+lighting with deep purple (#C84FFF) volumetric rim light from the right,
+dark charcoal background, photorealistic, editorial photography style,
+ultra-sharp detail, isolated figure with clean transparent-ready edges,
+studio fashion lighting --ar 1:1 4k
+
+------------------------------------------------------------
+2. person2.webp — "Qui sommes-nous" about section
+------------------------------------------------------------
+A sharp close portrait of a passionate tech instructor mid-explanation,
+gesturing toward something outside the frame, warm tungsten key light
+with a purple gel backlight, dark blurred tech office bokeh background
+with soft monitor glow, natural confident expression, cinematic color
+grade, professional editorial portrait, grain overlay --ar 1:1 4k
+
+------------------------------------------------------------
+3. catdata.webp — Data Analytics card
+------------------------------------------------------------
+Dramatic overhead macro shot of illuminated data flowing across a dark
+glass surface — glowing bar charts, line curves and scatter plots etched
+in electric violet light on obsidian black, light trails forming a dynamic
+composition, wet-look reflections, editorial product photography
+atmosphere, no people --ar 4:3 4k
+
+------------------------------------------------------------
+4. catai.webp — AI / Machine Learning card
+------------------------------------------------------------
+Abstract top-down view of a vast luminous neural network rendered as
+thousands of bright white nodes connected by ultra-thin violet filaments
+expanding outward into total darkness, the nodes pulse with different
+intensities, hyper-detailed digital fine art, astrophotography aesthetic,
+deep black background, fractal density at the center --ar 4:3 4k
+
+------------------------------------------------------------
+5. catcloud.webp — Cloud Computing card
+------------------------------------------------------------
+Extreme close-up of a dense bundle of fiber optic cables mid-bend,
+each strand emitting a different intensity of violet and white light,
+the light trails streak across a pitch-black background like luminous
+veins, macro lens perspective with sharp center and radial blur at
+edges, cinematic, hyper-detailed --ar 4:3 4k
+
+------------------------------------------------------------
+6. catcs.webp — Cyber Security card
+------------------------------------------------------------
+A biometric iris scan overlaid with a glowing purple hexagonal grid
+pattern on a pure black background, the iris reflecting fragmented
+code text, neon violet light leaks from the scan perimeter, hyper-
+detailed macro photography style, sci-fi surveillance aesthetic, sharp
+center with soft vignette edge --ar 4:3 4k
+
+------------------------------------------------------------
+7. catweb.webp — Web Development card
+------------------------------------------------------------
+Extreme close-up of dark IDE code on a matte black screen, vivid
+syntax highlighting in purple and white, developer hands resting on
+a matte black mechanical keyboard in shallow foreground blur, purple
+LED strip ambient backlight, editorial tech photography, moody and
+dramatic, no distracting elements --ar 4:3 4k
+
+------------------------------------------------------------
+8. catmanagment.webp — Project Management card
+------------------------------------------------------------
+Aerial flat-lay of a minimalist project board on dark slate surface —
+geometric cards arranged in clean columns with thin white connector
+lines, one card highlighted in glowing violet, architectural birds-eye
+photography, severe negative space, editorial magazine layout feeling,
+no text visible --ar 4:3 4k
+
+------------------------------------------------------------
+NOTE: For hero.webp and person2.webp — generate both in the same
+session for brand shoot consistency, but use two clearly different
+people (not the same model).
+------------------------------------------------------------
+
+
+============================================================
+/a-propos PAGE — Nano Banana Pro Image Prompts
+============================================================
+
+------------------------------------------------------------
+1. about-story.webp — "Notre histoire" section (split layout, right side)
+   Displayed at 4:3 in a card with decorative offset border
+------------------------------------------------------------
+Dramatic low-angle interior shot of a sleek modern tech classroom
+at golden hour — rows of dark ergonomic workstations facing floor-to-ceiling
+screens displaying glowing data dashboards in electric violet and white,
+harsh raking side light casting long geometric shadows across the dark
+matte floor, architectural photography style, no people, deep contrast,
+cinematic color grade, screens reflect faintly on the polished floor
+--ar 4:3 4k
+
+
+============================================================
+/entreprises PAGE — Nano Banana Pro Image Prompts
+============================================================
+
+------------------------------------------------------------
+1. enterprise-hero.webp — Hero section (bleeds from right edge, half-page)
+   Also used in the home page EnterpriseTeaser section (4:3 card)
+   Displayed: right half of viewport on desktop, full-bleed portrait
+------------------------------------------------------------
+A focused mid-shot of three diverse professionals gathered around a large
+wall-mounted screen in a sleek modern open-plan office, one person
+pointing at a data visualization in electric violet on the dark screen,
+the others engaged and listening, soft dramatic window light from the
+left, shallow depth of field, bokeh of open workspace in background,
+editorial corporate photography, cinematic color grade, no stock-photo
+poses — candid and real --ar 3:4 4k

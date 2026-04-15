@@ -15,6 +15,8 @@ export default function AdminBootcampsPage() {
       const start = Date.now()
 
       try {
+        await fetch("/api/admin/migrate-bootcamps", { method: "POST" })
+
         const [bootcampsRes, coursesRes] = await Promise.all([
           fetch("/api/admin/bootcamps"),
           fetch("/api/admin/courses"),
@@ -61,6 +63,7 @@ export default function AdminBootcampsPage() {
 
     // Course IDs
     formData.append("courseIds", JSON.stringify(bootcamp.courseIds ?? []))
+    formData.append("tags", JSON.stringify(bootcamp.tags ?? []))
 
     // Cover image
     if (bootcamp.coverImage instanceof File) {
