@@ -68,14 +68,14 @@ export default function CtaBanner() {
 
           <div className="flex flex-col sm:flex-row gap-3 shrink-0">
             <Link
-              href="/bootcamps"
+              href="/formations"
               className="group inline-flex items-center justify-center gap-2 bg-accent text-white px-8 py-4 text-sm font-semibold hover:bg-accent/90 transition-all"
             >
               Voir les bootcamps
               <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform duration-200" />
             </Link>
             <Link
-              href="/courses"
+              href="/formations"
               className="inline-flex items-center justify-center gap-2 border border-foreground/20 text-foreground px-8 py-4 text-sm font-semibold hover:border-accent hover:text-accent transition-colors"
             >
               Parcourir les formations

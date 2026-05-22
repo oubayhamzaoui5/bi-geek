@@ -2,21 +2,20 @@
 
 import { useEffect, useState } from "react"
 
-import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { MessagesTab } from "@/components/messages-tab"
 import { BookOpen } from "lucide-react"
 
 import { Course, CourseStatus } from "@/components/student/CourseCard"
 import { CourseSection } from "@/components/student/CourseSection"
-import { SidebarProvider } from "@/components/ui/sidebar-context"
 
 type CoursesApiItem = {
   id: string
   slug?: string
   title: string
   durationLabel: string
+  instructorName?: string
+  groupId?: string | null
   coverImage?: string | null
 }
 
@@ -60,7 +59,9 @@ export default function CoursesPage() {
               title: c.title,
               progress: c.progress ?? (isCompleted ? 100 : 0),
               duration: c.durationLabel ?? "",
-              thumbnail: c.coverImage ?? "/placeholder-course.png",
+              instructorName: c.instructorName ?? "",
+              groupId: c.groupId ?? null,
+              thumbnail: c.coverImage ?? "/placeholder-course.webp",
               hasWork: false,
               status: isCompleted ? "completed" : "active",
               programType: c.programType,
@@ -81,12 +82,8 @@ export default function CoursesPage() {
   const byStatus = (status: CourseStatus) => courses.filter((c) => c.status === status)
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-muted/30">
-        <Sidebar />
-
-        <main className="flex-1 overflow-auto">
-          <Header />
+    <>
+      <Header />
 
           <div className="p-6 md:p-8 space-y-8">
             <h2 className="text-3xl font-bold text-foreground flex items-center gap-3">
@@ -119,11 +116,7 @@ export default function CoursesPage() {
             />
           </div>
 
-          <Footer />
-        </main>
-
-        <MessagesTab />
-      </div>
-    </SidebarProvider>
+      <Footer />
+    </>
   )
 }

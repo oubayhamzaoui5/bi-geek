@@ -6,7 +6,6 @@ import { useParams } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { CourseDetailsSection } from "@/components/student/course-details-section"
 import { Footer } from "@/components/footer"
-import LoadingBI from "@/components/LoadingBI"
 import { MetaPixel } from "@/components/MetaPixel"
 
 export default function BootcampDetailsPage() {
@@ -76,16 +75,16 @@ export default function BootcampDetailsPage() {
 
     for (let idx = 0; idx < courses.length; idx++) {
       const c = courses[idx]
-      const courseMods = modulesByCourse.get(c.slug) ?? []
+      const courseMods = modulesByCourse.get(c.id) ?? []
 
       result.push({
         title: `Formation ${idx + 1} : ${c.title}`,
         duration: c.durationLabel ?? "",
         lessons: courseMods.map((m) => {
-          const modLessons = lessonsByModule.get(m.slug) ?? []
+          const modLessons = lessonsByModule.get(m.id) ?? []
           return {
             title: m.title,
-            duration: m.duration ?? "",
+            duration: m.durationLabel ?? m.duration ?? "",
             contents: modLessons.map((l) => ({
               title: l.title,
               type: "video" as const,
@@ -110,7 +109,43 @@ export default function BootcampDetailsPage() {
     return items
   }, [courses])
 
-  if (loading) return <LoadingBI />
+  if (loading) return (
+    <>
+      <Navbar />
+      <main className="px-4 md:px-16">
+        <div className="-mx-4 overflow-x-clip bg-[#fbfaf8] md:-mx-16">
+          <div className="border-b border-zinc-200 bg-white">
+            <div className="mx-auto max-w-[86rem] px-4 py-8 md:px-6 md:py-10">
+              <div className="mb-6 space-y-3">
+                <div className="h-3 w-28 animate-pulse rounded bg-zinc-200" />
+                <div className="h-10 w-3/4 animate-pulse rounded bg-zinc-200" />
+                <div className="h-5 w-full max-w-2xl animate-pulse rounded bg-zinc-200" />
+                <div className="h-5 w-2/3 animate-pulse rounded bg-zinc-200" />
+                <div className="mt-4 flex gap-3">
+                  <div className="h-11 w-44 animate-pulse rounded-md bg-zinc-200" />
+                  <div className="h-11 w-44 animate-pulse rounded-md bg-zinc-200" />
+                </div>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,56rem)_320px]">
+                <div className="aspect-video w-full animate-pulse rounded-2xl bg-zinc-200" />
+                <div className="animate-pulse rounded-2xl bg-zinc-200" style={{ minHeight: 260 }} />
+              </div>
+            </div>
+          </div>
+          <div className="mx-auto max-w-[86rem] px-4 py-14 md:px-6">
+            <div className="space-y-4">
+              <div className="h-3 w-20 animate-pulse rounded bg-zinc-200" />
+              <div className="h-8 w-1/2 animate-pulse rounded bg-zinc-200" />
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {[1,2,3,4].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-zinc-200" />)}
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+      <Footer />
+    </>
+  )
   if (!bootcamp) return <div className="p-6">Bootcamp not found</div>
 
   const courseFromPb = {
@@ -124,12 +159,13 @@ export default function BootcampDetailsPage() {
       "",
     durationLabel: bootcamp.durationLabel ?? (bootcamp.hours ? `${bootcamp.hours} heures` : ""),
     levelLabel: bootcamp.levelLabel ?? "",
-    certificate: !!bootcamp.certificate,
+    certificate: !!bootcamp.certificate || courses.some((course) => course.certificate),
     rating: bootcamp.rating ?? 4.8,
     reviewsCount: bootcamp.reviewsCount ?? 0,
     whatYouWillLearn: bootcampWhatYouWillLearn,
     coverImage: bootcamp.image ?? courses[0]?.coverImage ?? null, // fallback to first course
     prerequis: bootcamp.prerequis,
+    certifications: Array.isArray(bootcamp.certifications) ? bootcamp.certifications : [],
   }
 
   return (
@@ -143,6 +179,7 @@ export default function BootcampDetailsPage() {
           courseFromPb={courseFromPb}
           courseId={bootcamp.id}
           courses={courses}
+          modules={modulesFromPb}
         />
       </main>
       <Footer />

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
 
 type SessionRecord = {
@@ -61,7 +61,7 @@ export async function GET() {
         date: s.date ?? s.startDate ?? "",
         time: s.time ?? s.startTime ?? "00:00",
         durationMin: s.durationMin ?? s.duration,
-        instructor: s.instructor ?? s.teacher ?? "Equipe pÃ©dagogique",
+        instructor: s.instructor ?? s.teacher ?? "Equipe pédagogique",
         joinUrl: s.joinUrl ?? s.link,
         isLive: s.isLive ?? false,
       }))

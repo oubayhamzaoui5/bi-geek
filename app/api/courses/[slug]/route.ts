@@ -4,6 +4,24 @@ import { NextResponse } from "next/server";
 type LessonLink = { url?: string; title?: string; description?: string; order?: number };
 type LessonAttachmentMeta = { name?: string; title?: string; description?: string; order?: number };
 
+const getCertificationItems = (record: any, pbUrl: string) => {
+  const expandedItems = record.expand?.certificationItems;
+  const items = Array.isArray(expandedItems)
+    ? expandedItems
+    : expandedItems
+      ? [expandedItems]
+      : [];
+  if (items.length > 0) {
+    return items.map((cert: any) => ({
+      title: cert.title,
+      issuer: cert.issuer ?? "",
+      imageUrl: cert.image ? `${pbUrl}/api/files/certifications/${cert.id}/${cert.image}` : null,
+    }));
+  }
+
+  return Array.isArray(record.certifications) ? record.certifications : [];
+};
+
 export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
     const { slug } = await params;
@@ -14,7 +32,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
 
     const courseRecord = await pb
       .collection("courses")
-      .getFirstListItem(`slug="${slug}"`);
+      .getFirstListItem(`slug="${slug}"`, { expand: "certificationItems" });
 
     let group: any = null;
     if (studentId && courseRecord) {
@@ -39,7 +57,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
       durationLabel: courseRecord.durationLabel,
       prerequis: courseRecord.prerequis ?? "Aucun",
       certificate: !!courseRecord.certificate,
-      certifications: courseRecord.certifications ?? [],
+      certifications: getCertificationItems(courseRecord, PB_URL),
       rating: courseRecord.rating ?? 4.8,
       reviewsCount: courseRecord.reviewsCount ?? 0,
       whatYouWillLearn: courseRecord.whatYouWillLearn ?? [],
@@ -103,7 +121,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
           ? (l.youtubeLinks as LessonLink[])
           : [];
         const videoContents = youtubeLinks.map((link, idx: number) => ({
-          title: link.title ?? link.description ?? `VidÃ©o ${idx + 1}`,
+          title: link.title ?? link.description ?? `Vidéo ${idx + 1}`,
           description: link.description ?? "",
           order: link.order ?? attachmentFiles.length + idx + 1,
           type: "video" as const,

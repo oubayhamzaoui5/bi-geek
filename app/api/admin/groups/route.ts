@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
+import { authErrorResponse, requireUser } from "@/lib/server-auth"
 
 type ScheduleSlot = {
   day: string
@@ -22,6 +23,7 @@ type IncomingGroup = {
   unlockedModules?: string[]
   lockedLessons?: string[]
   unlockedLessons?: string[]
+  resourceMode?: "default" | "custom"
   schedules?: ScheduleSlot[]
   schedule_start_date?: string | null
   schedule_end_date?: string | null
@@ -41,8 +43,9 @@ async function getAdminPb() {
   return pb
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    await requireUser(req, ["admin", "admin_agent"])
     const pb = await getAdminPb()
 
     const groupFetch = async () => {
@@ -61,15 +64,19 @@ export async function GET() {
       return page.items
     }
 
-    const [groupRes, courseRes, bootcampRes] = await Promise.allSettled([
+    const today = new Date().toISOString().slice(0, 10)
+
+    const [groupRes, courseRes, bootcampRes, sessionRes] = await Promise.allSettled([
       groupFetch(),
       pb.collection("courses").getFullList({ sort: "title" }),
       pb.collection("bootcamps").getFullList({ sort: "title" }),
+      pb.collection("sessions").getFullList({ filter: `date >= "${today}"`, sort: "date,start_time" }),
     ])
 
     const groupRecords = groupRes.status === "fulfilled" ? groupRes.value : []
     const courseRecords = courseRes.status === "fulfilled" ? courseRes.value : []
     const bootcampRecords = bootcampRes.status === "fulfilled" ? bootcampRes.value : []
+    const sessionRecords = sessionRes.status === "fulfilled" ? sessionRes.value : []
 
     const formatPbError = (err: any) => ({
       message: err?.message,
@@ -135,6 +142,7 @@ export async function GET() {
       unlockedModules: Array.isArray(g.unlockedModules) ? g.unlockedModules : [],
       lockedLessons: Array.isArray(g.lockedLessons) ? g.lockedLessons : [],
       unlockedLessons: Array.isArray(g.unlockedLessons) ? g.unlockedLessons : [],
+      resourceMode: g.resourceMode || "default",
       schedules: (() => {
         const raw = g.schedules
         if (!raw) return []
@@ -176,8 +184,38 @@ export async function GET() {
       surname: u.surname || "",
     }))
 
-    return NextResponse.json({ ok: true, groups, courses, bootcamps, students, instructors, warnings })
+    const sessions = (sessionRecords as any[]).map((s) => ({
+      id: s.id,
+      group: s.group,
+      date: s.date.slice(0, 10),
+      start_time: s.start_time || "",
+      duration: s.duration || 120,
+      mode: s.mode || "live_presentiel",
+      title: s.title || null,
+      is_cancelled: s.is_cancelled || false,
+    }))
+
+    // Pre-sort in_progress groups by next upcoming session
+    const now = Date.now()
+    const nextTimeByGroup = new Map<string, number>()
+    for (const s of sessions) {
+      if (s.is_cancelled) continue
+      const t = new Date(`${s.date}T${s.start_time || "00:00"}:00`).getTime()
+      if (!Number.isFinite(t) || t < now) continue
+      const existing = nextTimeByGroup.get(s.group)
+      if (existing === undefined || t < existing) nextTimeByGroup.set(s.group, t)
+    }
+    groups.sort((a, b) => {
+      if (a.status !== "in_progress" || b.status !== "in_progress") return 0
+      const ta = a.id ? (nextTimeByGroup.get(a.id) ?? Infinity) : Infinity
+      const tb = b.id ? (nextTimeByGroup.get(b.id) ?? Infinity) : Infinity
+      return ta - tb
+    })
+
+    return NextResponse.json({ ok: true, groups, courses, bootcamps, students, instructors, sessions, warnings })
   } catch (err: any) {
+    const auth = authErrorResponse(err)
+    if (auth) return auth
     console.error("ADMIN GROUPS GET ERROR:", err)
     const msg = err?.data?.message || err?.message || "Erreur serveur"
     return NextResponse.json({ error: msg }, { status: 500 })
@@ -186,6 +224,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    await requireUser(req, ["admin", "admin_agent"])
     const payload = (await req.json()) as IncomingGroup
     const pb = await getAdminPb()
 
@@ -226,6 +265,7 @@ export async function POST(req: Request) {
       unlockedModules,
       lockedLessons,
       unlockedLessons,
+      resourceMode: payload.resourceMode || "default",
     }
 
     if (payload.schedules !== undefined) {
@@ -259,6 +299,7 @@ export async function POST(req: Request) {
       unlockedModules: Array.isArray(record.unlockedModules) ? record.unlockedModules : [],
       lockedLessons: Array.isArray(record.lockedLessons) ? record.lockedLessons : [],
       unlockedLessons: Array.isArray(record.unlockedLessons) ? record.unlockedLessons : [],
+      resourceMode: record.resourceMode || "default",
       schedules: (() => {
         const raw = record.schedules
         if (!raw) return []
@@ -272,6 +313,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, group })
   } catch (err: any) {
+    const auth = authErrorResponse(err)
+    if (auth) return auth
     console.error("ADMIN GROUPS POST ERROR:", err)
     const msg = err?.data?.message || err?.message || "Erreur serveur"
     return NextResponse.json({ error: msg }, { status: 500 })

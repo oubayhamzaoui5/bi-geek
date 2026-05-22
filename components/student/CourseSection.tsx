@@ -1,4 +1,4 @@
-"use client"
+﻿﻿"use client"
 
 import { ProgramCard } from "@/components/program-card"
 import { motion } from "framer-motion"
@@ -47,7 +47,7 @@ export function CourseSection({ title, subtitle, courses }: CourseSectionProps) 
       </motion.div>
 
       {courses.length === 0 ? (
-        <p className="text-muted-foreground">Aucun formation dans cette catÃ©gorie.</p>
+        <p className="text-muted-foreground">Aucun formation dans cette catégorie.</p>
       ) : (
         <motion.div
           className={`grid ${gridCols} gap-6 transition-all duration-300 px-4`}
@@ -62,13 +62,14 @@ export function CourseSection({ title, subtitle, courses }: CourseSectionProps) 
               title: course.title,
               shortDescription:
                 course.status === "active"
-                  ? "Formation en cours â€“ poursuivez votre apprentissage."
+                  ? "Formation en cours — poursuivez votre apprentissage."
                   : course.status === "upcoming"
-                  ? "Prochainement disponible, inscrivez-vous dÃ¨s maintenant."
+                  ? "Prochainement disponible, inscrivez-vous dès maintenant."
                   : course.status === "completed"
-                  ? "Formation terminÃ©e â€“ consultez vos progrÃ¨s."
-                  : "Formation enregistrÃ©e â€“ apprenez Ã  votre rythme.",
+                  ? "Formation terminée — consultez vos progrès."
+                  : "Formation enregistrée — apprenez à votre rythme.",
               durationLabel: course.duration,
+              instructorName: course.instructorName,
               image: course.thumbnail,
               tags: [course.status],
             }
@@ -77,7 +78,11 @@ export function CourseSection({ title, subtitle, courses }: CourseSectionProps) 
               <motion.div key={course.id} variants={cardVariants}>
                 <ProgramCard
                   program={pseudoProgram}
-                  hrefOverride={`/student-dashboard/course/${course.slug ?? course.id}`}
+                  hrefOverride={
+                    course.groupId
+                      ? `/student-dashboard/groups/${course.groupId}`
+                      : `/student-dashboard/course/${course.slug ?? course.id}`
+                  }
                 />
               </motion.div>
             )

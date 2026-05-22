@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import PocketBase from "pocketbase"
+import { randomInt } from "node:crypto"
+import { authErrorResponse, getAdminPb, requireUser } from "@/lib/server-auth"
 
 function generatePassword(length = 12) {
   const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ"
@@ -8,33 +9,34 @@ function generatePassword(length = 12) {
   const symbols = "!@#$%*?"
   const all = upper + lower + nums + symbols
 
-  const pick = (chars: string) => chars[Math.floor(Math.random() * chars.length)]
+  const pick = (chars: string) => chars[randomInt(chars.length)]
   let pwd = pick(upper) + pick(lower) + pick(nums) + pick(symbols)
 
   for (let i = pwd.length; i < length; i++) {
-    pwd += all[Math.floor(Math.random() * all.length)]
+    pwd += all[randomInt(all.length)]
   }
 
-  return pwd.split("").sort(() => Math.random() - 0.5).join("")
+  const chars = pwd.split("")
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1)
+    ;[chars[i], chars[j]] = [chars[j], chars[i]]
+  }
+  return chars.join("")
 }
 
 export async function POST(req: Request) {
   try {
+    const caller = await requireUser(req, ["admin", "admin_agent"])
     const { userId } = await req.json()
     if (!userId) {
       return NextResponse.json({ error: "userId requis." }, { status: 400 })
     }
 
-    const PB_URL = process.env.POCKETBASE_URL ?? "http://127.0.0.1:8090"
-    const adminEmail = process.env.POCKETBASE_ADMIN_EMAIL
-    const adminPass = process.env.POCKETBASE_ADMIN_PASSWORD
-
-    if (!adminEmail || !adminPass) {
-      return NextResponse.json({ error: "Configuration serveur manquante." }, { status: 500 })
+    const pb = await getAdminPb()
+    const target = await pb.collection("users").getOne(userId)
+    if (caller.role === "admin_agent" && ["admin", "admin_agent"].includes(target.role)) {
+      return NextResponse.json({ error: "Permission refusee." }, { status: 403 })
     }
-
-    const pb = new PocketBase(PB_URL)
-    await pb.collection("_superusers").authWithPassword(adminEmail, adminPass)
 
     const newPassword = generatePassword()
 
@@ -47,6 +49,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, plainPassword: newPassword })
   } catch (err: any) {
+    const auth = authErrorResponse(err)
+    if (auth) return auth
     return NextResponse.json(
       { error: err?.message ?? "Erreur serveur." },
       { status: err?.status ?? 500 }

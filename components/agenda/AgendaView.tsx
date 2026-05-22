@@ -1,17 +1,14 @@
 "use client"
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   ChevronLeft, ChevronRight, Calendar, List, Grid3X3,
-  Wifi, MapPin, MonitorSmartphone, HelpCircle,
   X, Save, Trash2, Clock, Users, AlertCircle,
   Plus, Check, Loader2,
 } from "lucide-react"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-
-export type SessionMode = "live" | "presentiel" | "live_presentiel" | "not_set"
 
 export type Session = {
   id: string | null
@@ -20,7 +17,7 @@ export type Session = {
   date: string
   start_time: string
   duration: number
-  mode: SessionMode
+  mode: string
   title: string | null
   notes: string
   is_cancelled: boolean
@@ -52,15 +49,6 @@ const MONTHS_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
 const HOUR_START = 7
 const HOUR_END = 22
 const SLOT_HEIGHT = 64
-
-const MODE_META: Record<SessionMode, {
-  label: string; color: string; bg: string; border: string; icon: React.ElementType
-}> = {
-  live: { label: "Live", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", icon: Wifi },
-  presentiel: { label: "Présentiel", color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", icon: MapPin },
-  live_presentiel: { label: "Live + Présentiel", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", icon: MonitorSmartphone },
-  not_set: { label: "Non défini", color: "#64748b", bg: "#f8fafc", border: "#e2e8f0", icon: HelpCircle },
-}
 
 const GROUP_COLORS = [
   "#2563EB", "#F59E0B", "#16A34A", "#8B5CF6",
@@ -189,9 +177,6 @@ function SessionPanel({
     return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
   })()
 
-  const meta = MODE_META[draft.mode]
-  const ModeIcon = meta.icon
-
   async function save() {
     setSaving(true)
     try { await onSave(draft, updateMode) } finally { setSaving(false) }
@@ -218,19 +203,19 @@ function SessionPanel({
           <div className="flex items-center gap-2.5">
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ background: meta.bg, border: `1px solid ${meta.border}` }}
+              style={{ background: "#f1f5f9", border: "1px solid #e2e8f0" }}
             >
-              <ModeIcon size={16} style={{ color: meta.color }} />
+              <Calendar size={16} style={{ color: "#475569" }} />
             </div>
             <div>
               <p className="text-[13px] font-semibold text-gray-900">
                 {draft.title || group?.title || "Session"}
               </p>
-              <p className="text-[11px] text-gray-400 capitalize">{dateFmt}</p>
+              <p className="text-[11px] text-gray-600 capitalize">{dateFmt}</p>
             </div>
           </div>
           <button onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-600
               hover:bg-gray-100 hover:text-gray-600 transition-colors">
             <X size={16} />
           </button>
@@ -264,7 +249,7 @@ function SessionPanel({
           )}
 
           {/* Group info */}
-          <div className="flex items-center gap-2 text-[12px] text-gray-500">
+          <div className="flex items-center gap-2 text-[12px] text-gray-600">
             <Users size={13} />
             <span className="font-medium text-gray-700">{group?.title || draft.group}</span>
           </div>
@@ -272,7 +257,7 @@ function SessionPanel({
           {/* Time / Duration */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">
                 Heure de début
               </label>
               {readOnly ? (
@@ -290,7 +275,7 @@ function SessionPanel({
               )}
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">
                 Durée
               </label>
               <div className="h-9 px-3 flex items-center rounded-lg border border-gray-100 bg-gray-50 text-[13px] text-gray-700">
@@ -299,50 +284,12 @@ function SessionPanel({
             </div>
           </div>
 
-          {/* Mode */}
-          <div>
-            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
-              Mode de session
-            </label>
-            {readOnly ? (
-              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border text-[12px] font-medium"
-                style={{ background: meta.bg, borderColor: meta.border, color: meta.color }}>
-                <ModeIcon size={13} />
-                <span>{meta.label}</span>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {(Object.keys(MODE_META) as SessionMode[]).map((m) => {
-                  const mm = MODE_META[m]
-                  const MIcon = mm.icon
-                  const active = draft.mode === m
-                  return (
-                    <button
-                      key={m}
-                      onClick={() => setDraft(d => ({ ...d, mode: m }))}
-                      className="flex items-center gap-2 px-3 py-2.5 rounded-lg border text-[12px] font-medium transition-all"
-                      style={{
-                        background: active ? mm.bg : "#fff",
-                        borderColor: active ? mm.color : "#e5e7eb",
-                        color: active ? mm.color : "#6b7280",
-                      }}
-                    >
-                      <MIcon size={13} />
-                      <span>{mm.label}</span>
-                      {active && <Check size={12} className="ml-auto" />}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
           {/* Cancel toggle — admin only */}
           {!readOnly && (
             <div className="flex items-center justify-between py-3 px-3 rounded-lg bg-gray-50 border border-gray-100">
               <div>
                 <p className="text-[12px] font-semibold text-gray-700">Annuler la session</p>
-                <p className="text-[11px] text-gray-400">Marquer comme annulée</p>
+                <p className="text-[11px] text-gray-600">Marquer comme annulée</p>
               </div>
               <button
                 onClick={() => setDraft(d => ({ ...d, is_cancelled: !d.is_cancelled }))}
@@ -360,7 +307,7 @@ function SessionPanel({
           {/* Notes — read-only display if notes exist */}
           {readOnly && draft.notes && (
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">
                 Notes
               </label>
               <div className="px-3 py-2 rounded-lg border border-gray-100 bg-gray-50 text-[13px] text-gray-700 leading-relaxed">
@@ -378,14 +325,14 @@ function SessionPanel({
               <button
                 onClick={() => setUpdateMode("single")}
                 className={`flex-1 h-7 rounded-md text-[11px] font-medium transition-all
-                  ${updateMode === "single" ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+                  ${updateMode === "single" ? "bg-white text-gray-800 shadow-sm" : "text-gray-600 hover:text-gray-700"}`}
               >
                 Cette session
               </button>
               <button
                 onClick={() => setUpdateMode("all_following")}
                 className={`flex-1 h-7 rounded-md text-[11px] font-medium transition-all
-                  ${updateMode === "all_following" ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+                  ${updateMode === "all_following" ? "bg-white text-gray-800 shadow-sm" : "text-gray-600 hover:text-gray-700"}`}
               >
                 Toutes les suivantes
               </button>
@@ -407,7 +354,7 @@ function SessionPanel({
             <button
               onClick={onClose}
               className="h-9 px-4 rounded-lg border border-gray-200 text-[12px] font-medium
-                text-gray-500 hover:bg-gray-50 transition-colors ml-auto"
+                text-gray-600 hover:bg-gray-50 transition-colors ml-auto"
             >
               Fermer
             </button>
@@ -442,9 +389,9 @@ function SlotRow({
   return (
     <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-3 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Séance {index + 1}</span>
+        <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Séance {index + 1}</span>
         <button onClick={() => onRemove(index)}
-          className="w-6 h-6 flex items-center justify-center rounded-md text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors">
+          className="w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-red-400 hover:bg-red-50 transition-colors">
           <X size={13} />
         </button>
       </div>
@@ -452,20 +399,20 @@ function SlotRow({
         {DAYS_OPTIONS.map(d => (
           <button key={d.val} onClick={() => set({ day: d.val })}
             className={`px-2 py-1 rounded-md text-[11px] font-semibold border transition-all
-              ${slot.day === d.val ? "bg-violet-600 text-white border-violet-600" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>
+              ${slot.day === d.val ? "bg-violet-600 text-white border-violet-600" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"}`}>
             {d.short}
           </button>
         ))}
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Heure</label>
+          <label className="block text-[9px] font-bold text-gray-600 uppercase tracking-wider mb-1">Heure</label>
           <input type="time" value={slot.start_time} onChange={e => set({ start_time: e.target.value })}
             className="w-full h-8 px-2 rounded-lg border border-gray-200 text-[12px]
               focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400/20 bg-white" />
         </div>
         <div>
-          <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Durée (min)</label>
+          <label className="block text-[9px] font-bold text-gray-600 uppercase tracking-wider mb-1">Durée (min)</label>
           <input type="number" min={15} max={480} step={15} value={slot.duration}
             onChange={e => set({ duration: parseInt(e.target.value) || 120 })}
             className="w-full h-8 px-2 rounded-lg border border-gray-200 text-[12px]
@@ -512,10 +459,10 @@ function GroupScheduleModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <div>
             <h2 className="text-[14px] font-bold text-gray-900">Planning hebdomadaire</h2>
-            <p className="text-[12px] text-gray-400 mt-0.5">{group.title}</p>
+            <p className="text-[12px] text-gray-600 mt-0.5">{group.title}</p>
           </div>
           <button onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">
             <X size={16} />
           </button>
         </div>
@@ -524,13 +471,13 @@ function GroupScheduleModal({
             <p className="text-[11px] font-bold text-violet-500 uppercase tracking-wider">Période du groupe</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Date de début</label>
+                <label className="block text-[9px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">Date de début</label>
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
                   className="w-full h-9 px-3 rounded-lg border border-gray-200 text-[12px]
                     focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400/20 bg-white" />
               </div>
               <div>
-                <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Date de fin</label>
+                <label className="block text-[9px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">Date de fin</label>
                 <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
                   className="w-full h-9 px-3 rounded-lg border border-gray-200 text-[12px]
                     focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400/20 bg-white" />
@@ -538,11 +485,11 @@ function GroupScheduleModal({
             </div>
           </div>
           <div className="space-y-3">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Séances hebdomadaires</p>
+            <p className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Séances hebdomadaires</p>
             {slots.length === 0 && (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Clock size={28} className="text-gray-200 mb-2" />
-                <p className="text-[12px] text-gray-400">Aucune séance définie</p>
+                <p className="text-[12px] text-gray-600">Aucune séance définie</p>
               </div>
             )}
             {slots.map((slot, i) => (
@@ -553,17 +500,17 @@ function GroupScheduleModal({
             <button
               onClick={() => setSlots(prev => [...prev, emptySlot()])}
               className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-dashed
-                border-gray-300 text-[12px] font-medium text-gray-400 hover:border-violet-400
+                border-gray-300 text-[12px] font-medium text-gray-600 hover:border-violet-400
                 hover:text-violet-600 hover:bg-violet-50/50 transition-all">
               <Plus size={14} />Ajouter une séance
             </button>
           </div>
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex justify-between items-center shrink-0">
-          <p className="text-[11px] text-gray-400">{slots.length} séance{slots.length > 1 ? "s" : ""} / semaine</p>
+          <p className="text-[11px] text-gray-600">{slots.length} séance{slots.length > 1 ? "s" : ""} / semaine</p>
           <div className="flex gap-2">
             <button onClick={onClose}
-              className="h-9 px-4 rounded-lg border border-gray-200 text-[12px] font-medium text-gray-500 hover:bg-gray-50 transition-colors">
+              className="h-9 px-4 rounded-lg border border-gray-200 text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition-colors">
               Annuler
             </button>
             <button onClick={save} disabled={saving}
@@ -624,7 +571,7 @@ function WeekGrid({
           const isToday = toYMD(d) === today
           return (
             <div key={i} className="flex-1 min-w-0 flex flex-col items-center py-2.5 gap-0.5 border-r border-gray-100 last:border-r-0">
-              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{DAYS_FR[i]}</span>
+              <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">{DAYS_FR[i]}</span>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[14px] font-bold transition-colors
                 ${isToday ? "bg-violet-600 text-white" : "text-gray-700"}`}>
                 {d.getDate()}
@@ -637,7 +584,7 @@ function WeekGrid({
         <div className="flex" style={{ minHeight: `${(HOUR_END - HOUR_START) * SLOT_HEIGHT}px` }}>
           <div className="w-16 shrink-0 border-r border-gray-100 relative">
             {hours.map(h => (
-              <div key={h} className="absolute right-2 text-[10px] text-gray-400 font-medium leading-none"
+              <div key={h} className="absolute right-2 text-[10px] text-gray-600 font-medium leading-none"
                 style={{ top: (h - HOUR_START) * SLOT_HEIGHT - 6 }}>
                 {String(h).padStart(2, "0")}:00
               </div>
@@ -753,7 +700,7 @@ function MonthGrid({
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="grid grid-cols-7 border-b border-gray-100 bg-white shrink-0">
         {DAYS_FR.map(d => (
-          <div key={d} className="py-2 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider">{d}</div>
+          <div key={d} className="py-2 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider">{d}</div>
         ))}
       </div>
       <div className="flex-1 overflow-y-auto">
@@ -795,7 +742,7 @@ function MonthGrid({
                           )
                         })}
                         {daySessions.length > 3 && (
-                          <p className="text-[10px] text-gray-400 pl-1">+{daySessions.length - 3} autres</p>
+                          <p className="text-[10px] text-gray-600 pl-1">+{daySessions.length - 3} autres</p>
                         )}
                       </div>
                     </>
@@ -833,7 +780,7 @@ function ListView({
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <Calendar size={40} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-[13px] text-gray-400">Aucune session à venir</p>
+          <p className="text-[13px] text-gray-600">Aucune session à venir</p>
         </div>
       </div>
     )
@@ -848,7 +795,7 @@ function ListView({
         return (
           <div key={date}>
             <div className="flex items-center gap-2 mb-2">
-              <span className={`text-[12px] font-bold capitalize ${isToday ? "text-violet-600" : "text-gray-500"}`}>
+              <span className={`text-[12px] font-bold capitalize ${isToday ? "text-violet-600" : "text-gray-600"}`}>
                 {dayLabel}
               </span>
               {isToday && (
@@ -859,7 +806,6 @@ function ListView({
             </div>
             <div className="space-y-2">
               {grouped[date].map((s, i) => {
-                const ModeIcon = MODE_META[s.mode].icon
                 const gc = groupColorMap.get(s.group) ?? "#475569"
                 const isCancelled = s.is_cancelled
                 return (
@@ -871,10 +817,8 @@ function ListView({
                       style={{ background: isCancelled ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.18)" }}>
                       {isCancelled ? (
                         <AlertCircle size={16} style={{ color: "#dc2626" }} />
-                      ) : s.mode === "not_set" ? (
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#ffffff", opacity: 0.92 }} />
                       ) : (
-                        <ModeIcon size={16} style={{ color: "#ffffff" }} />
+                        <Calendar size={16} style={{ color: "#ffffff" }} />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -886,9 +830,6 @@ function ListView({
                           <Clock size={10} />
                           {s.start_time} · {formatDuration(s.duration)}
                         </span>
-                        <span className="text-[10px] font-medium" style={{ color: isCancelled ? "#ef4444" : "#ffffff", opacity: 0.92 }}>
-                          {MODE_META[s.mode].label}
-                        </span>
                       </div>
                     </div>
                     {isCancelled && (
@@ -897,7 +838,7 @@ function ListView({
                       </span>
                     )}
                     {s.virtual && !isCancelled && (
-                      <span className="text-[10px] bg-gray-50 text-gray-400 border border-gray-100 px-2 py-0.5 rounded font-medium shrink-0">
+                      <span className="text-[10px] bg-gray-50 text-gray-600 border border-gray-100 px-2 py-0.5 rounded font-medium shrink-0">
                         Auto
                       </span>
                     )}
@@ -921,10 +862,14 @@ export interface AgendaViewProps {
   readOnly?: boolean
   /** Required when readOnly=true: the instructor's user ID */
   instructorId?: string
+  /** Required for the student agenda: the student's user ID */
+  studentId?: string
 }
 
-export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) {
+export function AgendaView({ readOnly = false, instructorId, studentId }: AgendaViewProps) {
+  const router = useRouter()
   const searchParams = useSearchParams()
+  const isStudentAgenda = Boolean(studentId)
 
   const [view, setView] = useState<ViewMode>("week")
   const [weekStart, setWeekStart] = useState<Date>(() => getWeekStart(new Date()))
@@ -966,11 +911,14 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
 
   // Fetch groups
   useEffect(() => {
-    const url = readOnly && instructorId
-      ? `/api/instructor/groups?instructorId=${instructorId}`
-      : "/api/admin/groups"
+    const url = isStudentAgenda && studentId
+      ? `/api/student/groups?studentId=${studentId}`
+      : readOnly && instructorId
+        ? `/api/instructor/groups?instructorId=${instructorId}`
+        : "/api/admin/groups"
 
-    if (readOnly && !instructorId) return
+    if (isStudentAgenda && !studentId) return
+    if (readOnly && !instructorId && !isStudentAgenda) return
 
     fetch(url)
       .then(r => r.json())
@@ -985,12 +933,12 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
             schedule_start_date: g.schedule_start_date || undefined,
             schedule_end_date: g.schedule_end_date || undefined,
           }))
-          .filter((g: Group) => g.status !== "completed")
+          .filter((g: Group) => g.status === "in_progress")
           .sort((a: Group, b: Group) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99))
         setGroups(g)
       })
       .catch(() => {})
-  }, [readOnly, instructorId])
+  }, [readOnly, instructorId, studentId, isStudentAgenda])
 
   // Compute date range
   const { from, to } = (() => {
@@ -1005,12 +953,17 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
 
   // Fetch sessions
   useEffect(() => {
-    if (readOnly && !instructorId) return
+    if (isStudentAgenda && !studentId) return
+    if (readOnly && !instructorId && !isStudentAgenda) return
     const controller = new AbortController()
     setLoading(true)
 
     let url: string
-    if (readOnly && instructorId) {
+    if (isStudentAgenda && studentId) {
+      url = from && to
+        ? `/api/student/sessions?studentId=${studentId}&from=${from}&to=${to}`
+        : `/api/student/sessions?studentId=${studentId}`
+    } else if (readOnly && instructorId) {
       url = from && to
         ? `/api/instructor/sessions?instructorId=${instructorId}&from=${from}&to=${to}`
         : `/api/instructor/sessions?instructorId=${instructorId}`
@@ -1023,7 +976,7 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
       .then(d => { setSessions(d.sessions || []); setLoading(false) })
       .catch(err => { if (err.name !== "AbortError") { console.error(err); setLoading(false) } })
     return () => controller.abort()
-  }, [from, to, readOnly, instructorId])
+  }, [from, to, readOnly, instructorId, studentId, isStudentAgenda])
 
   // Auto-open target session
   useEffect(() => {
@@ -1034,11 +987,16 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
       .filter(s => s.group === targetGroupId && s.date === targetDate && !s.is_cancelled && (!targetStartTime || s.start_time === targetStartTime))
       .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""))[0]
     if (!target) return
+    if (isStudentAgenda) {
+      router.replace(`/student-dashboard/groups/${target.group}`)
+      openedFromQueryRef.current = targetKey
+      return
+    }
     setSelectedSession(target)
     openedFromQueryRef.current = targetKey
-    const basePath = readOnly ? "/instructor-dashboard/agenda" : "/admin-dashboard/agenda"
+    const basePath = isStudentAgenda ? "/student-dashboard/agenda" : readOnly ? "/instructor-dashboard/agenda" : "/admin-dashboard/agenda"
     window.history.replaceState(null, "", basePath)
-  }, [sessions, loading, targetGroupId, targetDate, targetStartTime, targetKey, readOnly])
+  }, [sessions, loading, targetGroupId, targetDate, targetStartTime, targetKey, readOnly, isStudentAgenda, router])
 
   useEffect(() => () => {
     if (groupSwitchTimeoutRef.current) clearTimeout(groupSwitchTimeoutRef.current)
@@ -1131,7 +1089,7 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
           const dayName = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][d.getDay()]
           const matchingSlot = group.schedules.find(slot => slot.day === dayName && slot.start_time === draft.start_time)
           if (matchingSlot) {
-            return [...filtered, { id: null, group: draft.group, groupTitle: draft.groupTitle, date: draft.date, start_time: matchingSlot.start_time, duration: matchingSlot.duration, mode: "not_set", title: null, notes: "", is_cancelled: false, instructor: null, virtual: true }]
+            return [...filtered, { id: null, group: draft.group, groupTitle: draft.groupTitle, date: draft.date, start_time: matchingSlot.start_time, duration: matchingSlot.duration, mode: "live_presentiel", title: null, notes: "", is_cancelled: false, instructor: null, virtual: true }]
           }
         }
         return filtered
@@ -1194,6 +1152,14 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
     }, 160)
   }
 
+  function handleSessionClick(session: Session) {
+    if (isStudentAgenda) {
+      router.push(`/student-dashboard/groups/${session.group}`)
+      return
+    }
+    setSelectedSession(session)
+  }
+
   const groupColorMap = new Map(groups.map((g, idx) => [g.id, GROUP_COLORS[idx % GROUP_COLORS.length]]))
   const groupColor = (id: string) => groupColorMap.get(id) ?? "#475569"
 
@@ -1210,11 +1176,11 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
             <>
               <div className="flex items-center gap-1">
                 <button onClick={prevPeriod}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">
                   <ChevronLeft size={16} />
                 </button>
                 <button onClick={nextPeriod}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">
                   <ChevronRight size={16} />
                 </button>
               </div>
@@ -1237,7 +1203,7 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
             ] as const).map(({ val, icon: Icon, label }) => (
               <button key={val} onClick={() => setView(val)}
                 className={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium transition-all
-                  ${view === val ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                  ${view === val ? "bg-white text-gray-800 shadow-sm" : "text-gray-600 hover:text-gray-700"}`}>
                 <Icon size={12} />
                 <span className="hidden sm:inline">{label}</span>
               </button>
@@ -1251,7 +1217,7 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
           <div className={`shrink-0 border-r border-gray-100 bg-white flex flex-col transition-all duration-200
             ${sidebarOpen ? "w-52" : "w-0 overflow-hidden"}`}>
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Groupes</span>
+              <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Groupes</span>
             </div>
             <div className="flex-1 overflow-y-auto py-2 px-2">
               {(["in_progress", "not_started"] as const).map(status => {
@@ -1260,7 +1226,7 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
                 const label = status === "in_progress" ? "En cours" : "Pas commencé"
                 return (
                   <div key={status} className="mb-3">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-1.5 mb-1">{label}</p>
+                    <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest px-1.5 mb-1">{label}</p>
                     <div className="space-y-0.5">
                       {statusGroups.map(g => {
                         const hidden = focusedGroupId !== null && focusedGroupId !== g.id
@@ -1279,14 +1245,14 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
                             {/* Schedule edit button — admin only */}
                             {!readOnly && (
                               <button onClick={() => setScheduleGroup(g)}
-                                className="w-5 h-5 flex items-center justify-center rounded text-gray-300
+                                className="w-5 h-5 flex items-center justify-center rounded text-gray-400
                                   opacity-0 group-hover/item:opacity-100 hover:text-gray-600 hover:bg-gray-100 transition-all"
                                 title="Modifier le planning">
                                 <Clock size={11} />
                               </button>
                             )}
                             {hasSchedule ? (
-                              <span className="text-[9px] font-bold text-gray-300 shrink-0"
+                              <span className="text-[9px] font-bold text-gray-400 shrink-0"
                                 title={`${g.schedules.length} séance${g.schedules.length > 1 ? "s" : ""}/semaine`}>
                                 ×{g.schedules.length}
                               </span>
@@ -1301,26 +1267,12 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
                 )
               })}
             </div>
-            {/* Legend */}
-            <div className="px-3 py-3 border-t border-gray-100 space-y-1.5">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Modes</p>
-              {(Object.keys(MODE_META) as SessionMode[]).filter(m => m !== "not_set").map(m => {
-                const mm = MODE_META[m]
-                const MIcon = mm.icon
-                return (
-                  <div key={m} className="flex items-center gap-1.5">
-                    <MIcon size={11} style={{ color: mm.color }} />
-                    <span className="text-[11px] text-gray-500">{mm.label}</span>
-                  </div>
-                )
-              })}
-            </div>
           </div>
 
           {/* Sidebar toggle */}
           <button onClick={() => setSidebarOpen(p => !p)}
             className="shrink-0 w-4 flex items-center justify-center border-r border-gray-100
-              bg-white text-gray-300 hover:text-gray-500 hover:bg-gray-50 transition-colors cursor-pointer">
+              bg-white text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
             <div className="flex flex-col gap-0.5">
               <span className="w-1 h-1 rounded-full bg-current" />
               <span className="w-1 h-1 rounded-full bg-current" />
@@ -1332,16 +1284,16 @@ export function AgendaView({ readOnly = false, instructorId }: AgendaViewProps) 
           <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-white">
             {view === "week" && (
               <WeekGrid weekStart={weekStart} sessions={visibleSessions}
-                onSessionClick={setSelectedSession} groupColorMap={groupColorMap} />
+                onSessionClick={handleSessionClick} groupColorMap={groupColorMap} />
             )}
             {view === "month" && (
               <MonthGrid year={monthYear.year} month={monthYear.month} sessions={visibleSessions}
-                onSessionClick={setSelectedSession}
+                onSessionClick={handleSessionClick}
                 onDayClick={d => { setWeekStart(getWeekStart(d)); setView("week") }}
                 groupColorMap={groupColorMap} />
             )}
             {view === "list" && (
-              <ListView sessions={visibleSessions} onSessionClick={setSelectedSession} groupColorMap={groupColorMap} />
+              <ListView sessions={visibleSessions} onSessionClick={handleSessionClick} groupColorMap={groupColorMap} />
             )}
           </div>
         </div>

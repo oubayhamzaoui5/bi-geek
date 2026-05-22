@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
+import { updateMeetEvent, deleteMeetEvent } from "@/lib/google-calendar"
 
 async function getAdminPb() {
   const pb = new PocketBase(process.env.POCKETBASE_URL)
@@ -18,11 +19,13 @@ function formatSession(s: any): any {
     date: s.date.slice(0, 10),
     start_time: s.start_time || "",
     duration: s.duration || 120,
-    mode: s.mode || "not_set",
+    mode: s.mode || "live_presentiel",
     title: s.title || null,
     notes: s.notes || "",
     is_cancelled: s.is_cancelled || false,
     instructor: s.instructor || null,
+    joinUrl: s.joinUrl || null,
+    googleEventId: s.googleEventId || null,
   }
 }
 
@@ -40,6 +43,14 @@ export async function DELETE(
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
     if (existing.date.slice(0, 10) < todayStr) {
       return NextResponse.json({ error: "Les sessions passées ne peuvent pas être supprimées." }, { status: 403 })
+    }
+
+    try {
+      if ((existing as any).googleEventId) {
+        await deleteMeetEvent((existing as any).googleEventId)
+      }
+    } catch (meetErr) {
+      console.error("GOOGLE MEET DELETE ERROR:", meetErr)
     }
 
     await pb.collection("sessions").delete(id)
@@ -64,7 +75,7 @@ export async function PATCH(
 
     // Build update payload from allowed fields
     const data: any = {}
-    if (fields.mode !== undefined) data.mode = fields.mode
+    if (fields.date !== undefined) data.date = fields.date
     if (fields.start_time !== undefined) data.start_time = fields.start_time
     if (fields.duration !== undefined) data.duration = fields.duration
     if (fields.title !== undefined) data.title = fields.title
@@ -81,6 +92,19 @@ export async function PATCH(
         return NextResponse.json({ error: "Les sessions passées ne peuvent pas être modifiées." }, { status: 403 })
       }
       const record = await pb.collection("sessions").update(id, data)
+      if ((record as any).googleEventId && (fields.date || fields.start_time || fields.duration || fields.title)) {
+        try {
+          await updateMeetEvent({
+            googleEventId: (record as any).googleEventId,
+            title: fields.title,
+            date: fields.date,
+            startTime: fields.start_time,
+            duration: fields.duration,
+          })
+        } catch (meetErr) {
+          console.error("GOOGLE MEET UPDATE ERROR:", meetErr)
+        }
+      }
       return NextResponse.json({ ok: true, sessions: [formatSession(record)] })
     }
 
@@ -104,6 +128,20 @@ export async function PATCH(
 
       const updated = await Promise.all(
         following.map(s => pb.collection("sessions").update(s.id, data))
+      )
+
+      await Promise.allSettled(
+        updated
+          .filter((s: any) => s.googleEventId && (fields.start_time || fields.duration || fields.title))
+          .map((s: any) =>
+            updateMeetEvent({
+              googleEventId: s.googleEventId,
+              title: fields.title,
+              date: s.date?.slice(0, 10),
+              startTime: fields.start_time,
+              duration: fields.duration,
+            })
+          )
       )
 
       return NextResponse.json({ ok: true, sessions: updated.map(formatSession) })

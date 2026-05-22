@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
+import { assertSelfOrRole, authErrorResponse, requireUser } from "@/lib/server-auth"
 
 async function getAdminPb() {
   const pb = new PocketBase(process.env.POCKETBASE_URL)
@@ -10,118 +11,132 @@ async function getAdminPb() {
   return pb
 }
 
-// GET — fetch conversation between instructor and a student
-// ?instructorId=xxx&studentId=yyy  → returns messages between them
-// ?instructorId=xxx                → returns latest message per student (inbox)
+function fileUrl(record: any, filename: string) {
+  return `${process.env.POCKETBASE_URL}/api/files/${record.collectionId}/${record.id}/${filename}`
+}
+
+function formatMessage(m: any) {
+  const files = Array.isArray(m.attachments) ? m.attachments : m.attachments ? [m.attachments] : []
+  const created = m.sent_at || m.created || m.updated || ""
+  return {
+    id: m.id,
+    group: m.group || "",
+    sender: m.sender,
+    recipient: m.recipient || "",
+    content: m.content || "",
+    created,
+    sent_at: created,
+    read: m.read || false,
+    attachments: files.map((name: string) => ({
+      name,
+      url: fileUrl(m, name),
+      isImage: /\.(png|jpe?g|webp|gif)$/i.test(name),
+    })),
+  }
+}
+
+function sortByCreated(records: any[]) {
+  return records.sort((a, b) => new Date(a.sent_at || a.created || a.updated || 0).getTime() - new Date(b.sent_at || b.created || b.updated || 0).getTime())
+}
+
+async function assertInstructorInGroup(pb: PocketBase, instructorId: string, groupId: string) {
+  const group = await pb.collection("groups").getOne(groupId)
+  if (group.instructor !== instructorId) throw new Error("GROUP_ACCESS_DENIED")
+  return group
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const instructorId = searchParams.get("instructorId")
-    const studentId = searchParams.get("studentId")
+    const groupId = searchParams.get("groupId")
+    const markRead = searchParams.get("markRead") !== "0"
 
-    if (!instructorId) return NextResponse.json({ error: "instructorId requis" }, { status: 400 })
+    if (!instructorId || !groupId) {
+      return NextResponse.json({ error: "instructorId et groupId requis" }, { status: 400 })
+    }
+    const user = await requireUser(req, ["instructor", "admin", "admin_agent"])
+    assertSelfOrRole(user, instructorId)
 
     const pb = await getAdminPb()
+    await assertInstructorInGroup(pb, instructorId, groupId)
 
-    if (studentId) {
-      // Fetch conversation
-      const records = await pb.collection("messages").getFullList({
-        filter: `(sender = "${instructorId}" && recipient = "${studentId}") || (sender = "${studentId}" && recipient = "${instructorId}")`,
-        sort: "created",
-      }).catch(() => [])
+    const records = await pb.collection("messages").getFullList({
+      filter: `group = "${groupId}"`,
+    }).catch(() => [])
 
-      const messages = records.map((m: any) => ({
-        id: m.id,
-        sender: m.sender,
-        recipient: m.recipient,
-        content: m.content,
-        created: m.created,
-        read: m.read || false,
-      }))
+    const messages = sortByCreated(records).map(formatMessage)
 
-      return NextResponse.json({ ok: true, messages })
-    } else {
-      // Inbox: fetch all messages involving instructor, group by other party
-      const records = await pb.collection("messages").getFullList({
-        filter: `sender = "${instructorId}" || recipient = "${instructorId}"`,
-        sort: "-created",
-      }).catch(() => [])
+    const unreadIds = records
+      .filter((m: any) => m.sender !== instructorId && !m.read)
+      .map((m: any) => m.id)
 
-      // Group by conversation partner, keep latest message
-      const convMap: Record<string, any> = {}
-      for (const m of records) {
-        const partner = m.sender === instructorId ? m.recipient : m.sender
-        if (!convMap[partner]) {
-          convMap[partner] = {
-            partnerId: partner,
-            lastMessage: m.content,
-            lastMessageDate: m.created,
-            unread: m.recipient === instructorId && !m.read ? 1 : 0,
-          }
-        } else if (m.recipient === instructorId && !m.read) {
-          convMap[partner].unread = (convMap[partner].unread || 0) + 1
-        }
-      }
-
-      return NextResponse.json({ ok: true, conversations: Object.values(convMap) })
+    if (markRead && unreadIds.length > 0) {
+      Promise.allSettled(unreadIds.map((id: string) => pb.collection("messages").update(id, { read: true })))
     }
+
+    return NextResponse.json({ ok: true, messages })
   } catch (err: any) {
+    const auth = authErrorResponse(err)
+    if (auth) return auth
+    if (err?.message === "GROUP_ACCESS_DENIED") {
+      return NextResponse.json({ error: "Permission refusee." }, { status: 403 })
+    }
     console.error("INSTRUCTOR MESSAGES GET ERROR:", err)
     return NextResponse.json({ error: err?.message || "Erreur serveur" }, { status: 500 })
   }
 }
 
-// POST — send a message
 export async function POST(req: Request) {
   try {
+    const user = await requireUser(req, ["instructor", "admin", "admin_agent"])
     const pb = await getAdminPb()
-    const { sender, recipient, content } = await req.json()
 
-    if (!sender || !recipient || !content?.trim()) {
-      return NextResponse.json({ error: "Données manquantes" }, { status: 400 })
+    const contentType = req.headers.get("content-type") || ""
+    let sender = ""
+    let groupId = ""
+    let content = ""
+    let body: FormData | Record<string, any>
+
+    if (contentType.includes("multipart/form-data")) {
+      const fd = await req.formData()
+      sender = String(fd.get("sender") || "")
+      groupId = String(fd.get("groupId") || "")
+      content = String(fd.get("content") || "")
+      body = fd
+    } else {
+      const json = await req.json()
+      sender = json.sender || ""
+      groupId = json.groupId || ""
+      content = json.content || ""
+      body = { group: groupId, sender, content: content.trim(), read: false, sent_at: new Date().toISOString() }
     }
 
-    const record = await pb.collection("messages").create({
-      sender,
-      recipient,
-      content: content.trim(),
-      read: false,
-    })
+    if (!sender || !groupId || !content.trim() && !(body instanceof FormData && body.getAll("attachments").length > 0)) {
+      return NextResponse.json({ error: "Donnees manquantes" }, { status: 400 })
+    }
 
-    return NextResponse.json({
-      ok: true,
-      message: {
-        id: record.id,
-        sender: record.sender,
-        recipient: record.recipient,
-        content: record.content,
-        created: record.created,
-        read: record.read || false,
-      },
-    })
+    assertSelfOrRole(user, sender)
+    await assertInstructorInGroup(pb, sender, groupId)
+
+    if (body instanceof FormData) {
+      body.set("group", groupId)
+      body.set("sender", sender)
+      body.set("content", content.trim())
+      body.set("read", "false")
+      body.set("sent_at", new Date().toISOString())
+      body.delete("groupId")
+    }
+
+    const record = await pb.collection("messages").create(body)
+    return NextResponse.json({ ok: true, message: formatMessage(record) })
   } catch (err: any) {
+    const auth = authErrorResponse(err)
+    if (auth) return auth
+    if (err?.message === "GROUP_ACCESS_DENIED") {
+      return NextResponse.json({ error: "Permission refusee." }, { status: 403 })
+    }
     console.error("INSTRUCTOR MESSAGES POST ERROR:", err)
-    return NextResponse.json({ error: err?.message || "Erreur serveur" }, { status: 500 })
-  }
-}
-
-// PATCH — mark messages as read
-export async function PATCH(req: Request) {
-  try {
-    const pb = await getAdminPb()
-    const { messageIds } = await req.json()
-
-    if (!Array.isArray(messageIds) || messageIds.length === 0) {
-      return NextResponse.json({ ok: true })
-    }
-
-    await Promise.allSettled(
-      messageIds.map(id => pb.collection("messages").update(id, { read: true }))
-    )
-
-    return NextResponse.json({ ok: true })
-  } catch (err: any) {
-    console.error("INSTRUCTOR MESSAGES PATCH ERROR:", err)
     return NextResponse.json({ error: err?.message || "Erreur serveur" }, { status: 500 })
   }
 }

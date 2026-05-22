@@ -21,6 +21,7 @@ export async function GET(req: Request) {
     // Fetch instructor's groups
     const groups = await pb.collection("groups").getFullList({
       filter: `instructor = "${instructorId}"`,
+      expand: "course,bootcamp",
     })
 
     const groupIds = groups.map((g: any) => g.id)
@@ -79,21 +80,22 @@ export async function GET(req: Request) {
           date: s.date.slice(0, 10),
           start_time: s.start_time || "",
           duration: s.duration || 120,
-          mode: s.mode || "not_set",
+          mode: s.mode || "live_presentiel",
           title: s.title || null,
           is_cancelled: s.is_cancelled || false,
+          joinUrl: s.joinUrl || null,
         }))
       }
     }
 
-    const activeGroups = groups.filter((g: any) => g.status === "in_progress").length
+    const activeGroups = groups.filter((g: any) => g.status === "in_progress")
     const totalGroups = groups.length
 
     return NextResponse.json({
       ok: true,
       stats: {
         totalGroups,
-        activeGroups,
+        activeGroups: activeGroups.length,
         totalStudents: studentIdSet.size,
         todaySessions,
         weekSessions,
@@ -105,6 +107,23 @@ export async function GET(req: Request) {
         status: g.status,
         studentCount: (g.students || []).length,
       })),
+      programs: activeGroups.map((g: any) => {
+        const program = g.programType === "bootcamp" ? g.expand?.bootcamp : g.expand?.course
+        return {
+          id: g.id,
+          slug: program?.id || g.id,
+          title: g.title,
+          shortDescription: program?.shortDescription || "",
+          durationLabel: program?.durationLabel || "",
+          instructorName: "",
+          groupId: g.id,
+          tags: [],
+          image: program?.coverImage ? `${process.env.POCKETBASE_URL}/api/files/${program.collectionId}/${program.id}/${program.coverImage}` : null,
+          completed: false,
+          progress: 0,
+          variant: g.programType || (g.course ? "course" : "bootcamp"),
+        }
+      }),
     })
   } catch (err: any) {
     console.error("INSTRUCTOR OVERVIEW GET ERROR:", err)

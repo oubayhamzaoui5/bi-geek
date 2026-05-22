@@ -1,15 +1,18 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://bi-geek.net/sitemap.xml
-
-# Crawl delay (optional)
-# Crawl-delay: 10
-
-# Disallow private routes (example)
 Disallow: /api/
-Disallow: /admin/
-Disallow: /dashboard/
+Disallow: /admin-dashboard/
+Disallow: /student-dashboard/
+Disallow: /instructor-dashboard/
+Disallow: /studet-dashboard/
+Disallow: /login
+Disallow: /forgot-password
+Disallow: /forgot-username
+Disallow: /force-change-password
+Disallow: /pdf-viewer/
+Disallow: /video-viewer
+Disallow: /meet
 Disallow: /_next/
-Disallow: /404
-Disallow: /500
+
+Sitemap: https://bi-geek.net/sitemap.xml

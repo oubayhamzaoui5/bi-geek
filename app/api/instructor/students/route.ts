@@ -10,6 +10,13 @@ async function getAdminPb() {
   return pb
 }
 
+function resolveAvatar(user: any) {
+  if (!user?.avatar) return null
+  if (typeof user.avatar === "string" && user.avatar.startsWith("http")) return user.avatar
+  const pbUrl = process.env.NEXT_PUBLIC_PB_URL || process.env.POCKETBASE_URL
+  return `${pbUrl}/api/files/${user.collectionId}/${user.id}/${user.avatar}`
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
@@ -65,9 +72,7 @@ export async function GET(req: Request) {
       username: u.username || "",
       email: u.email || "",
       phone: u.phone || "",
-      avatar: u.avatar
-        ? `${process.env.POCKETBASE_URL}/api/files/${u.collectionId}/${u.id}/${u.avatar}`
-        : null,
+      avatar: resolveAvatar(u),
       groups: studentGroupMap[u.id] || [],
       created: u.created,
     }))

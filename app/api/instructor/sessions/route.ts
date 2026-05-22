@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
+import { createMeetEvent } from "@/lib/google-calendar"
 
 async function getAdminPb() {
   const pb = new PocketBase(process.env.POCKETBASE_URL)
@@ -18,11 +19,13 @@ function formatSession(s: any): any {
     date: s.date.slice(0, 10),
     start_time: s.start_time || "",
     duration: s.duration || 120,
-    mode: s.mode || "not_set",
+    mode: s.mode || "live_presentiel",
     title: s.title || null,
     notes: s.notes || "",
     is_cancelled: s.is_cancelled || false,
     instructor: s.instructor || null,
+    joinUrl: s.joinUrl || null,
+    googleEventId: s.googleEventId || null,
   }
 }
 
@@ -71,16 +74,34 @@ export async function POST(req: Request) {
     const payload = await req.json()
 
     const record = await pb.collection("sessions").create({
-      group: payload.group,
-      date: payload.date,
-      start_time: payload.start_time || "",
-      duration: payload.duration || 120,
-      mode: payload.mode || "not_set",
-      title: payload.title || null,
-      notes: payload.notes || "",
+      group:        payload.group,
+      date:         payload.date,
+      start_time:   payload.start_time || "",
+      duration:     payload.duration || 120,
+      mode:         "live_presentiel",
+      title:        payload.title || null,
+      notes:        payload.notes || "",
       is_cancelled: payload.is_cancelled || false,
-      instructor: payload.instructor || null,
+      instructor:   payload.instructor || null,
     }, { expand: "group" })
+
+    // Auto-create Google Meet event
+    try {
+      const { googleEventId, joinUrl } = await createMeetEvent({
+        requestId: record.id,
+        title:     payload.title || "Séance de formation",
+        date:      payload.date,
+        startTime: payload.start_time || "09:00",
+        duration:  payload.duration || 120,
+      })
+      if (googleEventId || joinUrl) {
+        await pb.collection("sessions").update(record.id, { googleEventId, joinUrl })
+        ;(record as any).googleEventId = googleEventId
+        ;(record as any).joinUrl       = joinUrl
+      }
+    } catch (meetErr) {
+      console.error("GOOGLE MEET CREATE ERROR:", meetErr)
+    }
 
     return NextResponse.json({ ok: true, session: formatSession(record) })
   } catch (err: any) {

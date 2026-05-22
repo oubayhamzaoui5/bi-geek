@@ -16,7 +16,7 @@ export function InstructorPageHeader({ title, description, breadcrumbs, actions 
       <div className="flex items-start justify-between gap-4">
         <div>
           {breadcrumbs && breadcrumbs.length > 0 && (
-            <nav className="flex items-center gap-1 text-xs text-gray-400 mb-2">
+            <nav className="flex items-center gap-1 text-xs text-gray-600 mb-2">
               <Link href="/instructor-dashboard/overview" className="hover:text-gray-700 transition-colors">
                 Accueil
               </Link>
@@ -35,7 +35,7 @@ export function InstructorPageHeader({ title, description, breadcrumbs, actions 
             </nav>
           )}
           <h1 className="text-xl font-bold text-gray-900" style={{ fontFamily: "var(--ff-display)" }}>{title}</h1>
-          {description && <p className="text-sm text-gray-400 mt-0.5">{description}</p>}
+          {description && <p className="text-sm text-gray-600 mt-0.5">{description}</p>}
         </div>
         {actions && <div className="flex items-center gap-2 mt-1 shrink-0">{actions}</div>}
       </div>

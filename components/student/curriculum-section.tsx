@@ -70,8 +70,20 @@ const parsePocketBasePdf = (href: string) => {
 
 /* ─── animation variants ─────────────────────────── */
 const moduleBodyVariants = {
-  open:      { height: "auto", opacity: 1,  transition: { duration: 0.38, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] } },
-  collapsed: { height: 0,      opacity: 0,  transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] } },
+  open: {
+    height: "auto",
+    opacity: 1,
+    y: 0,
+    borderTopColor: "var(--col-border)",
+    transition: { duration: 0.36, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+  },
+  collapsed: {
+    height: 0,
+    opacity: 0,
+    y: -8,
+    borderTopColor: "transparent",
+    transition: { duration: 0.24, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] },
+  },
 }
 
 const staggerList = {
@@ -225,7 +237,12 @@ export function CurriculumSection({
             const completed = status === "completed"
 
             return (
-              <div key={mi} className={`module-card ${isOpen ? "module-card--open" : ""} ${isLocked ? "module-card--locked" : ""}`}>
+              <motion.div
+                key={mi}
+                layout
+                transition={{ layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
+                className={`module-card ${isOpen ? "module-card--open" : ""} ${isLocked ? "module-card--locked" : ""}`}
+              >
                 {/* ── module header button ── */}
                 <button
                   className="module-trigger"
@@ -264,22 +281,20 @@ export function CurriculumSection({
                 </button>
 
                 {/* ── lessons ── */}
-                <AnimatePresence initial={false}>
-                  {isOpen && (
-                    <motion.div
-                      key="body"
-                      initial="collapsed"
-                      animate="open"
-                      exit="collapsed"
-                      variants={moduleBodyVariants}
-                      className="module-body"
-                    >
-                      <motion.ul
-                        variants={staggerList}
-                        initial="collapsed"
-                        animate="open"
-                        className="lesson-list"
-                      >
+                <motion.div
+                  initial={false}
+                  animate={isOpen ? "open" : "collapsed"}
+                  variants={moduleBodyVariants}
+                  className="module-body"
+                  aria-hidden={!isOpen}
+                  style={{ pointerEvents: isOpen ? "auto" : "none" }}
+                >
+                  <motion.ul
+                    variants={staggerList}
+                    initial={false}
+                    animate={isOpen ? "open" : "collapsed"}
+                    className="lesson-list"
+                  >
                         {module.lessons.map((lesson, li) => {
                           const lStatus     = lessonStatus(lesson, module, mi, li)
                           const lLocked     = lStatus === "locked"
@@ -372,11 +387,9 @@ export function CurriculumSection({
                             </motion.li>
                           )
                         })}
-                      </motion.ul>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                  </motion.ul>
+                </motion.div>
+              </motion.div>
             )
           })}
         </div>
@@ -796,7 +809,7 @@ export function CurriculumSection({
 
         /* ── responsive ── */
         @media (max-width: 480px) {
-          .module-trigger  { padding: 14px 14px; }
+          .module-trigger  { padding: 14px 14px; }m
           .module-index    { width: 34px; height: 34px; border-radius: 10px; }
           .module-title    { font-size: 14px; }
           .content-badge   { display: none; }

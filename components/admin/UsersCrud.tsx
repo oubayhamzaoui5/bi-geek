@@ -22,7 +22,7 @@ export type AdminUser = {
   surname?: string
   email: string
   phone: string
-  role: "admin" | "student" | "instructor"
+  role: "admin" | "admin_agent" | "student" | "instructor"
   verified: boolean
   usePassword?: boolean
   password?: string
@@ -35,6 +35,7 @@ type UsersCrudProps = {
   onSave?: (user: AdminUser, avatarFile?: File) => Promise<void>
   onDelete?: (id: string) => Promise<void>
   onView?: (id: string) => void
+  currentUserRole?: string
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
@@ -60,7 +61,7 @@ function avatarColor(name: string): { from: string; to: string } {
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6, letterSpacing: "0.02em" }}>
+    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 6, letterSpacing: "0.02em" }}>
       {children}{required && <span style={{ color: "#f43f5e", marginLeft: 3 }}>*</span>}
     </label>
   )
@@ -81,7 +82,7 @@ function Input({ value, onChange, placeholder, type = "text", readOnly, disabled
         width: "100%", padding: "10px 14px",
         background: readOnly || disabled ? "#f1f5f9" : "#f8fafc",
         border: "1.5px solid #e2e8f0", borderRadius: 10,
-        fontSize: 14, color: readOnly || disabled ? "#64748b" : "#0f172a",
+        fontSize: 14, color: readOnly || disabled ? "#475569" : "#0f172a",
         outline: "none", boxSizing: "border-box", fontFamily: "inherit",
         transition: "border-color 0.15s, box-shadow 0.15s",
         ...style
@@ -98,16 +99,16 @@ function SelectField({ value, onChange, children, disabled }: {
   return (
     <div style={{ position: "relative" }}>
       <select value={value} onChange={e => onChange(e.target.value)} disabled={disabled}
-        style={{ width: "100%", padding: "10px 36px 10px 14px", background: disabled ? "#f1f5f9" : "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, color: disabled ? "#94a3b8" : "#0f172a", outline: "none", appearance: "none", cursor: disabled ? "not-allowed" : "pointer", fontFamily: "inherit", transition: "border-color 0.15s" }}
+        style={{ width: "100%", padding: "10px 36px 10px 14px", background: disabled ? "#f1f5f9" : "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, color: disabled ? "#475569" : "#0f172a", outline: "none", appearance: "none", cursor: disabled ? "not-allowed" : "pointer", fontFamily: "inherit", transition: "border-color 0.15s" }}
         onFocus={e => { if (!disabled) { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)" } }}
         onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none" }}
       >{children}</select>
-      <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none", fontSize: 11 }}>▾</div>
+      <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#475569", pointerEvents: "none", fontSize: 11 }}>▾</div>
     </div>
   )
 }
 
-function IconBtn({ onClick, title, color = "#64748b", hoverBg = "#f1f5f9", children }: {
+function IconBtn({ onClick, title, color = "#475569", hoverBg = "#f1f5f9", children }: {
   onClick: (e: React.MouseEvent) => void; title?: string; color?: string; hoverBg?: string; children: React.ReactNode
 }) {
   const [hover, setHover] = useState(false)
@@ -124,7 +125,7 @@ function FormCard({ title, icon, children, action }: { title: string; icon?: Rea
     <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #e8ecf3", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
       <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(180deg,#fafbfd 0%,#fff 100%)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 9, background: "linear-gradient(135deg,rgba(99,102,241,0.12),rgba(129,140,248,0.06))", color: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>
+          <div style={{ width: 30, height: 30, borderRadius: 9, background: "var(--accent,#6366f1)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h3>
         </div>
         {action}
@@ -136,7 +137,10 @@ function FormCard({ title, icon, children, action }: { title: string; icon?: Rea
 
 // ─── Main component ──────────────────────────────────────────────────────────────
 
-export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView }: UsersCrudProps) {
+const ADMIN_ROLES = ["admin", "admin_agent"]
+
+export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView, currentUserRole }: UsersCrudProps) {
+  const isAdminAgent = currentUserRole === "admin_agent"
 
   // ── State ──
   const [users, setUsers] = useState<AdminUser[]>(initialUsers)
@@ -236,6 +240,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
   const stats = {
     total: users.length,
     admin: users.filter(u => u.role === "admin").length,
+    admin_agent: users.filter(u => u.role === "admin_agent").length,
     instructor: users.filter(u => u.role === "instructor").length,
     student: users.filter(u => u.role === "student").length,
   }
@@ -304,6 +309,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
 
   const handleSaveUser = async () => {
     if (!editingUser) return
+    if (isAdminAgent && ADMIN_ROLES.includes(editingUser.role ?? "")) return setError("Permission refusée : un admin agent ne peut pas créer ou modifier des comptes admin.")
     if (!editingUser.name?.trim() || !editingUser.surname?.trim()) return setError("Le prénom et le nom sont obligatoires")
     if (!editingUser.email.trim()) return setError("L'email est obligatoire")
     if (!editingUser.phone.trim()) return setError("Le téléphone est obligatoire")
@@ -394,7 +400,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
       <div style={{ padding: "14px 32px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, borderBottom: "1px solid #f1f5f9", background: "#fff" }}>
         {/* Search */}
         <div style={{ position: "relative", flex: 1 }}>
-          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#94a3b8" }} />
+          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#475569" }} />
           <input type="text" placeholder="Rechercher un utilisateur…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
             style={{ width: "100%", padding: "7px 12px 7px 34px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit" }}
             onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.08)" }}
@@ -404,25 +410,26 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
         {/* Role filter pills */}
         <div style={{ display: "flex", gap: 6 }}>
           {([
-            { value: "student",    label: "Étudiants",    count: stats.student },
-            { value: "instructor", label: "Instructeurs", count: stats.instructor },
-            { value: "admin",      label: "Admins",       count: stats.admin },
+            { value: "student",     label: "Étudiants",     count: stats.student },
+            { value: "instructor",  label: "Instructeurs",  count: stats.instructor },
+            { value: "admin",       label: "Admins",        count: stats.admin },
+            { value: "admin_agent", label: "Admin Agents",  count: stats.admin_agent },
           ] as { value: AdminUser["role"]; label: string; count: number }[]).map(({ value, label, count }) => {
             const active = filterRole === value
             return (
               <button key={value} onClick={() => setFilterRole(value)}
-                style={{ padding: "6px 14px", borderRadius: 8, border: `1.5px solid ${active ? "var(--accent,#6366f1)" : "#e8ecf3"}`, background: active ? "var(--accent,#6366f1)" : "#f8fafc", color: active ? "#fff" : "#64748b", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 7, transition: "all 0.15s", fontFamily: "inherit" }}
+                style={{ padding: "6px 14px", borderRadius: 8, border: `1.5px solid ${active ? "var(--accent,#6366f1)" : "#e8ecf3"}`, background: active ? "var(--accent,#6366f1)" : "#f8fafc", color: active ? "#fff" : "#475569", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 7, transition: "all 0.15s", fontFamily: "inherit" }}
                 onMouseEnter={e => { if (!active) { e.currentTarget.style.borderColor = "var(--accent,#6366f1)"; e.currentTarget.style.color = "var(--accent,#6366f1)" } }}
-                onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = "#e8ecf3"; e.currentTarget.style.color = "#64748b" } }}
+                onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = "#e8ecf3"; e.currentTarget.style.color = "#475569" } }}
               >
                 {label}
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 5, background: active ? "rgba(255,255,255,0.22)" : "#e8ecf3", color: active ? "#fff" : "#94a3b8" }}>{count}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 5, background: active ? "rgba(255,255,255,0.22)" : "#e8ecf3", color: active ? "#fff" : "#475569" }}>{count}</span>
               </button>
             )
           })}
         </div>
         {/* Count */}
-        <div style={{ fontSize: 13, color: "#94a3b8", marginLeft: "auto" }}>
+        <div style={{ fontSize: 13, color: "#475569", marginLeft: "auto" }}>
           <span style={{ fontWeight: 600, color: "#0f172a" }}>{filteredUsers.length}</span> utilisateur{filteredUsers.length !== 1 ? "s" : ""}
         </div>
       </div>
@@ -432,15 +439,15 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
         {filteredUsers.length === 0 ? (
           <div style={{ background: "#fff", padding: "64px 24px", textAlign: "center" }}>
             <User style={{ width: 40, height: 40, color: "#e2e8f0", margin: "0 auto 12px" }} />
-            <p style={{ fontSize: 15, fontWeight: 600, color: "#64748b", margin: "0 0 4px" }}>Aucun utilisateur trouvé</p>
-            <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>Créez votre premier utilisateur avec le bouton ci-dessus.</p>
+            <p style={{ fontSize: 15, fontWeight: 600, color: "#475569", margin: "0 0 4px" }}>Aucun utilisateur trouvé</p>
+            <p style={{ fontSize: 13, color: "#475569", margin: 0 }}>Créez votre premier utilisateur avec le bouton ci-dessus.</p>
           </div>
         ) : (
           <div style={{ background: "#fff", overflow: "hidden" }}>
             {/* Table header */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 200px 100px", padding: "12px 36px", borderBottom: "1px solid #f1f5f9", background: "#fafbfd" }}>
               {["Utilisateur", "Contact", "Actions"].map(h => (
-                <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
+                <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
               ))}
             </div>
             {/* Rows */}
@@ -466,7 +473,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <p style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName}</p>
-                      <p style={{ fontSize: 12, color: "#94a3b8", margin: 0 }}>@{user.username || "—"}</p>
+                      <p style={{ fontSize: 12, color: "#475569", margin: 0 }}>@{user.username || "—"}</p>
                     </div>
                   </div>
                   {/* Contact */}
@@ -475,7 +482,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
                       <Mail style={{ width: 11, height: 11, flexShrink: 0 }} />{user.email}
                     </p>
                     {user.phone && (
-                      <p style={{ fontSize: 12, color: "#94a3b8", margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
+                      <p style={{ fontSize: 12, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
                         <Phone style={{ width: 11, height: 11, flexShrink: 0 }} />{user.phone}
                       </p>
                     )}
@@ -485,9 +492,11 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
                     <IconBtn onClick={e => { e.stopPropagation(); handleSelectUser(user) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)" title="Modifier">
                       <Edit style={{ width: 16, height: 16 }} />
                     </IconBtn>
-                    <IconBtn onClick={e => { e.stopPropagation(); user.id && handleDeleteUser(user.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Supprimer">
-                      <Trash2 style={{ width: 16, height: 16 }} />
-                    </IconBtn>
+                    {!(isAdminAgent && ADMIN_ROLES.includes(user.role)) && (
+                      <IconBtn onClick={e => { e.stopPropagation(); user.id && handleDeleteUser(user.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Supprimer">
+                        <Trash2 style={{ width: 16, height: 16 }} />
+                      </IconBtn>
+                    )}
                   </div>
                 </div>
               )
@@ -517,7 +526,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <button onClick={handleSaveUser} disabled={loading}
-                  style={{ padding: "9px 22px", borderRadius: 10, border: "none", background: loading ? "#f1f5f9" : "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: loading ? "#94a3b8" : "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 7, boxShadow: loading ? "none" : "0 4px 14px rgba(99,102,241,0.35)", transition: "all 0.2s" }}
+                  style={{ padding: "9px 22px", borderRadius: 10, border: "none", background: loading ? "#f1f5f9" : "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: loading ? "#475569" : "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 7, boxShadow: loading ? "none" : "0 4px 14px rgba(99,102,241,0.35)", transition: "all 0.2s" }}
                   onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; if (!loading) b.style.boxShadow = "0 6px 20px rgba(99,102,241,0.5)" }}
                   onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; if (!loading) b.style.boxShadow = "0 4px 14px rgba(99,102,241,0.35)" }}
                 >
@@ -525,9 +534,9 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
                   {loading ? "Enregistrement…" : "Enregistrer"}
                 </button>
                 <button onClick={handleCancelEdit}
-                  style={{ width: 34, height: 34, borderRadius: 9, border: "1.5px solid #e8ecf3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", transition: "all 0.15s" }}
+                  style={{ width: 34, height: 34, borderRadius: 9, border: "1.5px solid #e8ecf3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#475569", transition: "all 0.15s" }}
                   onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = "#fca5a5"; b.style.color = "#ef4444"; b.style.background = "#fff5f5" }}
-                  onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = "#e8ecf3"; b.style.color = "#94a3b8"; b.style.background = "#fff" }}
+                  onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = "#e8ecf3"; b.style.color = "#475569"; b.style.background = "#fff" }}
                 >
                   <X style={{ width: 15, height: 15 }} />
                 </button>
@@ -578,7 +587,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
                           style={{ width: "100%", fontSize: 12 }}
                           onChange={e => { const f = e.target.files?.[0]; if (f) setAvatarFile(f) }} />
                       </div>
-                      <p style={{ fontSize: 12, color: "#94a3b8", margin: 0 }}>Formats: JPG, PNG, WebP · Max 2MB · Recommandé: 400×400px</p>
+                      <p style={{ fontSize: 12, color: "#475569", margin: 0 }}>Formats: JPG, PNG, WebP · Max 2MB · Recommandé: 400×400px</p>
                       {(avatarPreview || editingUser.avatar) && (
                         <button type="button" onClick={() => { setAvatarFile(null); setAvatarPreview(null); setEditingUser({ ...editingUser, avatar: null }) }}
                           style={{ marginTop: 8, background: "none", border: "none", color: "#f43f5e", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0 }}>
@@ -610,11 +619,24 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
                     </div>
                     <div>
                       <FieldLabel>Rôle</FieldLabel>
-                      <SelectField value={editingUser.role} onChange={v => setEditingUser({ ...editingUser, role: v as AdminUser["role"] })}>
+                      <SelectField
+                        value={editingUser.role}
+                        onChange={v => setEditingUser({ ...editingUser, role: v as AdminUser["role"] })}
+                        disabled={isAdminAgent && ADMIN_ROLES.includes(editingUser.role ?? "")}
+                      >
                         <option value="student">Étudiant</option>
-                        <option value="admin">Administrateur</option>
                         <option value="instructor">Instructeur</option>
+                        {!isAdminAgent && <option value="admin">Administrateur</option>}
+                        {!isAdminAgent && <option value="admin_agent">Admin Agent</option>}
+                        {isAdminAgent && ADMIN_ROLES.includes(editingUser.role ?? "") && (
+                          <option value={editingUser.role}>{editingUser.role === "admin" ? "Administrateur" : "Admin Agent"}</option>
+                        )}
                       </SelectField>
+                      {isAdminAgent && ADMIN_ROLES.includes(editingUser.role ?? "") && (
+                        <p style={{ fontSize: 11, color: "#f43f5e", margin: "5px 0 0" }}>
+                          Vous ne pouvez pas modifier le rôle d'un compte admin.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </FormCard>
@@ -640,7 +662,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
                           boxSizing: "border-box", fontFamily: "monospace", letterSpacing: "0.03em",
                         }}
                       />
-                      <p style={{ fontSize: 11, color: "#94a3b8", margin: "5px 0 0" }}>
+                      <p style={{ fontSize: 11, color: "#475569", margin: "5px 0 0" }}>
                         {isCreating ? "Généré automatiquement à partir du prénom et du nom." : "Le nom d'utilisateur est généré automatiquement."}
                       </p>
                     </div>
@@ -690,14 +712,14 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
                             <Copy style={{ width: 13, height: 13 }} />{passwordCopied ? "Copié ✓" : "Copier"}
                           </button>
                         </div>
-                        <p style={{ fontSize: 12, color: "#64748b", marginTop: 8 }}>Mot de passe temporaire généré automatiquement. Communiquez-le à l'utilisateur — il devra le changer à sa première connexion.</p>
+                        <p style={{ fontSize: 12, color: "#475569", marginTop: 8 }}>Mot de passe temporaire généré automatiquement. Communiquez-le à l'utilisateur — il devra le changer à sa première connexion.</p>
                       </div>
                     )}
 
                     {/* Reinitialiser (edit mode only) */}
                     {!isCreating && (
                       <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 14 }}>
-                        <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px" }}>
+                        <p style={{ fontSize: 12, color: "#475569", margin: "0 0 10px" }}>
                           Générer un nouveau mot de passe temporaire et l'envoyer à l'utilisateur.
                         </p>
                         <button type="button" onClick={handleResetPassword} disabled={loading}
@@ -769,7 +791,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
                         + Ajouter
                       </button>
                     </div>
-                    <p style={{ fontSize: 11, color: "#94a3b8", margin: "8px 0 0" }}>Appuyez sur Entrée ou virgule pour ajouter. Ex: Power BI, DAX, SQL…</p>
+                    <p style={{ fontSize: 11, color: "#475569", margin: "8px 0 0" }}>Appuyez sur Entrée ou virgule pour ajouter. Ex: Power BI, DAX, SQL…</p>
                   </FormCard>
                 )}
 
@@ -791,7 +813,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView 
                   ? <CheckCircle style={{ width: 18, height: 18, color: "#22c55e", flexShrink: 0 }} />
                   : <AlertCircle style={{ width: 18, height: 18, color: "#f43f5e", flexShrink: 0 }} />}
                 <p style={{ flex: 1, fontSize: 13, fontWeight: 600, color: ok ? "#166534" : "#9f1239", margin: 0 }}>{toast.message}</p>
-                <button onClick={() => removeToast(toast.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#94a3b8", display: "flex" }}>
+                <button onClick={() => removeToast(toast.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#475569", display: "flex" }}>
                   <X style={{ width: 14, height: 14 }} />
                 </button>
               </div>

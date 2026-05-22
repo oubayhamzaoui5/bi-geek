@@ -77,20 +77,23 @@ export function CourseProgress({
         </div>
       </div>
 
-      <button className="w-full rounded-xl bg-accent text-accent-foreground font-semibold py-3 tracking-wide shadow-[0_0_24px_hsl(var(--accent)/0.35)] hover:bg-accent/90 transition animate-[pulse_3s_ease-in-out_infinite]">
+      <button className="w-full rounded-2xl bg-accent text-accent-foreground font-bold py-4 text-sm tracking-widest uppercase shadow-[0_0_24px_hsl(var(--accent)/0.35)] hover:bg-accent/90 hover:-translate-y-1 hover:shadow-[0_0_32px_hsl(var(--accent)/0.5)] transition-all duration-300 animate-[pulse_3s_ease-in-out_infinite]">
         Continuer l'apprentissage
       </button>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span className="rounded-full border border-border bg-muted/40 px-3 py-1">
-          {stats?.videos ?? 0} Vidéos
-        </span>
-        <span className="rounded-full border border-border bg-muted/40 px-3 py-1">
-          {stats?.articles ?? 0} Articles
-        </span>
-        <span className="rounded-full border border-border bg-muted/40 px-3 py-1">
-          {stats?.lessons ?? totalLessons} Leçons
-        </span>
+      <div className="flex w-full gap-2 text-[11px] sm:text-xs text-muted-foreground">
+        <div className="flex-1 flex flex-col items-center justify-center rounded-xl border border-border bg-muted/30 py-3 transition-colors hover:bg-muted/60">
+          <span className="text-lg font-bold text-foreground">{stats?.videos ?? 0}</span>
+          <span className="uppercase tracking-wider mt-0.5">Vidéos</span>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center rounded-xl border border-border bg-muted/30 py-3 transition-colors hover:bg-muted/60">
+          <span className="text-lg font-bold text-foreground">{stats?.articles ?? 0}</span>
+          <span className="uppercase tracking-wider mt-0.5">Articles</span>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center rounded-xl border border-border bg-muted/30 py-3 transition-colors hover:bg-muted/60">
+          <span className="text-lg font-bold text-foreground">{stats?.lessons ?? totalLessons}</span>
+          <span className="uppercase tracking-wider mt-0.5">Leçons</span>
+        </div>
       </div>
 
       <div className="border-t border-border pt-4">

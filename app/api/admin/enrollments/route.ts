@@ -2,6 +2,12 @@
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
 
+const ENROLLMENT_STATUSES = new Set(["pending", "contacted", "confirmed", "cancelled"])
+
+function normalizeEnrollmentStatus(status: unknown) {
+  return typeof status === "string" && ENROLLMENT_STATUSES.has(status) ? status : "pending"
+}
+
 async function getAdminPb() {
   const PB_URL = process.env.POCKETBASE_URL
   const ADMIN_EMAIL = process.env.POCKETBASE_ADMIN_EMAIL
@@ -51,7 +57,7 @@ export async function GET() {
         created: e.created?.slice(0, 10) ?? "",
         courseTitle,
         bootcampTitle,
-        status: e.status ?? "pending", // default
+        status: normalizeEnrollmentStatus(e.status),
       }
     })
 

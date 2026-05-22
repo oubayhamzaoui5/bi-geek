@@ -12,8 +12,8 @@ async function getAdminPb() {
   return pb
 }
 
-// POST: upload a file attachment to a lesson or video
-// FormData: { type: "lesson" | "video", parentId: string, name?: string, file: File }
+// POST: upload a file attachment to a lesson, video, or module
+// FormData: { type: "lesson" | "video" | "module", parentId: string, name?: string, file: File }
 export async function POST(req: Request) {
   try {
     const pb = await getAdminPb()
@@ -23,19 +23,23 @@ export async function POST(req: Request) {
     const parentId = formData.get("parentId") as string
     const name = (formData.get("name") as string) || ""
     const file = formData.get("file") as File | null
+    const order = formData.get("order") as string | null
 
     if (!file || !parentId || !type) {
       return NextResponse.json({ error: "Données manquantes" }, { status: 400 })
     }
 
-    const isLesson = type === "lesson"
-    const collection = isLesson ? "lesson_attachments" : "video_attachments"
-    const parentField = isLesson ? "lesson_id" : "video_id"
+    let collection: string
+    let parentField: string
+    if (type === "lesson") { collection = "lesson_attachments"; parentField = "lesson_id" }
+    else if (type === "module") { collection = "module_attachments"; parentField = "module_id" }
+    else { collection = "video_attachments"; parentField = "video_id" }
 
     const pbForm = new FormData()
     pbForm.append(parentField, parentId)
     pbForm.append("name", name || file.name)
     pbForm.append("file", file)
+    if (type === "module" && order !== null) pbForm.append("order", order)
 
     const record = await pb.collection(collection).create(pbForm)
 
@@ -45,7 +49,9 @@ export async function POST(req: Request) {
         id: record.id,
         name: record.name || file.name,
         url: `${PB_FILE_URL}/api/files/${collection}/${record.id}/${record.file}`,
-        ...(isLesson ? { lessonId: record.lesson_id } : { videoId: record.video_id }),
+        ...(type === "lesson" ? { lessonId: record.lesson_id }
+          : type === "module" ? { moduleId: record.module_id, order: record.order ?? 0 }
+          : { videoId: record.video_id }),
       },
     })
   } catch (err: any) {
@@ -60,7 +66,7 @@ export async function DELETE(req: Request) {
   try {
     const pb = await getAdminPb()
     const { type, id } = await req.json()
-    const collection = type === "lesson_attachment" ? "lesson_attachments" : "video_attachments"
+    const collection = type === "lesson_attachment" ? "lesson_attachments" : type === "module_attachment" ? "module_attachments" : "video_attachments"
     await pb.collection(collection).delete(id)
     return NextResponse.json({ ok: true })
   } catch (err: any) {

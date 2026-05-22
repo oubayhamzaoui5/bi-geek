@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
+import { assertSelfOrRole, authErrorResponse, requireUser } from "@/lib/server-auth"
 
 const getPB = () =>
   new PocketBase(process.env.POCKETBASE_URL ?? process.env.NEXT_PUBLIC_PB_URL ?? "http://127.0.0.1:8090")
+
+function resolveAvatar(user: any) {
+  if (!user?.avatar) return null
+  if (typeof user.avatar === "string" && user.avatar.startsWith("http")) return user.avatar
+  const pbUrl = process.env.POCKETBASE_URL ?? process.env.NEXT_PUBLIC_PB_URL ?? "http://127.0.0.1:8090"
+  return `${pbUrl}/api/files/${user.collectionId}/${user.id}/${user.avatar}`
+}
 
 /** GET /api/student/profile?userId=<id> */
 export async function GET(req: Request) {
@@ -12,6 +20,8 @@ export async function GET(req: Request) {
     if (!userId) {
       return NextResponse.json({ error: "userId manquant." }, { status: 400 })
     }
+    const caller = await requireUser(req, ["student", "admin", "admin_agent"])
+    assertSelfOrRole(caller, userId)
 
     const pb = getPB()
     const user = await pb.collection("users").getOne(userId)
@@ -23,9 +33,11 @@ export async function GET(req: Request) {
       surname: user.surname ?? "",
       email: user.email ?? "",
       phone: user.phone ?? "",
-      avatar: user.avatar ?? null,
+      avatar: resolveAvatar(user),
     })
   } catch (err: any) {
+    const auth = authErrorResponse(err)
+    if (auth) return auth
     console.error("GET /api/student/profile error:", err)
     return NextResponse.json(
       { error: err?.message ?? "Erreur serveur." },
@@ -43,6 +55,8 @@ export async function PATCH(req: Request) {
     if (!id) {
       return NextResponse.json({ error: "id manquant." }, { status: 400 })
     }
+    const caller = await requireUser(req, ["student", "admin", "admin_agent"])
+    assertSelfOrRole(caller, id)
 
     const pb = getPB()
     const formData = new FormData()
@@ -58,8 +72,11 @@ export async function PATCH(req: Request) {
       surname: updated.surname ?? "",
       email: updated.email ?? "",
       phone: updated.phone ?? "",
+      avatar: resolveAvatar(updated),
     })
   } catch (err: any) {
+    const auth = authErrorResponse(err)
+    if (auth) return auth
     console.error("PATCH /api/student/profile error:", err)
     return NextResponse.json(
       { error: err?.message ?? "Erreur serveur." },

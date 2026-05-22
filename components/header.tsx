@@ -47,8 +47,9 @@ export function Header({ variant = "student", announcementCount = 0 }: HeaderPro
     return () => document.removeEventListener("click", handler)
   }, [dropdownOpen])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem("user")
+    await fetch("/api/logout", { method: "POST" }).catch(() => {})
     window.location.href = "/"
   }
 

@@ -1,0 +1,109 @@
+{
+  "model": "chatgpt-image-2",
+  "global_style": {
+    "brand": "BI GEEK professional technology training center",
+    "visual_direction": "clean, premium, credible, modern education and data consulting aesthetic",
+    "palette": "warm white, graphite black, subtle magenta accent, muted natural office colors",
+    "lighting": "soft daylight, realistic, crisp, no heavy glow",
+    "composition": "professional editorial photography, uncluttered, strong negative space for web layout",
+    "avoid": [
+      "cartoon",
+      "3D illustration",
+      "neon cyberpunk",
+      "excessive purple glow",
+      "busy background",
+      "text in image",
+      "logos",
+      "watermarks",
+      "distorted hands",
+      "fake UI text"
+    ]
+  },
+  "images": [
+    {
+      "slot": "hero",
+      "target_file": "/hero.webp",
+      "aspect_ratio": "4:3",
+      "prompt": "Create a realistic premium editorial photo for a technology training homepage. A diverse small group of adult learners and a mentor are gathered around laptops in a bright modern classroom, reviewing business intelligence dashboards and data charts on screens. The mood is focused, ambitious, professional and welcoming. Use warm daylight, clean desks, subtle magenta accent objects, graphite and white interior, shallow depth of field. Leave natural negative space on the left side for website headline placement. No visible brand logos, no readable text, no watermark.",
+      "negative_prompt": "No cartoon style, no 3D render, no neon cyberpunk, no exaggerated purple lighting, no fake text on screens, no distorted faces or hands, no clutter."
+    },
+    {
+      "slot": "about",
+      "target_file": "/person2.webp",
+      "aspect_ratio": "1:1",
+      "prompt": "Create a realistic square editorial portrait scene for a professional tech training center. A confident mentor explains data analytics concepts to two adult learners at a clean desk with laptops and notebooks. The setting is a modern Tunis business training room, bright and minimal, with warm daylight and subtle magenta accent details. Professional, trustworthy, human, not posed like stock photography. No logos, no readable text.",
+      "negative_prompt": "No cartoon, no over-smiling stock photo look, no fake typography, no watermark, no messy cables, no distorted hands."
+    },
+    {
+      "slot": "enterprise",
+      "target_file": "/enterprise-hero.webp",
+      "aspect_ratio": "4:3",
+      "prompt": "Create a realistic professional photo for a corporate training offer. A small enterprise team is in a modern meeting room, collaborating with a trainer on a data strategy workshop. Include laptops, printed workshop notes, and a large screen showing abstract dashboard shapes without readable text. Premium consulting atmosphere, calm focus, warm neutral colors with a subtle magenta accent, soft daylight, crisp composition. No brand logos and no readable text.",
+      "negative_prompt": "No cartoon, no 3D render, no exaggerated corporate stock pose, no readable text, no watermark, no extreme purple gradient."
+    },
+    {
+      "slot": "category_data_analytics",
+      "target_file": "/catdata.webp",
+      "aspect_ratio": "16:10",
+      "prompt": "Create a clean realistic web category image for Data Analytics training. Close-up of a laptop showing abstract data visualization cards and charts with no readable labels, alongside a notebook and pen on a bright desk. Professional, minimal, warm white background, graphite details, subtle magenta accent. Sharp, premium, uncluttered.",
+      "negative_prompt": "No text, no logos, no cartoon, no 3D render, no busy dashboard, no watermark."
+    },
+    {
+      "slot": "category_ai",
+      "target_file": "/catai.webp",
+      "aspect_ratio": "16:10",
+      "prompt": "Create a clean realistic web category image for AI training. A professional workspace with a laptop displaying abstract neural network visuals without text, a tablet, and simple geometric notes. Modern, credible, soft daylight, warm neutral colors, subtle magenta accent, minimal and premium.",
+      "negative_prompt": "No humanoid robots, no sci-fi neon, no readable text, no logos, no cartoon, no watermark."
+    },
+    {
+      "slot": "category_cloud",
+      "target_file": "/catcloud.webp",
+      "aspect_ratio": "16:10",
+      "prompt": "Create a clean realistic web category image for Cloud training. A laptop and tablet on a modern desk display abstract cloud architecture diagrams with nodes and lines, no readable text. Calm professional tech atmosphere, warm white and graphite palette, subtle magenta accent, soft daylight, crisp minimal composition.",
+      "negative_prompt": "No literal cartoon clouds, no text, no logos, no dark cyber background, no watermark."
+    },
+    {
+      "slot": "category_cyber_security",
+      "target_file": "/catcs.webp",
+      "aspect_ratio": "16:10",
+      "prompt": "Create a clean realistic web category image for Cyber Security training. A secure modern workstation with laptop showing abstract shield and network security visualization, no readable labels. Professional, serious, minimal, warm daylight, graphite and white palette with subtle magenta accent. No hacker stereotype.",
+      "negative_prompt": "No hooded hacker, no Matrix code, no readable text, no logos, no cartoon, no watermark."
+    },
+    {
+      "slot": "category_web_development",
+      "target_file": "/catweb.webp",
+      "aspect_ratio": "16:10",
+      "prompt": "Create a clean realistic web category image for Web Development training. A developer desk with laptop showing abstract code blocks and responsive layout wireframes without readable code, plus a coffee cup and notebook. Bright modern workspace, premium professional look, warm white background, graphite details, subtle magenta accent.",
+      "negative_prompt": "No readable code, no logos, no cartoon, no cluttered desk, no watermark."
+    },
+    {
+      "slot": "category_project_management",
+      "target_file": "/catmanagment.webp",
+      "aspect_ratio": "16:10",
+      "prompt": "Create a clean realistic web category image for Project Management training. A professional team planning table with sticky notes, timeline cards, laptop and tablet, but no readable text. Organized, calm, modern office environment, warm neutral colors, graphite details, subtle magenta accent, premium editorial photography.",
+      "negative_prompt": "No readable notes, no logos, no cartoon, no clutter, no watermark."
+    },
+    {
+      "slot": "testimonial_yassine",
+      "target_file": "/tp1.webp",
+      "aspect_ratio": "1:1",
+      "prompt": "Create a realistic professional headshot avatar of a Tunisian male business analyst in his early 30s, friendly confident expression, smart casual shirt, neutral bright studio background, natural skin texture, soft daylight, premium LinkedIn-style portrait. No logos, no text.",
+      "negative_prompt": "No cartoon, no glamour retouching, no watermark, no distorted face, no text."
+    },
+    {
+      "slot": "testimonial_amel",
+      "target_file": "/tp2.webp",
+      "aspect_ratio": "1:1",
+      "prompt": "Create a realistic professional headshot avatar of a Tunisian female data analyst in her late 20s, confident warm expression, smart casual blazer, neutral bright studio background, natural skin texture, soft daylight, premium LinkedIn-style portrait. No logos, no text.",
+      "negative_prompt": "No cartoon, no glamour retouching, no watermark, no distorted face, no text."
+    },
+    {
+      "slot": "testimonial_mehdi",
+      "target_file": "/tp3.webp",
+      "aspect_ratio": "1:1",
+      "prompt": "Create a realistic professional headshot avatar of a Tunisian male data engineer in his early 30s, calm confident expression, smart casual outfit, neutral bright studio background, natural skin texture, soft daylight, premium LinkedIn-style portrait. No logos, no text.",
+      "negative_prompt": "No cartoon, no glamour retouching, no watermark, no distorted face, no text."
+    }
+  ],
+  "note": "Partner and certification images should ideally remain real logo/badge assets instead of AI-generated images. Generate the listed replaceable photos only, then send the final files to link into the page."
+}

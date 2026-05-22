@@ -237,12 +237,12 @@ export default function InstructorsCrud({
             {/* Total Instructors */}
             <div className="bg-white border rounded-xl p-5 shadow-sm flex flex-col justify-between">
               <div>
-                <p className="text-sm text-gray-500 text-center">Total formateurs</p>
+                <p className="text-sm text-gray-600 text-center">Total formateurs</p>
                 <p className="text-3xl font-bold text-gray-900 mt-2 text-center">
                   {totalInstructors}
                 </p>
               </div>
-              <div className="mt-2 text-xs text-gray-400 text-center">
+              <div className="mt-2 text-xs text-gray-600 text-center">
                 Tous niveaux confondus
               </div>
             </div>
@@ -261,7 +261,7 @@ export default function InstructorsCrud({
           <div className="bg-white p-4 rounded-xl border shadow-sm flex-1 flex flex-col overflow-hidden">
             <div className="space-y-4 pb-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600 w-5 h-5" />
                 <input
                   type="text"
                   placeholder="Rechercher un formateur..."
@@ -311,7 +311,7 @@ export default function InstructorsCrud({
                               {instructor.firstName} {instructor.lastName}
                             </h4>
                             {instructor.email && (
-                              <p className="text-sm text-gray-500 truncate">{instructor.email}</p>
+                              <p className="text-sm text-gray-600 truncate">{instructor.email}</p>
                             )}
                           </div>
                         </div>
@@ -327,7 +327,7 @@ export default function InstructorsCrud({
                               </span>
                             ))}
                             {instructor.expertise.length > 2 && (
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-gray-600">
                                 +{instructor.expertise.length - 2}
                               </span>
                             )}
@@ -451,7 +451,7 @@ export default function InstructorsCrud({
                         <input
                           type="file"
                           accept="image/*"
-                          className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-accent/20 file:text-accent hover:file:bg-accent/30"
+                          className="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-accent/20 file:text-accent hover:file:bg-accent/30"
                           onChange={(e) => {
                             const file = e.target.files?.[0]
                             if (file) {
@@ -460,7 +460,7 @@ export default function InstructorsCrud({
                           }}
                         />
                       </div>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-600">
                         Formats: JPG, PNG, WebP. Taille max: 2MB. Recommandé: 400x400px
                       </p>
                       {(avatarPreview || editingInstructor.avatar) && (

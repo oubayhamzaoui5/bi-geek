@@ -9,6 +9,24 @@ const getFileUrl = (record: any, file: string | null) => {
   return `${PB_URL}/api/files/${record.collectionId}/${record.id}/${file}`
 }
 
+const getCertificationItems = (record: any) => {
+  const expandedItems = record.expand?.certificationItems
+  const items = Array.isArray(expandedItems)
+    ? expandedItems
+    : expandedItems
+      ? [expandedItems]
+      : []
+  if (items.length > 0) {
+    return items.map((cert: any) => ({
+      title: cert.title,
+      issuer: cert.issuer ?? "",
+      imageUrl: cert.image ? `${PB_URL}/api/files/certifications/${cert.id}/${cert.image}` : null,
+    }))
+  }
+
+  return Array.isArray(record.certifications) ? record.certifications : []
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ slug: string }> }
@@ -25,11 +43,11 @@ export async function GET(
     try {
       bootcampRaw = await pb
         .collection("bootcamps")
-        .getFirstListItem(`slug="${safeSlug}"`)
+        .getFirstListItem(`slug="${safeSlug}"`, { expand: "certificationItems" })
     } catch (err: any) {
       if (err?.status === 404) {
         // Fallback: treat slug as id
-        bootcampRaw = await pb.collection("bootcamps").getOne(safeSlug)
+        bootcampRaw = await pb.collection("bootcamps").getOne(safeSlug, { expand: "certificationItems" })
       } else {
         throw err
       }
@@ -39,6 +57,7 @@ export async function GET(
       ...bootcampRaw,
       image: getFileUrl(bootcampRaw, bootcampRaw.coverImage ?? bootcampRaw.image),
       prerequis: bootcampRaw.prerequis ?? null,
+      certifications: getCertificationItems(bootcampRaw),
     }
 
     let group: any = null;
@@ -54,7 +73,7 @@ export async function GET(
     const pivots = await pb.collection("bootcamp_courses").getFullList({
       filter: `bootcamp="${bootcampRaw.id}"`,
       sort: "order",
-      expand: "course",
+      expand: "course,course.certificationItems",
     })
 
     const courses = pivots
@@ -70,7 +89,7 @@ export async function GET(
         prerequis: c.prerequis ?? "Aucun",
         coverImage: getFileUrl(c, c.coverImage ?? c.image),
         certificate: !!c.certificate,
-        certifications: c.certifications ?? [],
+        certifications: getCertificationItems(c),
       }))
 
     // 3) Modules for all courses

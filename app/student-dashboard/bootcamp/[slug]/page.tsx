@@ -3,13 +3,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 
-import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { CurriculumSection } from "@/components/student/curriculum-section"
-import { Footer } from "@/components/footer"
-import { MessagesTab } from "@/components/messages-tab"
 import { CourseProgress } from "@/components/student/course-progress"
-import { SidebarProvider } from "@/components/ui/sidebar-context"
 import LoadingBI from "@/components/LoadingBI"
 import { LayoutDashboard } from "lucide-react"
 
@@ -168,85 +164,66 @@ export default function BootcampDetailsPageBySlug() {
 
   if (loading) {
     return (
-      <SidebarProvider>
-        <div className="flex h-screen bg-muted/30">
-          <Sidebar />
-          <main className="flex-1 overflow-auto bg-background text-foreground">
-            <Header />
-            <div className="flex items-center justify-center min-h-[60vh]">
-              <LoadingBI fullScreen={false} />
-            </div>
-          </main>
-          <MessagesTab />
+      <>
+        <Header />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <LoadingBI fullScreen={false} />
         </div>
-      </SidebarProvider>
+      </>
     )
   }
 
   if (!bootcamp) {
     return (
-      <SidebarProvider>
-        <div className="flex h-screen bg-muted/30">
-          <Sidebar />
-          <main className="flex-1 overflow-auto">
-            <Header />
-            <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">
-              <div className="text-center space-y-4">
-                <LayoutDashboard className="w-12 h-12 mx-auto text-muted-foreground/50" />
-                <p>Bootcamp introuvable.</p>
-              </div>
-            </div>
-          </main>
-          <MessagesTab />
+      <>
+        <Header />
+        <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">
+          <div className="text-center space-y-4">
+            <LayoutDashboard className="w-12 h-12 mx-auto text-muted-foreground/50" />
+            <p>Bootcamp introuvable.</p>
+          </div>
         </div>
-      </SidebarProvider>
+      </>
     )
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-muted/30">
-        <Sidebar />
-        <main className="flex-1 overflow-auto bg-background text-foreground scroll-smooth pb-20">
-          <Header />
-          
-          <div className="relative pt-10 pb-20 px-4 md:px-8 xl:px-12">
-            <div className="max-w-[1400px] mx-auto">
+    <div className="bg-background text-foreground scroll-smooth pb-20">
+      <Header />
 
-              <div className="mb-12">
-                <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-4">
-                  {bootcamp.title}
-                </h1>
-                <p className="text-muted-foreground max-w-2xl text-lg leading-relaxed mb-6">
-                  {bootcamp.shortDescription || bootcamp.longDescription}
-                </p>
-              </div>
-
-              <div className="flex flex-col lg:flex-row gap-8 xl:gap-12 relative items-start">
-                <div className="lg:w-[65%] xl:w-[70%] space-y-10 min-w-0 pb-16">
-                  <CurriculumSection 
-                    modulesFromPb={modulesFromPb} 
-                    courseId={bootcamp.id} 
-                    context="bootcamp"
-                    variant="student" 
-                  />
-                </div>
-
-                <aside className="lg:w-[35%] xl:w-[30%] space-y-6 flex-shrink-0 lg:sticky lg:top-24 h-fit pb-12 w-full">
-                  <CourseProgress
-                    completedLessons={completedLessons}
-                    totalLessons={totalLessons}
-                    coverImage={bootcamp.coverImage}
-                    courseTitle={bootcamp.title}
-                    stats={{ videos: totalVideos, articles: totalArticles, lessons: totalLessons }}
-                  />
-                </aside>
-              </div>
-            </div>
+      <div className="relative pt-10 pb-20 px-4 md:px-8 xl:px-12">
+        <div className="max-w-[1400px] mx-auto">
+          <div className="mb-12">
+            <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-4">
+              {bootcamp.title}
+            </h1>
+            <p className="text-muted-foreground max-w-2xl text-lg leading-relaxed mb-6">
+              {bootcamp.shortDescription || bootcamp.longDescription}
+            </p>
           </div>
-        </main>
-        <MessagesTab />
+
+          <div className="flex flex-col lg:flex-row gap-8 xl:gap-12 relative items-start">
+            <div className="lg:w-[65%] xl:w-[70%] space-y-10 min-w-0 pb-16">
+              <CurriculumSection
+                modulesFromPb={modulesFromPb}
+                courseId={bootcamp.id}
+                context="bootcamp"
+                variant="student"
+              />
+            </div>
+
+            <aside className="lg:w-[35%] xl:w-[30%] space-y-6 flex-shrink-0 lg:sticky lg:top-24 h-fit pb-12 w-full">
+              <CourseProgress
+                completedLessons={completedLessons}
+                totalLessons={totalLessons}
+                coverImage={bootcamp.coverImage}
+                courseTitle={bootcamp.title}
+                stats={{ videos: totalVideos, articles: totalArticles, lessons: totalLessons }}
+              />
+            </aside>
+          </div>
+        </div>
       </div>
-    </SidebarProvider>
+    </div>
   )
 }

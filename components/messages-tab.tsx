@@ -1,223 +1,222 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { MessageSquare, Send, X } from "lucide-react"
-import Image from "next/image"
+import { useCallback, useEffect, useRef, useState } from "react"
+import PocketBase from "pocketbase"
+import { ChatMessage, MessagesPanel, messageTime } from "@/components/messages/MessagesPanel"
 
-interface Teacher { id: number; name: string; avatar: string }
-const teachers: Teacher[] = [
-  { id: 1, name: "Mme Dupont",  avatar: "/instructor.jpg" },
-  { id: 2, name: "M. Laurent",  avatar: "/instructor.jpg" },
-  { id: 3, name: "Mme Garnier", avatar: "/instructor.jpg" },
-]
+interface GroupInfo {
+  id: string
+  title: string
+  status: string
+  instructorId: string
+  instructor: { id: string; name: string; surname: string } | null
+}
 
-type ChatMsg = { from: "me" | "teacher"; text: string }
+function instructorName(inst: GroupInfo["instructor"]) {
+  if (!inst) return "Formateur"
+  return [inst.name, inst.surname].filter(Boolean).join(" ") || "Formateur"
+}
 
-const spring = { type: "spring" as const, stiffness: 420, damping: 34, mass: 0.8 }
-const fadeUpIn  = { opacity: 1, scale: 1 }
-const fadeUpOut = { opacity: 0, scale: 0.98 }
+function normalizeRealtimeMessage(record: any): ChatMessage {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_PB_URL ||
+    process.env.NEXT_PUBLIC_POCKETBASE_URL ||
+    "http://127.0.0.1:8090"
+  const files = Array.isArray(record.attachments) ? record.attachments : record.attachments ? [record.attachments] : []
+  return {
+    ...record,
+    attachments: files.map((name: string) => ({
+      name,
+      url: `${baseUrl}/api/files/${record.collectionId}/${record.id}/${name}`,
+      isImage: /\.(png|jpe?g|webp|gif)$/i.test(name),
+    })),
+  }
+}
 
 export function MessagesTab() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null)
-  const [message, setMessage] = useState("")
-  const [messages, setMessages] = useState<Record<number, ChatMsg[]>>({})
-  const panelRef = useRef<HTMLDivElement | null>(null)
+  const [aiTutorOpen, setAiTutorOpen] = useState(false)
+  const [studentId, setStudentId] = useState("")
+  const [groups, setGroups] = useState<GroupInfo[]>([])
+  const [loadingGroups, setLoadingGroups] = useState(false)
+  const [selectedGroup, setSelectedGroup] = useState<GroupInfo | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [unreadByGroup, setUnreadByGroup] = useState<Record<string, number>>({})
+  const [loadingMessages, setLoadingMessages] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [openSignal, setOpenSignal] = useState(0)
+  const pendingGroupId = useRef<string | null>(null)
 
-  // keep track of pending timeouts to clear on unmount
-  const timeoutsRef = useRef<number[]>([])
-  // ref to auto-scroll
-  const scrollAnchorRef = useRef<HTMLDivElement | null>(null)
-
-  const addMessage = (teacherId: number, msg: ChatMsg) => {
-    setMessages(prev => ({
-      ...prev,
-      [teacherId]: [ ...(prev[teacherId] || []), msg ],
-    }))
-  }
-
-  const handleSend = () => {
-    if (!selectedTeacher || message.trim() === "") return
-    const teacherId = selectedTeacher.id
-    addMessage(teacherId, { from: "me", text: message })
-    setMessage("")
-
-    // --- TEST AUTO-REPLY: instructor says "Bonjour !" after 3s ---
-    const tid = window.setTimeout(() => {
-      addMessage(teacherId, { from: "teacher", text: "Bonjour !" })
-    }, 2000)
-    timeoutsRef.current.push(tid)
-  }
-
-  // Close on ESC
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setIsOpen(false) }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
+    try {
+      const u = JSON.parse(localStorage.getItem("user") || "null")
+      if (u?.id) setStudentId(u.id)
+    } catch {}
   }, [])
 
-  // Clear all pending timeouts on unmount
   useEffect(() => {
-    return () => {
-      timeoutsRef.current.forEach((id) => clearTimeout(id))
-      timeoutsRef.current = []
+    if (!studentId || groups.length > 0) return
+    setLoadingGroups(true)
+    fetch(`/api/student/groups?studentId=${studentId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (!d.ok) return
+        const loaded: GroupInfo[] = (d.groups || [])
+          .filter((g: any) => g.instructorId)
+          .map((g: any) => ({
+            id: g.id,
+            title: g.title,
+            status: g.status,
+            instructorId: g.instructorId,
+            instructor: g.instructor || null,
+          }))
+        setGroups(loaded)
+        if (pendingGroupId.current) {
+          const found = loaded.find(g => g.id === pendingGroupId.current)
+          if (found) setSelectedGroup(found)
+          pendingGroupId.current = null
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoadingGroups(false))
+  }, [groups.length, studentId])
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { groupId } = (e as CustomEvent).detail as { groupId: string }
+      setOpenSignal(value => value + 1)
+      setGroups(prev => {
+        const found = prev.find(g => g.id === groupId)
+        if (found) {
+          setSelectedGroup(found)
+          pendingGroupId.current = null
+        } else {
+          pendingGroupId.current = groupId
+        }
+        return prev
+      })
     }
+    window.addEventListener("open-message-group", handler)
+    return () => window.removeEventListener("open-message-group", handler)
   }, [])
 
-  // Auto-scroll to bottom when messages change for the selected teacher
   useEffect(() => {
-    if (!selectedTeacher) return
-    scrollAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-  }, [messages, selectedTeacher])
+    const handler = (e: Event) => {
+      const { open } = (e as CustomEvent<{ open?: boolean }>).detail || {}
+      setAiTutorOpen(Boolean(open))
+    }
+    window.addEventListener("pdf-ai-tutor-toggle", handler)
+    return () => window.removeEventListener("pdf-ai-tutor-toggle", handler)
+  }, [])
+
+  const markGroupSeen = useCallback((groupId: string) => {
+    localStorage.setItem(`messages_seen_student_${studentId}_${groupId}`, String(Date.now()))
+    setUnreadByGroup(prev => ({ ...prev, [groupId]: 0 }))
+  }, [studentId])
+
+  const fetchMessages = useCallback(async () => {
+    if (!studentId || !selectedGroup) return
+    setLoadingMessages(true)
+    try {
+      const res = await fetch(`/api/student/messages?studentId=${studentId}&groupId=${selectedGroup.id}`)
+      const data = await res.json()
+      if (data.ok) {
+        setMessages(data.messages || [])
+        markGroupSeen(selectedGroup.id)
+      }
+    } catch {}
+    finally { setLoadingMessages(false) }
+  }, [markGroupSeen, selectedGroup, studentId])
+
+  useEffect(() => { fetchMessages() }, [fetchMessages])
+
+  const refreshUnreadCounts = useCallback(async () => {
+    if (!studentId || groups.length === 0) return
+    const entries = await Promise.all(groups.map(async group => {
+      try {
+        const seenRaw = localStorage.getItem(`messages_seen_student_${studentId}_${group.id}`)
+        const seen = Number(seenRaw || "0")
+        const res = await fetch(`/api/student/messages?studentId=${studentId}&groupId=${group.id}&markRead=0`)
+        const data = await res.json()
+        const count = data.ok
+          ? (data.messages || []).filter((m: ChatMessage) => m.sender !== studentId && (seenRaw ? messageTime(m) > seen : !m.read)).length
+          : 0
+        return [group.id, count] as const
+      } catch {
+        return [group.id, 0] as const
+      }
+    }))
+    setUnreadByGroup(Object.fromEntries(entries))
+  }, [groups, studentId])
+
+  useEffect(() => { refreshUnreadCounts() }, [refreshUnreadCounts])
+
+  useEffect(() => {
+    if (groups.length === 0) return
+    const groupIds = new Set(groups.map(group => group.id))
+    const pb = new PocketBase(
+      process.env.NEXT_PUBLIC_PB_URL ||
+      process.env.NEXT_PUBLIC_POCKETBASE_URL ||
+      "http://127.0.0.1:8090"
+    )
+    let unsubscribe: (() => void) | undefined
+
+    pb.collection("messages")
+      .subscribe("*", (event) => {
+        const record = normalizeRealtimeMessage(event.record)
+        if (!groupIds.has(record.group)) return
+        if (record.group === selectedGroup?.id) {
+          setMessages(prev => {
+            if (event.action === "delete") return prev.filter(m => m.id !== record.id)
+            const exists = prev.some(m => m.id === record.id)
+            const next = exists ? prev.map(m => m.id === record.id ? record : m) : [...prev, record]
+            return next.sort((a, b) => messageTime(a) - messageTime(b))
+          })
+        }
+        if (record.sender !== studentId && record.group !== selectedGroup?.id) {
+          setUnreadByGroup(prev => ({ ...prev, [record.group]: (prev[record.group] || 0) + 1 }))
+        } else if (record.sender !== studentId && record.group === selectedGroup?.id) {
+          markGroupSeen(record.group)
+        }
+      })
+      .then(unsub => { unsubscribe = unsub })
+      .catch(console.warn)
+
+    return () => { unsubscribe?.() }
+  }, [groups, markGroupSeen, selectedGroup, studentId])
+
+  async function handleSend(content: string, files: File[]) {
+    if (!selectedGroup || !studentId || sending) return
+    setSending(true)
+    try {
+      const body = new FormData()
+      body.set("sender", studentId)
+      body.set("groupId", selectedGroup.id)
+      body.set("recipient", selectedGroup.instructorId)
+      body.set("content", content)
+      files.forEach(file => body.append("attachments", file))
+      const res = await fetch("/api/student/messages", { method: "POST", body })
+      const data = await res.json()
+      if (data.ok) setMessages(prev => prev.some(m => m.id === data.message.id) ? prev : [...prev, data.message])
+    } catch {}
+    finally { setSending(false) }
+  }
 
   return (
-    <>
-      <AnimatePresence mode="wait" initial={false}>
-        {!isOpen ? (
-          <motion.button
-            key="fab"
-            onClick={() => setIsOpen(true)}
-            aria-label="Ouvrir les messages"
-            initial={fadeUpOut}
-            animate={fadeUpIn}
-            exit={fadeUpOut}
-            transition={spring}
-            className="
-              fixed bottom-5 right-5 z-50
-              rounded-full bg-accent text-accent-foreground
-              shadow-lg border border-border
-              w-14 h-14 md:w-16 md:h-16
-              flex items-center justify-center
-              hover:opacity-90 transition
-              will-change-transform
-              cursor-pointer
-            "
-          >
-            <MessageSquare className="w-6 h-6 md:w-7 md:h-7" />
-          </motion.button>
-        ) : (
-          <motion.div
-            key="panel"
-            ref={panelRef}
-            initial={fadeUpOut}
-            animate={fadeUpIn}
-            exit={fadeUpOut}
-            transition={spring}
-            className="
-              fixed bottom-5 right-5 z-40
-              w-[92vw] sm:w-[420px] md:w-[620px]
-              rounded-xl border border-border
-              bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/90
-              shadow-2xl overflow-hidden
-              will-change-transform
-            "
-            style={{ maxHeight: "72vh" }}
-            role="dialog"
-            aria-modal="true"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/80">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-foreground/80" />
-                <h4 className="text-sm font-semibold text-foreground">Messages</h4>
-              </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                aria-label="Fermer"
-                className="p-1 rounded-md hover:bg-muted/60 transition cursor-pointer"
-              >
-                <X className="w-5 h-5 text-muted-foreground" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="flex h-[420px]">
-              {/* Teachers list */}
-              <div className="w-2/5 border-r border-border overflow-y-auto bg-muted/30">
-                {teachers.map((t) => {
-                  const active = selectedTeacher?.id === t.id
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => setSelectedTeacher(t)}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 transition-colors ${
-                        active ? "bg-muted/60" : ""
-                      }`}
-                    >
-                      <Image src={t.avatar} alt={t.name} width={40} height={40} className="rounded-md object-cover" />
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-foreground">{t.name}</span>
-                        <span className="text-xs text-muted-foreground">Disponible</span>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Chat area */}
-              <div className="flex-1 flex flex-col">
-                {selectedTeacher ? (
-                  <>
-                    {/* Chat header */}
-                    <div className="px-4 py-2 border-b border-border bg-card/60">
-                      <div className="flex items-center gap-2">
-                        <Image src={selectedTeacher.avatar} alt={selectedTeacher.name} width={28} height={28} className="rounded" />
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-foreground">{selectedTeacher.name}</span>
-                          <span className="text-xs text-muted-foreground">Discussion</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                      {(messages[selectedTeacher.id] || []).map((msg, i) => (
-                        <div key={i} className={`flex ${msg.from === "me" ? "justify-end" : "justify-start"}`}>
-                          <div
-                            className={`max-w-[75%] p-2 rounded-lg text-sm ${
-                              msg.from === "me"
-                                ? "bg-accent text-accent-foreground"
-                                : "bg-muted/50 text-foreground"
-                            }`}
-                          >
-                            {msg.text}
-                          </div>
-                        </div>
-                      ))}
-                      {/* Anchor for auto-scroll */}
-                      <div ref={scrollAnchorRef} />
-                    </div>
-
-                    {/* Input */}
-                    <div className="p-3 border-t border-border bg-card/70 flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        placeholder="Écrire un message..."
-                        className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                        onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                      />
-                      <button
-                        onClick={handleSend}
-                        className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        aria-label="Envoyer"
-                      >
-                        <Send className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
-                    Sélectionnez un enseignant pour commencer la discussion
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+    <MessagesPanel
+      groups={groups}
+      selectedGroup={selectedGroup}
+      messages={messages}
+      unreadByGroup={unreadByGroup}
+      currentUserId={studentId}
+      loadingGroups={loadingGroups}
+      loadingMessages={loadingMessages}
+      sending={sending}
+      closedOffset={aiTutorOpen}
+      openSignal={openSignal}
+      groupSubtitle={(group) => instructorName(group.instructor)}
+      headerSubtitle={(group) => instructorName(group.instructor)}
+      onSelectGroup={setSelectedGroup}
+      onSend={handleSend}
+    />
   )
 }

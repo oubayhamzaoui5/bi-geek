@@ -6,6 +6,16 @@ type GroupRecord = {
   programType?: "course" | "bootcamp"
   course?: string | null
   bootcamp?: string | null
+  instructor?: string | null
+  expand?: {
+    instructor?: {
+      id: string
+      name?: string
+      surname?: string
+      username?: string
+      email?: string
+    }
+  }
   students?: string[] | string | any
   status?: "not_started" | "in_progress" | "completed"
   unlockedLessons?: string[]
@@ -60,7 +70,7 @@ export async function GET(req: Request) {
     const pb = await getPocketBase()
     if (!pb) return NextResponse.json({ programs: [] })
 
-    const groups = await safeList<GroupRecord>(pb, "groups")
+    const groups = await safeList<GroupRecord>(pb, "groups", { expand: "instructor" })
     const relatedGroups = groups.filter((g) => {
       // Filter out 'pas encore' per the user's request
       if (g.status === "not_started") return false
@@ -78,9 +88,16 @@ export async function GET(req: Request) {
     })
 
     const groupStatusMap = new Map<string, string>()
+    const groupByProgramId = new Map<string, GroupRecord>()
     relatedGroups.forEach((g) => {
-      if (g.course) groupStatusMap.set(g.course, g.status || "in_progress")
-      if (g.bootcamp) groupStatusMap.set(g.bootcamp, g.status || "in_progress")
+      if (g.course) {
+        groupStatusMap.set(g.course, g.status || "in_progress")
+        if (!groupByProgramId.has(g.course)) groupByProgramId.set(g.course, g)
+      }
+      if (g.bootcamp) {
+        groupStatusMap.set(g.bootcamp, g.status || "in_progress")
+        if (!groupByProgramId.has(g.bootcamp)) groupByProgramId.set(g.bootcamp, g)
+      }
     })
 
     const courseIds = new Set(
@@ -134,6 +151,11 @@ export async function GET(req: Request) {
           title: c.title,
           shortDescription: c.shortDescription,
           durationLabel: c.durationLabel,
+          instructorName: [group?.expand?.instructor?.name, group?.expand?.instructor?.surname]
+            .filter(Boolean)
+            .join(" ")
+            .trim() || group?.expand?.instructor?.username || group?.expand?.instructor?.email || "",
+          groupId: group?.id ?? null,
           tags: Array.isArray(c.tags) ? c.tags : [],
           coverImage: c.coverImage
             ? `${PB_URL}/api/files/courses/${c.id}/${c.coverImage}`
@@ -147,20 +169,28 @@ export async function GET(req: Request) {
 
     const bootcamps = bootcampRecords
       .filter((b) => bootcampIds.has(b.id))
-      .map((b: any) => ({
-        id: b.id,
-        slug: b.slug ?? b.id,
-        title: b.title,
-        shortDescription: b.shortDescription ?? "",
-        durationLabel: b.durationLabel ?? "",
-        tags: ["Bootcamp"],
-        coverImage: b.coverImage
-          ? `${PB_URL}/api/files/bootcamps/${b.id}/${b.coverImage}`
-          : null,
-        programType: "bootcamp" as const,
-        status: groupStatusMap.get(b.id) || "in_progress",
-        completed: groupStatusMap.get(b.id) === "completed"
-      }))
+      .map((b: any) => {
+        const group = groupByProgramId.get(b.id)
+        return {
+          id: b.id,
+          slug: b.slug ?? b.id,
+          title: b.title,
+          shortDescription: b.shortDescription ?? "",
+          durationLabel: b.durationLabel ?? "",
+          instructorName: [group?.expand?.instructor?.name, group?.expand?.instructor?.surname]
+            .filter(Boolean)
+            .join(" ")
+            .trim() || group?.expand?.instructor?.username || group?.expand?.instructor?.email || "",
+          groupId: group?.id ?? null,
+          tags: ["Bootcamp"],
+          coverImage: b.coverImage
+            ? `${PB_URL}/api/files/bootcamps/${b.id}/${b.coverImage}`
+            : null,
+          programType: "bootcamp" as const,
+          status: groupStatusMap.get(b.id) || "in_progress",
+          completed: groupStatusMap.get(b.id) === "completed"
+        }
+      })
 
     const programs = [...courses, ...bootcamps].sort((a, b) =>
       (a.title ?? "").localeCompare(b.title ?? ""),

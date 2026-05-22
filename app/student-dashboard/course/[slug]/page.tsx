@@ -3,13 +3,10 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 
-import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { CurriculumSection } from "@/components/student/curriculum-section"
 import { Footer } from "@/components/footer"
-import { MessagesTab } from "@/components/messages-tab"
 import { CourseProgress } from "@/components/student/course-progress"
-import { SidebarProvider } from "@/components/ui/sidebar-context"
 import LoadingBI from "@/components/LoadingBI"
 import { Clock, BookOpen, Award, Sparkles, LayoutDashboard } from "lucide-react"
 
@@ -118,47 +115,32 @@ export default function CourseDetailsPageBySlug() {
 
   if (loading) {
     return (
-      <SidebarProvider>
-        <div className="flex h-screen bg-muted/30">
-          <Sidebar />
-          <main className="flex-1 overflow-auto bg-background text-foreground">
-            <Header />
-            <div className="flex items-center justify-center min-h-[60vh]">
-              <LoadingBI fullScreen={false} />
-            </div>
-          </main>
-          <MessagesTab />
+      <>
+        <Header />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <LoadingBI fullScreen={false} />
         </div>
-      </SidebarProvider>
+      </>
     )
   }
 
   if (!course) {
     return (
-      <SidebarProvider>
-        <div className="flex h-screen bg-muted/30">
-          <Sidebar />
-          <main className="flex-1 overflow-auto">
-            <Header />
-            <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">
-              <div className="text-center space-y-4">
-                <LayoutDashboard className="w-12 h-12 mx-auto text-muted-foreground/50" />
-                <p>Cours introuvable.</p>
-              </div>
-            </div>
-          </main>
-          <MessagesTab />
+      <>
+        <Header />
+        <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground">
+          <div className="text-center space-y-4">
+            <LayoutDashboard className="w-12 h-12 mx-auto text-muted-foreground/50" />
+            <p>Cours introuvable.</p>
+          </div>
         </div>
-      </SidebarProvider>
+      </>
     )
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-muted/30">
-        <Sidebar />
-        <main className="flex-1 overflow-auto bg-background text-foreground">
-          <Header />
+    <div className="bg-background text-foreground">
+      <Header />
           <div className="space-y-8 pb-12">
             {/* Modern Full-Width Hero Banner */}
             <section className="relative w-full min-h-[50vh] lg:min-h-[60vh] flex items-end pt-32 pb-16">
@@ -167,7 +149,7 @@ export default function CourseDetailsPageBySlug() {
                 <div
                   className="absolute inset-0 bg-cover bg-center"
                   style={{
-                    backgroundImage: `url(${course.coverImage ?? "/placeholder-course.png"})`,
+                    backgroundImage: `url(${course.coverImage ?? "/placeholder-course.webp"})`,
                   }}
                 />
                 {/* Smooth Fade-to-Background Gradients */}
@@ -238,10 +220,7 @@ export default function CourseDetailsPageBySlug() {
               </div>
             </div>
           </div>
-          <Footer />
-        </main>
-        <MessagesTab />
-      </div>
-    </SidebarProvider>
+      <Footer />
+    </div>
   )
 }

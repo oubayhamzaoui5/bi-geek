@@ -85,7 +85,7 @@ export async function POST(req: Request) {
               date: ymd,
               start_time: slot.start_time || "",
               duration: slot.duration || 120,
-              mode: "not_set",
+              mode: "live_presentiel",
               is_cancelled: false,
             })
           }

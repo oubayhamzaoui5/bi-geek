@@ -10,6 +10,13 @@ async function getAdminPb() {
   return pb
 }
 
+function resolveAvatar(user: any) {
+  if (!user?.avatar) return null
+  if (typeof user.avatar === "string" && user.avatar.startsWith("http")) return user.avatar
+  const pbUrl = process.env.NEXT_PUBLIC_PB_URL || process.env.POCKETBASE_URL
+  return `${pbUrl}/api/files/${user.collectionId}/${user.id}/${user.avatar}`
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
@@ -24,7 +31,6 @@ export async function GET(req: Request) {
       try {
         const res = await pb.collection("groups").getFullList({
           filter: `instructor = "${instructorId}"`,
-          sort: "-created",
           expand: "instructor",
         })
         if (res.length > 0) return res
@@ -36,7 +42,6 @@ export async function GET(req: Request) {
       try {
         const res = await pb.collection("groups").getFullList({
           filter: `instructor ~ "${instructorId}"`,
-          sort: "-created",
           expand: "instructor",
         })
         if (res.length > 0) return res
@@ -57,6 +62,8 @@ export async function GET(req: Request) {
         return []
       }
     }
+
+    const today = new Date().toISOString().slice(0, 10)
 
     const [groupRes, courseRes, bootcampRes] = await Promise.allSettled([
       fetchGroups(),
@@ -115,9 +122,7 @@ export async function GET(req: Request) {
             id: s.id,
             username: s.username || s.name || s.email?.split("@")[0] || "",
             email: s.email || "",
-            avatar: s.avatar
-              ? `${process.env.POCKETBASE_URL}/api/files/${s.collectionId}/${s.id}/${s.avatar}`
-              : null,
+            avatar: resolveAvatar(s),
           }
         })
       } catch (e) {
@@ -149,6 +154,7 @@ export async function GET(req: Request) {
               id: g.expand.instructor.id,
               name: g.expand.instructor.name || "",
               surname: g.expand.instructor.surname || "",
+              avatar: resolveAvatar(g.expand.instructor),
             }
           : null,
         courseTitle: g.course ? (courseMap[g.course] || "") : "",
@@ -163,7 +169,44 @@ export async function GET(req: Request) {
       }
     })
 
-    return NextResponse.json({ ok: true, groups: formatted, courses, bootcamps })
+    // Fetch upcoming sessions for in_progress groups
+    const inProgressIds = formatted.filter(g => g.status === "in_progress").map(g => g.id)
+    let sessions: any[] = []
+    if (inProgressIds.length > 0) {
+      const groupFilter = inProgressIds.map(id => `group = "${id}"`).join(" || ")
+      sessions = await pb.collection("sessions").getFullList({
+        filter: `(${groupFilter}) && date >= "${today}"`,
+        sort: "date,start_time",
+      }).then(recs => recs.map((s: any) => ({
+        id: s.id,
+        group: s.group,
+        date: s.date.slice(0, 10),
+        start_time: s.start_time || "",
+        duration: s.duration || 120,
+        mode: s.mode || "live_presentiel",
+        title: s.title || null,
+        is_cancelled: s.is_cancelled || false,
+      }))).catch(() => [])
+    }
+
+    // Pre-sort in_progress groups by next upcoming session
+    const now = Date.now()
+    const nextTimeByGroup = new Map<string, number>()
+    for (const s of sessions) {
+      if (s.is_cancelled) continue
+      const t = new Date(`${s.date}T${s.start_time || "00:00"}:00`).getTime()
+      if (!Number.isFinite(t) || t < now) continue
+      const existing = nextTimeByGroup.get(s.group)
+      if (existing === undefined || t < existing) nextTimeByGroup.set(s.group, t)
+    }
+    formatted.sort((a, b) => {
+      if (a.status !== "in_progress" || b.status !== "in_progress") return 0
+      const ta = nextTimeByGroup.get(a.id) ?? Infinity
+      const tb = nextTimeByGroup.get(b.id) ?? Infinity
+      return ta - tb
+    })
+
+    return NextResponse.json({ ok: true, groups: formatted, courses, bootcamps, sessions })
   } catch (err: any) {
     console.error("INSTRUCTOR GROUPS GET ERROR:", err)
     return NextResponse.json({ error: err?.message || "Erreur serveur" }, { status: 500 })

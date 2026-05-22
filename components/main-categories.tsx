@@ -57,7 +57,7 @@ export function MainCategories({ categories }: MainCategoriesProps) {
 
 function CategoryCard({ category }: { category: Category }) {
   return (
-    <Link href={`/courses?category=${encodeURIComponent(category.title)}`}>
+    <Link href={`/formations?category=${encodeURIComponent(category.title)}`}>
       <div className="group relative overflow-hidden rounded-none bg-white border border-border hover:border-accent transition-all duration-300 hover:shadow-lg hover:shadow-accent/10">
 
         {/* Image */}

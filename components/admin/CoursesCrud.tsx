@@ -183,7 +183,7 @@ function SelectField({ value, onChange, children }: { value: string; onChange: (
   )
 }
 
-function IconBtn({ onClick, title, color = "#64748b", hoverBg = "#f1f5f9", children }: {
+function IconBtn({ onClick, title, color = "#475569", hoverBg = "#f1f5f9", children }: {
   onClick: (e: React.MouseEvent) => void; title?: string; color?: string; hoverBg?: string; children: React.ReactNode
 }) {
   return (
@@ -408,6 +408,9 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
   }
   const handleNewCourse = () => { setEditingCourse(createBlankCourse()); setIsCreating(true); setExpandedModules(new Set()) }
   const handleCancelEdit = () => { setEditingCourse(null); setIsCreating(false) }
+  const openCourseResources = (courseId: string) => {
+    window.location.assign(`/admin-dashboard/courses/${courseId}/resources`)
+  }
 
   const handleSaveCourse = async () => {
     if (!editingCourse) return
@@ -638,7 +641,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                 if (viewMode === "active") { setViewMode("archived"); loadArchivedCourses() }
                 else setViewMode("active")
               }}
-              style={{ padding: "9px 20px", background: viewMode === "archived" ? "rgba(99,102,241,0.08)" : "#f8fafc", color: viewMode === "archived" ? "var(--accent,#6366f1)" : "#64748b", border: `1.5px solid ${viewMode === "archived" ? "var(--accent,#6366f1)" : "#e8ecf3"}`, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s" }}
+              style={{ padding: "9px 20px", background: viewMode === "archived" ? "rgba(99,102,241,0.08)" : "#f8fafc", color: viewMode === "archived" ? "var(--accent,#6366f1)" : "#475569", border: `1.5px solid ${viewMode === "archived" ? "var(--accent,#6366f1)" : "#e8ecf3"}`, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s" }}
             >
               <Archive style={{ width: 15, height: 15 }} /> Archives
             </button>
@@ -659,7 +662,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
       <div style={{ padding: "14px 32px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, borderBottom: "1px solid #f1f5f9", background: "#fff" }}>
         {/* Search */}
         <div style={{ position: "relative", flex: 1 }}>
-          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#94a3b8" }} />
+          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#475569" }} />
           <input type="text" placeholder="Rechercher…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
             style={{ width: "100%", padding: "7px 12px 7px 34px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit" }}
             onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.08)" }}
@@ -669,7 +672,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
 
         {/* Certificate select */}
         <select value={filterCertificate} onChange={e => setFilterCertificate(e.target.value as any)}
-          style={{ padding: "7px 12px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, color: filterCertificate !== "all" ? "var(--accent,#6366f1)" : "#64748b", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
+          style={{ padding: "7px 12px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, color: filterCertificate !== "all" ? "var(--accent,#6366f1)" : "#475569", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
           <option value="all">Certificat: tous</option>
           <option value="yes">Avec certificat</option>
           <option value="no">Sans certificat</option>
@@ -677,7 +680,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
 
         {/* Prerequisite select */}
         <select value={filterPrereq} onChange={e => setFilterPrereq(e.target.value as any)}
-          style={{ padding: "7px 12px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, color: filterPrereq !== "all" ? "var(--accent,#6366f1)" : "#64748b", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
+          style={{ padding: "7px 12px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, color: filterPrereq !== "all" ? "var(--accent,#6366f1)" : "#475569", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
           <option value="all">Prérequis: tous</option>
           <option value="none">Aucun prérequis</option>
           <option value="contact">Sur demande</option>
@@ -686,13 +689,13 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
         {/* Tag select */}
         {allTags.length > 0 && (
           <select value={filterTag} onChange={e => setFilterTag(e.target.value)}
-            style={{ padding: "7px 12px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, color: filterTag !== "all" ? "var(--accent,#6366f1)" : "#64748b", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
+            style={{ padding: "7px 12px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, color: filterTag !== "all" ? "var(--accent,#6366f1)" : "#475569", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
             <option value="all">Tag: tous</option>
             {allTags.map(tag => <option key={tag} value={tag}>{tag}</option>)}
           </select>
         )}
 
-<div style={{ fontSize: 13, color: "#94a3b8", marginLeft: "auto" }}>
+<div style={{ fontSize: 13, color: "#475569", marginLeft: "auto" }}>
           <span style={{ fontWeight: 600, color: "#0f172a" }}>{filteredCourses.length}</span> formation{filteredCourses.length !== 1 ? "s" : ""}
         </div>
       </div>
@@ -706,28 +709,28 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
           <div style={{ padding: "0px 0px" }}>
             {archivedLoading ? (
               <div style={{ background: "#fff", padding: "64px 24px", textAlign: "center" }}>
-                <Loader2 style={{ width: 32, height: 32, color: "#94a3b8", margin: "0 auto", animation: "spin 1s linear infinite" }} />
+                <Loader2 style={{ width: 32, height: 32, color: "#475569", margin: "0 auto", animation: "spin 1s linear infinite" }} />
               </div>
             ) : isEmpty ? (
               <div style={{ background: "#fff", padding: "64px 24px", textAlign: "center" }}>
                 <BookOpen style={{ width: 40, height: 40, color: "#e2e8f0", margin: "0 auto 12px" }} />
-                <p style={{ fontSize: 15, fontWeight: 600, color: "#64748b", margin: "0 0 4px" }}>
+                <p style={{ fontSize: 15, fontWeight: 600, color: "#475569", margin: "0 0 4px" }}>
                   {viewMode === "archived" ? "Aucune formation archivée" : "Aucune formation trouvée"}
                 </p>
-                <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>
+                <p style={{ fontSize: 13, color: "#475569", margin: 0 }}>
                   {viewMode === "active" ? "Créez votre première formation avec le bouton ci-dessus." : "Les formations archivées apparaîtront ici."}
                 </p>
               </div>
             ) : (
               <div style={{ background: "#fff", overflow: "hidden" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 180px 150px", padding: "18px 36px", borderBottom: "1px solid #f1f5f9", background: "#fafbfd" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 180px 190px", padding: "18px 36px", borderBottom: "1px solid #f1f5f9", background: "#fafbfd" }}>
                   {["Formation", "Tags", "Actions"].map(h => (
-                    <span key={h} style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
+                    <span key={h} style={{ fontSize: 13, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
                   ))}
                 </div>
                 {displayCourses.map((course, idx) => (
                   <div key={course.id}
-                    style={{ display: "grid", gridTemplateColumns: "1fr 180px 150px", padding: "32px 36px", borderBottom: idx < displayCourses.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", transition: "background 0.15s", opacity: viewMode === "archived" ? 0.85 : 1 }}
+                    style={{ display: "grid", gridTemplateColumns: "1fr 180px 190px", padding: "32px 36px", borderBottom: idx < displayCourses.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", transition: "background 0.15s", opacity: viewMode === "archived" ? 0.85 : 1 }}
                     onMouseEnter={e => (e.currentTarget.style.background = "#fafbfd")}
                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                   >
@@ -750,7 +753,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                             onMouseLeave={e => (e.currentTarget.style.color = "#0f172a")}
                             style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", margin: "0 0 6px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", cursor: viewMode === "active" ? "pointer" : "default", transition: "color 0.15s" }}
                           >{course.title || "Sans titre"}</p>
-                          <p style={{ fontSize: 14, color: "#94a3b8", margin: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical" }}>{course.longDescription}</p>
+                          <p style={{ fontSize: 14, color: "#475569", margin: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical" }}>{course.longDescription}</p>
                         </div>
                       </div>
                     </div>
@@ -761,7 +764,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                       ))}
                       {(course.tags?.length || 0) > 4 && (
                         <span
-                          style={{ fontSize: 13, padding: "5px 10px", borderRadius: 8, background: "#f1f5f9", color: "#94a3b8", fontWeight: 600, cursor: "default" }}
+                          style={{ fontSize: 13, padding: "5px 10px", borderRadius: 8, background: "#f1f5f9", color: "#475569", fontWeight: 600, cursor: "default" }}
                           onMouseEnter={e => { setTagsTooltipPos({ x: e.clientX, y: e.clientY + 16 }); setHoveredTagsCourseId(course.id ?? null) }}
                           onMouseLeave={() => setHoveredTagsCourseId(null)}
                         >+{course.tags.length - 4}</span>
@@ -771,7 +774,8 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                     <div style={{ display: "flex", gap: 8 }}>
                       {viewMode === "active" ? (
                         <>
-                          {onView && <IconBtn onClick={e => { e.stopPropagation(); course.id && onView(course.id) }} color="#64748b" title="Voir"><ExternalLink style={{ width: 22, height: 22 }} /></IconBtn>}
+                          {onView && <IconBtn onClick={e => { e.stopPropagation(); course.id && onView(course.id) }} color="#475569" title="Voir"><ExternalLink style={{ width: 22, height: 22 }} /></IconBtn>}
+                          <IconBtn onClick={e => { e.stopPropagation(); course.id && openCourseResources(course.id) }} color="#0f766e" hoverBg="rgba(15,118,110,0.08)" title="Ressources"><Film style={{ width: 22, height: 22 }} /></IconBtn>
                           <IconBtn onClick={e => { e.stopPropagation(); handleSelectCourse(course) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)" title="Modifier"><Edit style={{ width: 22, height: 22 }} /></IconBtn>
                           <IconBtn onClick={e => { e.stopPropagation(); course.id && handleDeleteCourse(course.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Archiver"><Archive style={{ width: 22, height: 22 }} /></IconBtn>
                         </>
@@ -806,7 +810,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <button onClick={handleSaveCourse} disabled={loading}
-                  style={{ padding: "9px 22px", borderRadius: 10, border: "none", background: loading ? "#f1f5f9" : "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: loading ? "#94a3b8" : "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 7, boxShadow: loading ? "none" : "0 4px 14px rgba(99,102,241,0.35)", transition: "all 0.2s" }}
+                  style={{ padding: "9px 22px", borderRadius: 10, border: "none", background: loading ? "#f1f5f9" : "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: loading ? "#475569" : "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 7, boxShadow: loading ? "none" : "0 4px 14px rgba(99,102,241,0.35)", transition: "all 0.2s" }}
                   onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 20px rgba(99,102,241,0.5)" }}
                   onMouseLeave={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 14px rgba(99,102,241,0.35)" }}
                 >
@@ -814,9 +818,9 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                   {loading ? "Enregistrement…" : "Enregistrer"}
                 </button>
                 <button onClick={handleCancelEdit}
-                  style={{ width: 34, height: 34, borderRadius: 9, border: "1.5px solid #e8ecf3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", transition: "all 0.15s" }}
+                  style={{ width: 34, height: 34, borderRadius: 9, border: "1.5px solid #e8ecf3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#475569", transition: "all 0.15s" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#fca5a5"; (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; (e.currentTarget as HTMLButtonElement).style.background = "#fff5f5" }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#e8ecf3"; (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8"; (e.currentTarget as HTMLButtonElement).style.background = "#fff" }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#e8ecf3"; (e.currentTarget as HTMLButtonElement).style.color = "#475569"; (e.currentTarget as HTMLButtonElement).style.background = "#fff" }}
                 >
                   <X style={{ width: 15, height: 15 }} />
                 </button>
@@ -853,7 +857,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                             <ImagePlus style={{ width: 26, height: 26, color: "var(--accent,#6366f1)" }} />
                           </div>
                           <p style={{ fontSize: 14, fontWeight: 600, color: "#475569", margin: 0 }}>Ajouter une image de couverture</p>
-                          <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 5 }}>Format recommandé : 1280 × 720 (16:9)</p>
+                          <p style={{ fontSize: 12, color: "#475569", marginTop: 5 }}>Format recommandé : 1280 × 720 (16:9)</p>
                         </div>
                       )}
                     </div>
@@ -943,7 +947,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderRadius: 12, background: editingCourse.certificate ? "linear-gradient(135deg,rgba(34,197,94,0.05),rgba(16,185,129,0.03))" : "#f8fafc", border: `1.5px solid ${editingCourse.certificate ? "rgba(34,197,94,0.2)" : "#e2e8f0"}`, transition: "all 0.2s" }}>
                       <div>
                         <p style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", margin: 0 }}>Certificat inclus</p>
-                        <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 0" }}>{editingCourse.certificate ? "Les apprenants reçoivent un certificat" : "Aucun certificat pour cette formation"}</p>
+                        <p style={{ fontSize: 12, color: "#475569", margin: "2px 0 0" }}>{editingCourse.certificate ? "Les apprenants reçoivent un certificat" : "Aucun certificat pour cette formation"}</p>
                       </div>
                       <label style={{ position: "relative", display: "inline-flex", alignItems: "center", cursor: "pointer" }}>
                         <input type="checkbox" checked={editingCourse.certificate} onChange={e => setEditingCourse({ ...editingCourse, certificate: e.target.checked })} style={{ position: "absolute", opacity: 0, width: 0, height: 0 }} />
@@ -957,7 +961,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                         {editingCourse.certifications.map((cert, index) => (
                           <div key={index} style={{ border: "1.5px solid #e2e8f0", borderRadius: 12, padding: "14px 16px", background: "#fafbfd" }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                              <span style={{ fontSize: 10, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" }}>Certification {index + 1}</span>
+                              <span style={{ fontSize: 10, fontWeight: 800, color: "#475569", letterSpacing: "0.08em", textTransform: "uppercase" }}>Certification {index + 1}</span>
                               <IconBtn onClick={() => setEditingCourse({ ...editingCourse, certifications: editingCourse.certifications.filter((_, i) => i !== index) })} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)"><Trash2 style={{ width: 13, height: 13 }} /></IconBtn>
                             </div>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -988,7 +992,24 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                   </div>
                 </FormCard>
 
+                {editingCourse.id && (
+                  <FormCard title="Ressources du cours" icon={<Film style={{ width: 16, height: 16 }} />}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: 16, borderRadius: 12, border: "1px solid #e8ecf3", background: "#fff" }}>
+                      <div>
+                        <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Modules, lecons, PDFs et videos Drive</p>
+                        <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>Gerez les ressources depuis une page dediee, avec la meme logique que les ressources de groupe.</p>
+                      </div>
+                      <button onClick={() => editingCourse.id && openCourseResources(editingCourse.id)}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+                      >
+                        <Film style={{ width: 14, height: 14 }} /> Ouvrir les ressources
+                      </button>
+                    </div>
+                  </FormCard>
+                )}
+
                 {/* ── Modules ── */}
+                {editingCourse && false && (
                 <FormCard title="Modules & Leçons" icon={<Layers style={{ width: 16, height: 16 }} />}
                   action={
                     <button onClick={handleAddModule} style={{ padding: "6px 14px", borderRadius: 8, border: "1.5px solid rgba(99,102,241,0.25)", background: "rgba(99,102,241,0.05)", color: "var(--accent,#6366f1)", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s" }}
@@ -1000,7 +1021,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                   }
                 >
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {(editingCourse.modules ?? []).map((module, mi) => {
+                    {(editingCourse!.modules ?? []).map((module, mi) => {
                       const isExpanded = expandedModules.has(mi)
                       return (
                         <div key={mi} style={{ borderRadius: 12, overflow: "hidden", border: "1px solid #e8ecf4", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
@@ -1017,10 +1038,10 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                               {module.lessons.length} leçon{module.lessons.length !== 1 ? "s" : ""}
                             </span>
                             <input type="text" value={module.durationLabel} onChange={e => { e.stopPropagation(); handleModuleChange(mi, "durationLabel", e.target.value) }} onClick={e => e.stopPropagation()} placeholder="Durée"
-                              style={{ width: 68, padding: "4px 8px", background: "#f8fafc", border: "1px solid #edf0f7", borderRadius: 6, fontSize: 11, color: "#64748b", outline: "none", fontFamily: "inherit", textAlign: "center" }} />
+                              style={{ width: 68, padding: "4px 8px", background: "#f8fafc", border: "1px solid #edf0f7", borderRadius: 6, fontSize: 11, color: "#475569", outline: "none", fontFamily: "inherit", textAlign: "center" }} />
                             <div style={{ display: "flex", gap: 1 }} onClick={e => e.stopPropagation()}>
-                              <IconBtn onClick={() => handleMoveModule(mi, "up")} color="#94a3b8"><ChevronUp style={{ width: 13, height: 13 }} /></IconBtn>
-                              <IconBtn onClick={() => handleMoveModule(mi, "down")} color="#94a3b8"><ChevronDown style={{ width: 13, height: 13 }} /></IconBtn>
+                              <IconBtn onClick={() => handleMoveModule(mi, "up")} color="#475569"><ChevronUp style={{ width: 13, height: 13 }} /></IconBtn>
+                              <IconBtn onClick={() => handleMoveModule(mi, "down")} color="#475569"><ChevronDown style={{ width: 13, height: 13 }} /></IconBtn>
                               <IconBtn onClick={() => handleRemoveModule(mi)} color="#ef4444" hoverBg="rgba(239,68,68,0.06)"><Trash2 style={{ width: 13, height: 13 }} /></IconBtn>
                             </div>
                             <ChevronRight style={{ width: 14, height: 14, color: "#c7d2e0", transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }} />
@@ -1043,10 +1064,10 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                                       onBlur={e => { e.target.style.borderColor = "#edf0f7"; e.target.style.boxShadow = "none"; e.target.style.background = "#f8fafc" }}
                                     />
                                     <input type="text" value={lesson.durationLabel} onChange={e => handleLessonChange(mi, li, "durationLabel", e.target.value)} placeholder="Durée"
-                                      style={{ width: 60, padding: "6px 8px", background: "#f8fafc", border: "1px solid #edf0f7", borderRadius: 8, fontSize: 11, color: "#64748b", outline: "none", fontFamily: "inherit", textAlign: "center" }} />
+                                      style={{ width: 60, padding: "6px 8px", background: "#f8fafc", border: "1px solid #edf0f7", borderRadius: 8, fontSize: 11, color: "#475569", outline: "none", fontFamily: "inherit", textAlign: "center" }} />
                                     <div style={{ display: "flex", gap: 1 }}>
-                                      <IconBtn onClick={() => handleMoveLesson(mi, li, "up")} color="#94a3b8"><ChevronUp style={{ width: 12, height: 12 }} /></IconBtn>
-                                      <IconBtn onClick={() => handleMoveLesson(mi, li, "down")} color="#94a3b8"><ChevronDown style={{ width: 12, height: 12 }} /></IconBtn>
+                                      <IconBtn onClick={() => handleMoveLesson(mi, li, "up")} color="#475569"><ChevronUp style={{ width: 12, height: 12 }} /></IconBtn>
+                                      <IconBtn onClick={() => handleMoveLesson(mi, li, "down")} color="#475569"><ChevronDown style={{ width: 12, height: 12 }} /></IconBtn>
                                       <IconBtn onClick={() => handleRemoveLesson(mi, li)} color="#ef4444" hoverBg="rgba(239,68,68,0.06)"><Trash2 style={{ width: 12, height: 12 }} /></IconBtn>
                                     </div>
                                   </div>
@@ -1083,22 +1104,22 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                                             {isYoutube ? (
                                               <input type="url" placeholder="https://youtube.com/watch?v=…" value={res.url || ""}
                                                 onChange={e => updateLessonYoutubeMeta(mi, li, res.index, "url", e.target.value)}
-                                                style={{ fontSize: 11, color: "#94a3b8", background: "transparent", border: "none", outline: "none", fontFamily: "inherit", padding: 0, width: "100%" }}
+                                                style={{ fontSize: 11, color: "#475569", background: "transparent", border: "none", outline: "none", fontFamily: "inherit", padding: 0, width: "100%" }}
                                               />
                                             ) : (
-                                              <span style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{res.name || "Fichier joint"}</span>
+                                              <span style={{ fontSize: 11, color: "#475569", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{res.name || "Fichier joint"}</span>
                                             )}
                                             <input type="text" placeholder="Description (optionnelle)" value={res.description || ""}
                                               onChange={e => { if (isYoutube) updateLessonYoutubeMeta(mi, li, res.index, "description", e.target.value); else updateLessonAttachmentMeta(mi, li, res.index, "description", e.target.value) }}
-                                              style={{ fontSize: 11, color: "#64748b", background: "transparent", border: "none", outline: "none", fontFamily: "inherit", padding: 0, width: "100%" }}
+                                              style={{ fontSize: 11, color: "#475569", background: "transparent", border: "none", outline: "none", fontFamily: "inherit", padding: 0, width: "100%" }}
                                             />
                                           </div>
 
                                           {/* Order + actions */}
-                                          <span style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", background: "#edf0f7", width: 16, height: 16, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>{res.order}</span>
+                                          <span style={{ fontSize: 9, fontWeight: 700, color: "#475569", background: "#edf0f7", width: 16, height: 16, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>{res.order}</span>
                                           <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
-                                            <IconBtn onClick={() => moveLessonResource(mi, li, ri, "up")} color="#94a3b8"><ChevronUp style={{ width: 11, height: 11 }} /></IconBtn>
-                                            <IconBtn onClick={() => moveLessonResource(mi, li, ri, "down")} color="#94a3b8"><ChevronDown style={{ width: 11, height: 11 }} /></IconBtn>
+                                            <IconBtn onClick={() => moveLessonResource(mi, li, ri, "up")} color="#475569"><ChevronUp style={{ width: 11, height: 11 }} /></IconBtn>
+                                            <IconBtn onClick={() => moveLessonResource(mi, li, ri, "down")} color="#475569"><ChevronDown style={{ width: 11, height: 11 }} /></IconBtn>
                                             <IconBtn onClick={() => removeLessonResource(mi, li, res.kind, res.index)} color="#ef4444" hoverBg="rgba(239,68,68,0.06)"><Trash2 style={{ width: 11, height: 11 }} /></IconBtn>
                                           </div>
                                         </div>
@@ -1145,14 +1166,15 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                       )
                     })}
 
-                    {(editingCourse.modules ?? []).length === 0 && (
+                    {(editingCourse!.modules ?? []).length === 0 && (
                       <div style={{ padding: "44px 24px", textAlign: "center", background: "#f8fafc", borderRadius: 12, border: "1.5px dashed #e2e8f0" }}>
                         <Layers style={{ width: 30, height: 30, color: "#cbd5e1", margin: "0 auto 10px" }} />
-                        <p style={{ fontSize: 13, fontWeight: 500, color: "#94a3b8", margin: 0 }}>Aucun module. Commencez par en ajouter un.</p>
+                        <p style={{ fontSize: 13, fontWeight: 500, color: "#475569", margin: 0 }}>Aucun module. Commencez par en ajouter un.</p>
                       </div>
                     )}
                   </div>
                 </FormCard>
+                )}
 
                 <div style={{ height: 32 }} />
               </div>
@@ -1185,7 +1207,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px" }}>
                 {ok ? <CheckCircle style={{ width: 18, height: 18, color: "#22c55e", flexShrink: 0 }} /> : <AlertCircle style={{ width: 18, height: 18, color: "#f43f5e", flexShrink: 0 }} />}
                 <p style={{ flex: 1, fontSize: 13, fontWeight: 600, color: ok ? "#166534" : "#9f1239", margin: 0 }}>{toast.message}</p>
-                <button onClick={() => removeToast(toast.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#94a3b8", display: "flex" }}><X style={{ width: 14, height: 14 }} /></button>
+                <button onClick={() => removeToast(toast.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#475569", display: "flex" }}><X style={{ width: 14, height: 14 }} /></button>
               </div>
               <div style={{ position: "absolute", bottom: 0, left: 0, height: 3, background: ok ? "#22c55e" : "#f43f5e", width: `${progress}%`, transition: "width 0.1s linear" }} />
             </div>

@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
-import PocketBase from "pocketbase";
+import { sendWelcomeEmail } from "@/lib/email";
+import { authErrorResponse, getAdminPb, requireUser } from "@/lib/server-auth";
 
 async function getAdminPB() {
-  const pb = new PocketBase(process.env.POCKETBASE_URL ?? "http://127.0.0.1:8090");
-  await pb.collection("_superusers").authWithPassword(
-    process.env.POCKETBASE_ADMIN_EMAIL!,
-    process.env.POCKETBASE_ADMIN_PASSWORD!
-  );
-  return pb;
+  return getAdminPb();
 }
+
+const ADMIN_ROLES = ["admin", "admin_agent"];
 
 const PB_URL = process.env.POCKETBASE_URL ?? "http://127.0.0.1:8090";
 
@@ -19,12 +17,15 @@ function resolveAvatar(user: any): string | null {
   return `${PB_URL}/api/files/${user.collectionId}/${user.id}/${user.avatar}`;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    await requireUser(req, ADMIN_ROLES);
     const pb = await getAdminPB();
     const users = await pb.collection("users").getFullList({ sort: "-created" });
     return NextResponse.json(users.map(u => ({ ...u, avatar: resolveAvatar(u) })));
   } catch (err: any) {
+    const auth = authErrorResponse(err);
+    if (auth) return auth;
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -32,7 +33,13 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const data = await req.json();
+    const caller = await requireUser(req, ADMIN_ROLES);
     const pb = await getAdminPB();
+
+    const callerRole = caller.role;
+    if (callerRole === "admin_agent" && ADMIN_ROLES.includes(data.role)) {
+      return NextResponse.json({ error: "Permission refusée : un admin agent ne peut pas créer des comptes admin." }, { status: 403 });
+    }
 
     const pwd = data.password || data.plainPassword;
     if (!pwd) throw new Error("Mot de passe requis.");
@@ -52,8 +59,23 @@ export async function POST(req: Request) {
       passwordConfirm: pwd,
     });
 
+    if (data.email) {
+      try {
+        await sendWelcomeEmail({
+          to: data.email,
+          username: data.username,
+          password: pwd,
+          name: data.name,
+        });
+      } catch (emailErr: any) {
+        console.error("Email send failed:", emailErr.message);
+      }
+    }
+
     return NextResponse.json({ ...user, avatar: resolveAvatar(user) });
   } catch (err: any) {
+    const auth = authErrorResponse(err);
+    if (auth) return auth;
     const details = err?.data?.data || err?.data || null;
     return NextResponse.json({ error: err.message, details }, { status: err?.status || 500 });
   }
@@ -64,7 +86,16 @@ export async function PATCH(req: Request) {
     const data = await req.json();
     if (!data.id) throw new Error("User ID requis.");
 
+    const caller = await requireUser(req, ADMIN_ROLES);
     const pb = await getAdminPB();
+
+    const callerRole = caller.role;
+    if (callerRole === "admin_agent") {
+      const target = await pb.collection("users").getOne(data.id);
+      if (ADMIN_ROLES.includes(target.role) || ADMIN_ROLES.includes(data.role)) {
+        return NextResponse.json({ error: "Permission refusée : un admin agent ne peut pas modifier des comptes admin." }, { status: 403 });
+      }
+    }
 
     const payload: Record<string, unknown> = {
       username: data.username,
@@ -92,6 +123,8 @@ export async function PATCH(req: Request) {
     const updated = await pb.collection("users").update(data.id, payload);
     return NextResponse.json({ ...updated, avatar: resolveAvatar(updated) });
   } catch (err: any) {
+    const auth = authErrorResponse(err);
+    if (auth) return auth;
     const details = err?.data?.data || err?.data || null;
     return NextResponse.json({ error: err.message, details }, { status: err?.status || 500 });
   }
@@ -103,10 +136,22 @@ export async function DELETE(req: Request) {
     const id = searchParams.get("id");
     if (!id) throw new Error("User ID requis.");
 
+    const caller = await requireUser(req, ADMIN_ROLES);
     const pb = await getAdminPB();
+
+    const callerRole = caller.role;
+    if (callerRole === "admin_agent") {
+      const target = await pb.collection("users").getOne(id);
+      if (ADMIN_ROLES.includes(target.role)) {
+        return NextResponse.json({ error: "Permission refusée : un admin agent ne peut pas supprimer des comptes admin." }, { status: 403 });
+      }
+    }
+
     await pb.collection("users").delete(id);
     return NextResponse.json({ success: true });
   } catch (err: any) {
+    const auth = authErrorResponse(err);
+    if (auth) return auth;
     const details = err?.data?.data || err?.data || null;
     return NextResponse.json({ error: err.message, details }, { status: err?.status || 500 });
   }

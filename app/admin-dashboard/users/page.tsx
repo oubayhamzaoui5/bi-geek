@@ -7,6 +7,15 @@ import LoadingBI from "@/components/LoadingBI";
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("user")
+      const u = raw ? JSON.parse(raw) : null
+      if (u?.id) setCurrentUser({ id: u.id, role: u.role ?? "admin" })
+    } catch { /* ignore */ }
+  }, [])
 
   // GET users
   useEffect(() => {
@@ -44,7 +53,7 @@ export default function AdminUsersPage() {
     const res = await fetch("/api/admin/users", {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(user),
+      body: JSON.stringify({ ...user, callerId: currentUser?.id }),
     });
 
     const saved = await res.json();
@@ -76,7 +85,8 @@ export default function AdminUsersPage() {
 
   // DELETE
   const handleDelete = async (id: string) => {
-    await fetch(`/api/admin/users?id=${id}`, { method: "DELETE" });
+    const callerParam = currentUser?.id ? `&callerId=${currentUser.id}` : "";
+    await fetch(`/api/admin/users?id=${id}${callerParam}`, { method: "DELETE" });
     setUsers(prev => prev.filter(u => u.id !== id));
   };
 
@@ -90,6 +100,7 @@ export default function AdminUsersPage() {
         initialUsers={users}
         onSave={handleSave}
         onDelete={handleDelete}
+        currentUserRole={currentUser?.role}
       />
     </>
   );

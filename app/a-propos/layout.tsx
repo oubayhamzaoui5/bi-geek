@@ -1,34 +1,35 @@
 import type { Metadata } from "next"
+import { getOgImage, siteConfig } from "@/lib/seo"
 
 export const metadata: Metadata = {
-  title: "À propos | BI Geek — Centre de formation tech en Tunisie",
+  title: "À propos",
   description:
-    "Découvrez la mission, l'histoire et les valeurs de BI Geek. Un centre de formation tech basé en Tunisie qui forme des professionnels immédiatement opérationnels en Data, IA, Cloud, Cyber Security et Web.",
+    "Découvrez la mission, l'histoire et les valeurs de BI Geek, centre de formation tech en Tunisie spécialisé en Data, IA, Cloud, Cyber Security et développement web.",
+  alternates: {
+    canonical: "/a-propos",
+  },
   openGraph: {
-    title: "À propos | BI Geek — Centre de formation tech en Tunisie",
+    title: "À propos | BI Geek",
     description:
-      "BI Geek forme les talents tech de demain grâce à une pédagogie ancrée dans le réel, des formateurs experts et des projets concrets.",
-    url: "https://bi-geek.net/a-propos",
-    siteName: "BI Geek",
+      "BI Geek forme les talents tech de demain avec une pédagogie pratique, des formateurs experts et des projets concrets.",
+    url: "/a-propos",
+    siteName: siteConfig.name,
     images: [
       {
-        url: "https://bi-geek.net/placeholder-course.png",
+        url: getOgImage(siteConfig.og.about),
         width: 1200,
         height: 630,
-        alt: "BI Geek — À propos",
+        alt: "BI Geek - à propos du centre de formation tech",
       },
     ],
-    locale: "fr-FR",
+    locale: siteConfig.locale,
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "À propos | BI Geek",
-    description:
-      "Former. Innover. Devenir. Le centre de formation tech qui accélère les carrières en Tunisie.",
-  },
-  alternates: {
-    canonical: "https://bi-geek.net/a-propos",
+    description: "Le centre de formation tech qui accélère les carrières en Tunisie.",
+    images: [getOgImage(siteConfig.og.about)],
   },
 }
 

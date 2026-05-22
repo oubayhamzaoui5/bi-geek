@@ -1,11 +1,9 @@
 "use client"
 
-import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { MessagesTab } from "@/components/messages-tab"
 import { Award, Download } from "lucide-react"
-import { SidebarProvider, useSidebar } from "@/components/ui/sidebar-context"
+import { useSidebar } from "@/components/ui/sidebar-context"
 
 interface Certificate {
   id: string
@@ -22,7 +20,7 @@ const certificates: Certificate[] = [
     courseTitle: "Fondamentaux de Power BI",
     instructor: "Alexandre Dupont",
     date: "20 Octobre 2025",
-    imageUrl: "/certificate.png",
+    imageUrl: "/certificate.webp",
     downloadUrl: "/certificates/powerbi-cert.pdf",
   },
   {
@@ -30,7 +28,7 @@ const certificates: Certificate[] = [
     courseTitle: "SQL pour l'Analyse de Données",
     instructor: "Marie Lambert",
     date: "05 Septembre 2025",
-    imageUrl: "/certificate.png",
+    imageUrl: "/certificate.webp",
     downloadUrl: "/certificates/sql-cert.pdf",
   },
   {
@@ -38,7 +36,7 @@ const certificates: Certificate[] = [
     courseTitle: "Visualisation de Données Avancée",
     instructor: "Julien Moreau",
     date: "01 Août 2025",
-    imageUrl: "/certificate.png",
+    imageUrl: "/certificate.webp",
     downloadUrl: "/certificates/dataviz-cert.pdf",
   },
 ]
@@ -106,12 +104,8 @@ function CertificatesGrid() {
 
 export default function CertificatesPage() {
   return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-muted/30">
-        <Sidebar />
-
-        <main className="flex-1 overflow-auto">
-          <Header />
+    <>
+      <Header />
 
           <div className="p-6 md:p-8 space-y-8">
             {/* Page Title */}
@@ -129,11 +123,7 @@ export default function CertificatesPage() {
             <CertificatesGrid />
           </div>
 
-          <Footer />
-        </main>
-
-        <MessagesTab />
-      </div>
-    </SidebarProvider>
+      <Footer />
+    </>
   )
 }

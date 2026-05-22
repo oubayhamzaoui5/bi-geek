@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import Link from "next/link"
 import { Clock, CheckCircle2, ClipboardList, CalendarDays, ArrowRight, Archive } from "lucide-react"
@@ -10,6 +10,8 @@ export interface Course {
   title: string
   progress: number
   duration: string
+  instructorName?: string
+  groupId?: string | null
   thumbnail: string
   hasWork: boolean
   status: CourseStatus
@@ -51,14 +53,14 @@ export function CourseCard({ course }: { course: Course }) {
             {isCompleted && (
               <span className="flex items-center gap-1 text-accent">
                 <CheckCircle2 size={14} />
-                ComplÃ©tÃ©
+                Complété
               </span>
             )}
 
             {course.hasWork && isActive && (
               <span className="flex items-center gap-1 text-yellow-400">
                 <ClipboardList size={14} />
-                Travail Ã  faire
+                Travail à faire
               </span>
             )}
 
@@ -76,26 +78,11 @@ export function CourseCard({ course }: { course: Course }) {
             {isStored && (
               <span className="flex items-center gap-1 text-white/80 px-2 py-0.5 rounded-md bg-white/10 border border-white/10 text-xs">
                 <Archive size={12} />
-                100% enregistrÃ©
+                100% enregistré
               </span>
             )}
           </div>
         </div>
-
-        {!isUpcoming && !isStored && (
-          <div className="space-y-2 mt-2">
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-white/60">Progression</span>
-              <span className="text-accent font-semibold">{course.progress}%</span>
-            </div>
-            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-accent to-accent/60 rounded-full transition-all duration-500"
-                style={{ width: `${course.progress}%` }}
-              />
-            </div>
-          </div>
-        )}
 
         <div className="mt-4">
           {(isUpcoming || isStored) && (
@@ -109,7 +96,7 @@ export function CourseCard({ course }: { course: Course }) {
           {isActive && (
             <Link href={courseHref}>
               <button className="w-full px-4 py-2 bg-white/5 text-white rounded-lg text-sm font-medium hover:bg-white/10 transition-colors border border-white/10">
-                DÃ©tails
+                Détails
               </button>
             </Link>
           )}

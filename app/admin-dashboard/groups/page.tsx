@@ -10,12 +10,14 @@ export default function AdminGroupsPage() {
   const [bootcamps, setBootcamps] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [instructors, setInstructors] = useState<any[]>([])
+  const [sessions, setSessions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchAll = async () => {
       const start = Date.now()
       try {
+        await fetch("/api/admin/migrate", { cache: "no-store" }).catch(() => null)
         const res = await fetch("/api/admin/groups")
         const data = await res.json()
         if (!res.ok) throw new Error(data.error)
@@ -24,6 +26,7 @@ export default function AdminGroupsPage() {
         setBootcamps(data.bootcamps || [])
         setStudents(data.students || [])
         setInstructors(data.instructors || [])
+        setSessions(data.sessions || [])
       } catch (err) {
         console.error(err)
       } finally {
@@ -69,6 +72,7 @@ export default function AdminGroupsPage() {
         initialBootcamps={bootcamps}
         initialStudents={students}
         initialInstructors={instructors}
+        initialSessions={sessions}
         onSave={handleSave}
         onDelete={handleDelete}
       />

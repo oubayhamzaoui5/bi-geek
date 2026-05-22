@@ -1,19 +1,17 @@
 "use client"
 
-import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import {
   Menu, X, Home, BookOpen, Settings, LogOut,
   Layers, Users, ClipboardList, Star, CalendarDays,
-  GraduationCap, MessageSquare,
+  GraduationCap,
 } from "lucide-react"
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSidebar } from "@/components/ui/sidebar-context"
 
-export function Sidebar({ variant = "student" }: { variant?: "student" | "admin" | "instructor" }) {
-  const router = useRouter()
+export function Sidebar({ variant = "student", compact = false }: { variant?: "student" | "admin" | "instructor"; compact?: boolean }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const { isCollapsed, setIsCollapsed } = useSidebar()
   const pathname = usePathname()
@@ -23,6 +21,31 @@ export function Sidebar({ variant = "student" }: { variant?: "student" | "admin"
   const [userName, setUserName] = useState("")
   const [userInitials, setUserInitials] = useState("U")
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
+  const [currentUserRole, setCurrentUserRole] = useState<string>("")
+  const railAvatarStyle = {
+    width: 28,
+    height: 28,
+    minWidth: 28,
+    minHeight: 28,
+    aspectRatio: "1 / 1",
+    borderRadius: "9999px",
+    flexShrink: 0,
+  } as const
+  const studentAvatarStyle = {
+    width: 32,
+    height: 32,
+    minWidth: 32,
+    minHeight: 32,
+    aspectRatio: "1 / 1",
+    borderRadius: "9999px",
+    flexShrink: 0,
+  } as const
+
+  const logout = async () => {
+    localStorage.removeItem("user")
+    await fetch("/api/logout", { method: "POST" }).catch(() => {})
+    window.location.assign("/")
+  }
 
   useEffect(() => {
     try {
@@ -39,6 +62,25 @@ export function Sidebar({ variant = "student" }: { variant?: "student" | "admin"
         name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)
       )
       setUserAvatar(avatar)
+      setCurrentUserRole(user?.role ?? "")
+      if (user?.id && user?.role) {
+        const profileRole = user.role === "admin" || user.role === "admin_agent" ? "admin" : user.role
+        fetch(`/api/${profileRole}/profile?userId=${encodeURIComponent(user.id)}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(profile => {
+            if (!profile) return
+            const refreshedName =
+              profile.username?.trim() ||
+              profile.email?.split("@")?.[0]?.trim() ||
+              name
+            const refreshedAvatar = typeof profile.avatar === "string" && profile.avatar.trim() ? profile.avatar.trim() : null
+            setUserName(refreshedName)
+            setUserInitials(refreshedName.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2))
+            setUserAvatar(refreshedAvatar)
+            localStorage.setItem("user", JSON.stringify({ ...user, email: profile.email ?? user.email, avatar: refreshedAvatar }))
+          })
+          .catch(() => {})
+      }
     } catch {
       setUserName(variant === "admin" ? "Admin" : variant === "instructor" ? "Formateur" : "Étudiant")
       setUserInitials("U")
@@ -55,23 +97,32 @@ export function Sidebar({ variant = "student" }: { variant?: "student" | "admin"
     { icon: Users, label: "Utilisateurs", href: "/admin-dashboard/users" },
     { icon: ClipboardList, label: "Inscriptions", href: "/admin-dashboard/enrollments" },
     { icon: Star, label: "Vedettes", href: "/admin-dashboard/featured" },
+    { icon: Settings, label: "Paramètres", href: "/admin-dashboard/settings" },
   ]
 
   const instructorLinks = [
     { icon: Home, label: "Accueil", href: "/instructor-dashboard/overview" },
-    { icon: Users, label: "Mes groupes", href: "/instructor-dashboard/groups" },
+    { icon: Users, label: "Mes formations", href: "/instructor-dashboard/groups" },
     { icon: CalendarDays, label: "Agenda", href: "/instructor-dashboard/agenda" },
-    { icon: MessageSquare, label: "Messages", href: "/instructor-dashboard/messages" },
+    { icon: Settings, label: "Paramètres", href: "/instructor-dashboard/settings" },
   ]
 
   const studentLinks = [
-    { icon: Home, label: "Accueil", href: "/student-dashboard" },
+    { icon: Home, label: "Accueil", href: "/student-dashboard/overview" },
+    { icon: Users, label: "Mes formations", href: "/student-dashboard/groups" },
+    { icon: CalendarDays, label: "Agenda", href: "/student-dashboard/agenda" },
     { icon: Settings, label: "Paramètres", href: "/student-dashboard/settings" },
   ]
 
   const primaryLinks = variant === "admin" ? adminLinks : variant === "instructor" ? instructorLinks : studentLinks
 
   const isActivePath = (href: string) => {
+    if (href === "/student-dashboard/overview") {
+      return pathname === "/student-dashboard/overview" || pathname === "/student-dashboard" || pathname === "/student-dashboard/"
+    }
+    if (href === "/student-dashboard") {
+      return pathname === "/student-dashboard" || pathname === "/student-dashboard/"
+    }
     if (href === "/student-dashboard/courses") {
       return pathname.startsWith("/student-dashboard/course") ||
              pathname.startsWith("/student-dashboard/courses")
@@ -86,7 +137,7 @@ export function Sidebar({ variant = "student" }: { variant?: "student" | "admin"
   }
 
   // ── ADMIN / INSTRUCTOR SIDEBAR: icon-only, hover-expand ────────────────────
-  if (isAdmin || isInstructor) {
+  if (compact || isAdmin || isInstructor) {
     return (
       <>
         {/* Mobile burger */}
@@ -160,17 +211,23 @@ export function Sidebar({ variant = "student" }: { variant?: "student" | "admin"
           {/* Bottom: avatar + logout */}
           <div className="border-t border-gray-100 py-3 px-2 flex-shrink-0">
             {/* User */}
-            <div className="flex items-center h-[42px] px-[14px] rounded-lg whitespace-nowrap">
+            <Link
+              href={`/${variant === "admin" ? "admin" : variant === "instructor" ? "instructor" : "student"}-dashboard/settings`}
+              className="flex items-center h-[42px] px-[14px] rounded-lg whitespace-nowrap cursor-pointer hover:bg-gray-50 transition-colors duration-150"
+            >
               {userAvatar ? (
                 <img
                   src={userAvatar}
                   alt={userName}
-                  className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                  className="object-cover"
+                  style={{ ...railAvatarStyle, display: "block" }}
                   onError={() => setUserAvatar(null)}
                 />
               ) : (
                 <div className="w-7 h-7 rounded-full bg-gradient-to-br from-accent to-accent/60
-                                flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
+                                flex items-center justify-center text-[10px] font-bold text-white"
+                  style={railAvatarStyle}
+                >
                   {userInitials}
                 </div>
               )}
@@ -179,15 +236,15 @@ export function Sidebar({ variant = "student" }: { variant?: "student" | "admin"
                   opacity-0 group-hover:opacity-100 transition-all duration-200 min-w-0"
               >
                 <p className="text-[12px] font-semibold text-gray-800 truncate leading-tight">{userName}</p>
-                <p className="text-[10px] text-gray-400 capitalize leading-tight">{isInstructor ? "formateur" : "admin"}</p>
+                <p className="text-[10px] text-gray-400 capitalize leading-tight">{isInstructor ? "formateur" : isAdmin ? (currentUserRole === "admin_agent" ? "admin agent" : "admin") : "etudiant"}</p>
               </div>
-            </div>
+            </Link>
             {/* Logout */}
             <button
-              onClick={() => { localStorage.removeItem("user"); router.push("/") }}
+              onClick={logout}
               title="Déconnexion"
               className="flex items-center w-full h-[42px] px-[14px] rounded-lg whitespace-nowrap
-                text-gray-400 hover:bg-gray-50 hover:text-gray-700 transition-colors duration-150"
+                text-red-500 hover:bg-transparent hover:text-red-500 transition-colors duration-150 cursor-pointer"
             >
               <LogOut size={18} strokeWidth={1.8} className="flex-shrink-0" />
               <span
@@ -230,8 +287,8 @@ export function Sidebar({ variant = "student" }: { variant?: "student" | "admin"
                 })}
               </nav>
               <div className="border-t border-gray-100 py-3 px-2">
-                <button onClick={() => { localStorage.removeItem("user"); router.push("/") }}
-                  className="flex items-center w-full h-[42px] px-3 rounded-lg gap-3 text-gray-400 hover:bg-gray-50 hover:text-gray-700 transition-colors">
+                <button onClick={logout}
+                  className="flex items-center w-full h-[42px] px-3 rounded-lg gap-3 text-red-500 hover:bg-transparent hover:text-red-500 transition-colors cursor-pointer">
                   <LogOut size={18} strokeWidth={1.8} />
                   <span className="text-[13px] font-medium">Déconnexion</span>
                 </button>
@@ -286,19 +343,25 @@ export function Sidebar({ variant = "student" }: { variant?: "student" | "admin"
             </Link>
           )}
 
-          <div className={`mx-2 mt-3 mb-1 rounded-lg bg-sidebar-accent/15 border border-sidebar-border/30
-            ${isCollapsed ? "flex items-center justify-center p-2" : "p-3"}`}>
+          <Link
+            href="/student-dashboard/settings"
+            className={`mx-2 mt-3 mb-1 rounded-lg bg-sidebar-accent/15 border border-sidebar-border/30 cursor-pointer hover:bg-sidebar-accent/25 transition-colors
+              ${isCollapsed ? "flex items-center justify-center p-2" : "p-3"}`}
+          >
             <div className={`flex items-center ${isCollapsed ? "" : "gap-3"}`}>
               {userAvatar ? (
                 <img
                   src={userAvatar}
                   alt={userName}
-                  className="w-8 h-8 rounded-full object-cover shrink-0"
+                  className="object-cover"
+                  style={{ ...studentAvatarStyle, display: "block" }}
                   onError={() => setUserAvatar(null)}
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-accent/60
-                                flex items-center justify-center text-[11px] font-bold text-white shrink-0">
+                                flex items-center justify-center text-[11px] font-bold text-white"
+                  style={studentAvatarStyle}
+                >
                   {userInitials}
                 </div>
               )}
@@ -309,7 +372,7 @@ export function Sidebar({ variant = "student" }: { variant?: "student" | "admin"
                 </div>
               )}
             </div>
-          </div>
+          </Link>
 
           <div className="flex-1 overflow-y-auto px-2">
             <div className="flex flex-col items-stretch w-full mt-2 border-t border-sidebar-border/50">
@@ -330,10 +393,10 @@ export function Sidebar({ variant = "student" }: { variant?: "student" | "admin"
           </div>
 
           <button
-            onClick={() => { localStorage.removeItem("user"); router.push("/") }}
+            onClick={logout}
             className={`w-full flex items-center cursor-pointer
               ${isCollapsed ? "justify-center h-14" : "h-14 px-3"}
-              bg-sidebar/60 hover:bg-sidebar-accent/10 text-sidebar-foreground transition-colors`}
+              bg-transparent hover:bg-transparent text-red-500 hover:text-red-500 transition-colors`}
           >
             <LogOut size={20} className="shrink-0" />
             {!isCollapsed && <span className="ml-2 text-sm font-medium">Déconnexion</span>}

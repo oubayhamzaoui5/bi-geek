@@ -27,7 +27,7 @@ export function InstructorSection({
   const description =
     instructorFromPb?.description ??
     "Expert en Data Science avec plusieurs années d'expérience en analyse de données et machine learning."
-  const avatarSrc = instructorFromPb?.avatarUrl ?? "/instructor.jpg"
+  const avatarSrc = instructorFromPb?.avatarUrl ?? "/instructor.webp"
   const linkedinUrl = instructorFromPb?.linkedinLink ?? "#"
 
   return (

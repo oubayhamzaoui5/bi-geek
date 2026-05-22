@@ -4,6 +4,10 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  --ff-display: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ff-body: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ff-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
   /* Light Mode — Studio Theme */
   --background: oklch(0.985 0.003 80);
   --foreground: oklch(0.10 0.01 260);
@@ -23,7 +27,7 @@
   --muted: oklch(0.94 0.005 80);
   --muted-foreground: oklch(0.48 0.01 260);
 
-  --accent: oklch(0.68 0.28 308);
+  --accent: #B010A3;
   --accent-foreground: oklch(0.985 0 0);
 
   --destructive: oklch(0.63 0.22 27);
@@ -31,24 +35,24 @@
 
   --border: oklch(0.88 0.006 80);
   --input: oklch(0.92 0.004 80);
-  --ring: oklch(0.72 0.22 300);
+  --ring: oklch(0.55 0.27 281);
 
-  --chart-1: oklch(0.68 0.28 308);
-  --chart-2: oklch(0.72 0.26 315);
-  --chart-3: oklch(0.66 0.24 300);
-  --chart-4: oklch(0.72 0.20 280);
-  --chart-5: oklch(0.78 0.16 240);
+  --chart-1: oklch(0.49 0.27 281);
+  --chart-2: oklch(0.55 0.26 275);
+  --chart-3: oklch(0.44 0.24 285);
+  --chart-4: oklch(0.60 0.20 270);
+  --chart-5: oklch(0.65 0.16 260);
 
   --radius: 0.5rem;
 
-  --sidebar: oklch(0.22 0.08 300);
+  --sidebar: oklch(0.18 0.08 281);
   --sidebar-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.68 0.30 300);
+  --sidebar-primary: oklch(0.49 0.27 281);
   --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.32 0.10 308);
+  --sidebar-accent: oklch(0.28 0.10 281);
   --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.35 0.05 300);
-  --sidebar-ring: oklch(0.72 0.22 300);
+  --sidebar-border: oklch(0.32 0.05 281);
+  --sidebar-ring: oklch(0.55 0.22 281);
 }
 
 .dark {
@@ -64,14 +68,14 @@
   --secondary-foreground: oklch(0.96 0.01 300);
   --muted: oklch(0.22 0.02 300);
   --muted-foreground: oklch(0.70 0.02 300);
-  --accent: oklch(0.70 0.28 308);
+  --accent: #B010A3;
   --accent-foreground: oklch(0.98 0 0);
   --destructive: oklch(0.58 0.24 25);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.24 0.02 300);
-  --input: oklch(0.24 0.02 300);
-  --ring: oklch(0.78 0.28 300);
-  --chart-1: oklch(0.70 0.28 308);
+  --border: oklch(0.24 0.02 281);
+  --input: oklch(0.24 0.02 281);
+  --ring: oklch(0.65 0.28 281);
+  --chart-1: oklch(0.58 0.27 281);
   --chart-2: oklch(0.74 0.24 315);
   --chart-3: oklch(0.68 0.22 300);
   --chart-4: oklch(0.76 0.20 280);
@@ -141,7 +145,35 @@
   }
 }
 
+@keyframes cert-marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.cert-card {
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.cert-card:hover {
+  background-color: #8b0f82 !important;
+  border-top-color: #8b0f82 !important;
+  box-shadow: 0 16px 40px -10px rgba(139,15,130,0.35);
+}
+.cert-card .cert-code,
+.cert-card .cert-name,
+.cert-card .cert-desc,
+.cert-card .cert-org  { transition: color 0.3s ease, opacity 0.3s ease; }
+.cert-card:hover .cert-code { color: #fff !important; }
+.cert-card:hover .cert-name { color: rgba(255,255,255,0.78) !important; }
+.cert-card:hover .cert-desc { color: rgba(255,255,255,0.5) !important; }
+.cert-card:hover .cert-org  { color: rgba(255,255,255,0.62) !important; }
+
 @layer utilities {
+  .homepage-system-font {
+    --ff-display: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --ff-body: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --ff-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+
   .font-display {
     font-family: var(--ff-display), "Syne", sans-serif;
   }

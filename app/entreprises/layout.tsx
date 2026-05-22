@@ -1,34 +1,36 @@
 import type { Metadata } from "next"
+import { getOgImage, siteConfig } from "@/lib/seo"
 
 export const metadata: Metadata = {
-  title: "Formation entreprise | BI Geek — Montée en compétences de vos équipes",
+  title: "Formation entreprise",
   description:
-    "BI Geek accompagne les entreprises dans la montée en compétences de leurs équipes tech. Programmes sur mesure en Data, IA, Cloud, Cyber Security et Web, dispensés par des experts certifiés.",
+    "BI Geek accompagne les entreprises dans la montée en compétences de leurs équipes tech avec des programmes sur mesure en Data, IA, Cloud, Cyber Security et développement web.",
+  alternates: {
+    canonical: "/entreprises",
+  },
   openGraph: {
     title: "Formation entreprise | BI Geek",
     description:
-      "Des programmes de formation tech sur mesure pour renforcer les compétences de vos collaborateurs. Audit, formation, certification et suivi individualisé.",
-    url: "https://bi-geek.net/entreprises",
-    siteName: "BI Geek",
+      "Des programmes de formation tech sur mesure pour renforcer les compétences de vos collaborateurs : audit, formation, certification et suivi individualisé.",
+    url: "/entreprises",
+    siteName: siteConfig.name,
     images: [
       {
-        url: "https://bi-geek.net/placeholder-course.png",
+        url: getOgImage(siteConfig.og.enterprise),
         width: 1200,
         height: 630,
-        alt: "BI Geek Entreprises — Formation professionnelle",
+        alt: "BI Geek Entreprises - formation professionnelle tech",
       },
     ],
-    locale: "fr-FR",
+    locale: siteConfig.locale,
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Formation entreprise | BI Geek",
     description:
-      "Renforcez les compétences tech de vos équipes avec des programmes sur mesure délivrés par des experts en activité.",
-  },
-  alternates: {
-    canonical: "https://bi-geek.net/entreprises",
+      "Renforcez les compétences tech de vos équipes avec des formations sur mesure en Data, IA, Cloud et Cyber Security.",
+    images: [getOgImage(siteConfig.og.enterprise)],
   },
 }
 

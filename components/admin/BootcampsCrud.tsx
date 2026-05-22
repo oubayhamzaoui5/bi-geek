@@ -61,7 +61,7 @@ const PREREQUIS_OPTIONS = [
 // ---- UI primitives (matching CoursesCrud style) ----
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#64748b", marginBottom: 7, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 7, letterSpacing: "0.06em", textTransform: "uppercase" }}>
       {children}{required && <span style={{ color: "#ef4444", marginLeft: 4 }}>*</span>}
     </label>
   )
@@ -109,12 +109,12 @@ function SelectField({ value, onChange, children }: { value: string; onChange: (
       >
         {children}
       </select>
-      <ChevronRight style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%) rotate(90deg)", width: 14, height: 14, color: "#94a3b8", pointerEvents: "none" }} />
+      <ChevronRight style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%) rotate(90deg)", width: 14, height: 14, color: "#475569", pointerEvents: "none" }} />
     </div>
   )
 }
 
-function IconBtn({ onClick, title, color = "#64748b", hoverBg = "#f1f5f9", children }: {
+function IconBtn({ onClick, title, color = "#475569", hoverBg = "#f1f5f9", children }: {
   onClick: (e: React.MouseEvent) => void; title?: string; color?: string; hoverBg?: string; children: React.ReactNode
 }) {
   const [hover, setHover] = useState(false)
@@ -136,7 +136,7 @@ function FormCard({ title, icon, children, action }: { title: string; icon?: Rea
     <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #edf0f7", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.04)" }}>
       <div style={{ padding: "14px 22px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(180deg,#fafbfe 0%,#fff 100%)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg,rgba(99,102,241,0.1),rgba(129,140,248,0.05))", color: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: "var(--accent,#6366f1)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {icon}
           </div>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: 0, letterSpacing: "-0.01em" }}>{title}</h3>
@@ -493,7 +493,7 @@ export default function BootcampsCrud({
                 if (viewMode === "active") { setViewMode("archived"); loadArchivedBootcamps() }
                 else setViewMode("active")
               }}
-              style={{ padding: "9px 20px", background: viewMode === "archived" ? "rgba(99,102,241,0.08)" : "#f8fafc", color: viewMode === "archived" ? "var(--accent,#6366f1)" : "#64748b", border: `1.5px solid ${viewMode === "archived" ? "var(--accent,#6366f1)" : "#e8ecf3"}`, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s" }}
+              style={{ padding: "9px 20px", background: viewMode === "archived" ? "rgba(99,102,241,0.08)" : "#f8fafc", color: viewMode === "archived" ? "var(--accent,#6366f1)" : "#475569", border: `1.5px solid ${viewMode === "archived" ? "var(--accent,#6366f1)" : "#e8ecf3"}`, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s" }}
             >
               <Archive style={{ width: 15, height: 15 }} /> Archives
             </button>
@@ -514,7 +514,7 @@ export default function BootcampsCrud({
       {/* ── Filters bar ── */}
       <div style={{ padding: "14px 32px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, borderBottom: "1px solid #f1f5f9", background: "#fff" }}>
         <div style={{ position: "relative", flex: 1 }}>
-          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#94a3b8" }} />
+          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#475569" }} />
           <input
             type="text"
             placeholder="Rechercher un bootcamp..."
@@ -527,12 +527,12 @@ export default function BootcampsCrud({
         </div>
         {allTags.length > 0 && (
           <select value={filterTag} onChange={e => setFilterTag(e.target.value)}
-            style={{ padding: "7px 12px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, color: filterTag !== "all" ? "var(--accent,#6366f1)" : "#64748b", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
+            style={{ padding: "7px 12px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, color: filterTag !== "all" ? "var(--accent,#6366f1)" : "#475569", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
             <option value="all">Tag: tous</option>
             {allTags.map(tag => <option key={tag} value={tag}>{tag}</option>)}
           </select>
         )}
-        <div style={{ fontSize: 13, color: "#94a3b8", marginLeft: "auto" }}>
+        <div style={{ fontSize: 13, color: "#475569", marginLeft: "auto" }}>
           <span style={{ fontWeight: 600, color: "#0f172a" }}>{filteredBootcamps.length}</span> bootcamp{filteredBootcamps.length !== 1 ? "s" : ""}
         </div>
       </div>
@@ -548,15 +548,15 @@ export default function BootcampsCrud({
           <div style={{ padding: "0px 0px" }}>
             {archivedLoading ? (
               <div style={{ background: "#fff", padding: "64px 24px", textAlign: "center" }}>
-                <Loader2 style={{ width: 32, height: 32, color: "#94a3b8", margin: "0 auto", animation: "spin 1s linear infinite" }} />
+                <Loader2 style={{ width: 32, height: 32, color: "#475569", margin: "0 auto", animation: "spin 1s linear infinite" }} />
               </div>
             ) : isEmpty ? (
               <div style={{ background: "#fff", padding: "64px 24px", textAlign: "center" }}>
                 <Layers style={{ width: 40, height: 40, color: "#e2e8f0", margin: "0 auto 12px" }} />
-                <p style={{ fontSize: 15, fontWeight: 600, color: "#64748b", margin: "0 0 4px" }}>
+                <p style={{ fontSize: 15, fontWeight: 600, color: "#475569", margin: "0 0 4px" }}>
                   {viewMode === "archived" ? "Aucun bootcamp archivé" : "Aucun bootcamp trouvé"}
                 </p>
-                <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>
+                <p style={{ fontSize: 13, color: "#475569", margin: 0 }}>
                   {viewMode === "active" ? "Créez votre premier bootcamp avec le bouton ci-dessus." : "Les bootcamps archivés apparaîtront ici."}
                 </p>
               </div>
@@ -565,7 +565,7 @@ export default function BootcampsCrud({
                 {/* Table header */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 180px 150px", padding: "18px 36px", borderBottom: "1px solid #f1f5f9", background: "#fafbfd" }}>
                   {["Bootcamp", "Tags", "Actions"].map(h => (
-                    <span key={h} style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
+                    <span key={h} style={{ fontSize: 13, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
                   ))}
                 </div>
                 {/* Rows */}
@@ -598,7 +598,7 @@ export default function BootcampsCrud({
                             onMouseLeave={e => (e.currentTarget.style.color = "#0f172a")}
                             style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", margin: "0 0 6px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", cursor: viewMode === "active" ? "pointer" : "default", transition: "color 0.15s" }}
                           >{bootcamp.title || "Sans titre"}</p>
-                          <p style={{ fontSize: 14, color: "#94a3b8", margin: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical" }}>{bootcamp.longDescription || bootcamp.shortDescription}</p>
+                          <p style={{ fontSize: 14, color: "#475569", margin: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical" }}>{bootcamp.longDescription || bootcamp.shortDescription}</p>
                         </div>
                       </div>
                     </div>
@@ -609,7 +609,7 @@ export default function BootcampsCrud({
                       ))}
                       {(bootcamp.tags?.length || 0) > 4 && (
                         <span
-                          style={{ fontSize: 13, padding: "5px 10px", borderRadius: 8, background: "#f1f5f9", color: "#94a3b8", fontWeight: 600, cursor: "default" }}
+                          style={{ fontSize: 13, padding: "5px 10px", borderRadius: 8, background: "#f1f5f9", color: "#475569", fontWeight: 600, cursor: "default" }}
                           onMouseEnter={e => { setTagsTooltipPos({ x: e.clientX, y: e.clientY + 16 }); setHoveredTagsBootcampId(bootcamp.id ?? null) }}
                           onMouseLeave={() => setHoveredTagsBootcampId(null)}
                         >+{bootcamp.tags!.length - 4}</span>
@@ -619,7 +619,7 @@ export default function BootcampsCrud({
                     <div style={{ display: "flex", gap: 8 }}>
                       {viewMode === "active" ? (
                         <>
-                          {onView && <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && onView(bootcamp.id) }} color="#64748b" title="Voir"><ExternalLink style={{ width: 22, height: 22 }} /></IconBtn>}
+                          {onView && <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && onView(bootcamp.id) }} color="#475569" title="Voir"><ExternalLink style={{ width: 22, height: 22 }} /></IconBtn>}
                           <IconBtn onClick={e => { e.stopPropagation(); handleSelectBootcamp(bootcamp) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)" title="Modifier"><Edit style={{ width: 22, height: 22 }} /></IconBtn>
                           <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && handleArchiveBootcamp(bootcamp.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Archiver"><Archive style={{ width: 22, height: 22 }} /></IconBtn>
                         </>
@@ -654,7 +654,7 @@ export default function BootcampsCrud({
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <button onClick={handleSaveBootcamp} disabled={loading}
-                  style={{ padding: "9px 22px", borderRadius: 10, border: "none", background: loading ? "#f1f5f9" : "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: loading ? "#94a3b8" : "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 7, boxShadow: loading ? "none" : "0 4px 14px rgba(99,102,241,0.35)", transition: "all 0.2s" }}
+                  style={{ padding: "9px 22px", borderRadius: 10, border: "none", background: loading ? "#f1f5f9" : "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: loading ? "#475569" : "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 7, boxShadow: loading ? "none" : "0 4px 14px rgba(99,102,241,0.35)", transition: "all 0.2s" }}
                   onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 20px rgba(99,102,241,0.5)" }}
                   onMouseLeave={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 14px rgba(99,102,241,0.35)" }}
                 >
@@ -662,9 +662,9 @@ export default function BootcampsCrud({
                   {loading ? "Enregistrement..." : "Enregistrer"}
                 </button>
                 <button onClick={handleCancelEdit}
-                  style={{ width: 34, height: 34, borderRadius: 9, border: "1.5px solid #e8ecf3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", transition: "all 0.15s" }}
+                  style={{ width: 34, height: 34, borderRadius: 9, border: "1.5px solid #e8ecf3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#475569", transition: "all 0.15s" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#fca5a5"; (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; (e.currentTarget as HTMLButtonElement).style.background = "#fff5f5" }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#e8ecf3"; (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8"; (e.currentTarget as HTMLButtonElement).style.background = "#fff" }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#e8ecf3"; (e.currentTarget as HTMLButtonElement).style.color = "#475569"; (e.currentTarget as HTMLButtonElement).style.background = "#fff" }}
                 >
                   <X style={{ width: 15, height: 15 }} />
                 </button>
@@ -701,7 +701,7 @@ export default function BootcampsCrud({
                             <ImagePlus style={{ width: 26, height: 26, color: "var(--accent,#6366f1)" }} />
                           </div>
                           <p style={{ fontSize: 14, fontWeight: 600, color: "#475569", margin: 0 }}>Ajouter une image de couverture</p>
-                          <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 5 }}>Format recommandé : 1280 × 720 (16:9)</p>
+                          <p style={{ fontSize: 12, color: "#475569", marginTop: 5 }}>Format recommandé : 1280 × 720 (16:9)</p>
                         </div>
                       )}
                     </div>
@@ -752,7 +752,7 @@ export default function BootcampsCrud({
                       <FieldLabel>Ajouter une formation</FieldLabel>
                       <div style={{ position: "relative" }} ref={courseDropdownRef}>
                         <div style={{ position: "relative" }}>
-                          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#94a3b8", zIndex: 1 }} />
+                          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#475569", zIndex: 1 }} />
                           <input
                             type="text"
                             style={{ width: "100%", padding: "10px 14px 10px 36px", background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit", transition: "border-color 0.15s, box-shadow 0.15s" }}
@@ -790,10 +790,10 @@ export default function BootcampsCrud({
                                 }}
                               >
                                 <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{course.title}</div>
-                                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{course.shortDescription}</div>
+                                <div style={{ fontSize: 12, color: "#475569", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{course.shortDescription}</div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>
                                   <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "rgba(99,102,241,0.08)", color: "var(--accent,#6366f1)", fontWeight: 600 }}>{course.levelLabel}</span>
-                                  <span style={{ fontSize: 11, color: "#94a3b8" }}>{course.durationLabel}</span>
+                                  <span style={{ fontSize: 11, color: "#475569" }}>{course.durationLabel}</span>
                                 </div>
                               </div>
                             ))}
@@ -805,11 +805,11 @@ export default function BootcampsCrud({
                     <div>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                         <p style={{ fontSize: 12, fontWeight: 600, color: "#475569", margin: 0 }}>Formations selectionnees ({getAssignedCourses().length})</p>
-                        <p style={{ fontSize: 11, color: "#94a3b8", margin: 0 }}>Utilisez les fleches pour reorganiser</p>
+                        <p style={{ fontSize: 11, color: "#475569", margin: 0 }}>Utilisez les fleches pour reorganiser</p>
                       </div>
 
                       {getAssignedCourses().length === 0 ? (
-                        <div style={{ padding: "16px", borderRadius: 10, border: "1px dashed #e2e8f0", background: "#f8fafc", textAlign: "center", fontSize: 12, color: "#94a3b8" }}>
+                        <div style={{ padding: "16px", borderRadius: 10, border: "1px dashed #e2e8f0", background: "#f8fafc", textAlign: "center", fontSize: 12, color: "#475569" }}>
                           Aucune formation selectionnee.
                         </div>
                       ) : (
@@ -819,11 +819,11 @@ export default function BootcampsCrud({
                               <div style={{ width: 26, height: 26, borderRadius: 8, background: "rgba(99,102,241,0.12)", color: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>{index + 1}</div>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{course.title}</div>
-                                <div style={{ fontSize: 12, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{course.shortDescription}</div>
+                                <div style={{ fontSize: 12, color: "#475569", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{course.shortDescription}</div>
                               </div>
                               <div style={{ display: "flex", gap: 4 }}>
-                                <IconBtn onClick={() => handleMoveCourse(course.id!, "up")} color="#64748b" hoverBg="#f1f5f9"><ChevronUp style={{ width: 12, height: 12 }} /></IconBtn>
-                                <IconBtn onClick={() => handleMoveCourse(course.id!, "down")} color="#64748b" hoverBg="#f1f5f9"><ChevronDown style={{ width: 12, height: 12 }} /></IconBtn>
+                                <IconBtn onClick={() => handleMoveCourse(course.id!, "up")} color="#475569" hoverBg="#f1f5f9"><ChevronUp style={{ width: 12, height: 12 }} /></IconBtn>
+                                <IconBtn onClick={() => handleMoveCourse(course.id!, "down")} color="#475569" hoverBg="#f1f5f9"><ChevronDown style={{ width: 12, height: 12 }} /></IconBtn>
                                 <IconBtn onClick={() => handleRemoveCourse(course.id!)} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)"><Trash2 style={{ width: 12, height: 12 }} /></IconBtn>
                               </div>
                             </div>
@@ -863,7 +863,7 @@ export default function BootcampsCrud({
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px" }}>
                 {ok ? <CheckCircle style={{ width: 18, height: 18, color: "#22c55e", flexShrink: 0 }} /> : <AlertCircle style={{ width: 18, height: 18, color: "#f43f5e", flexShrink: 0 }} />}
                 <p style={{ flex: 1, fontSize: 13, fontWeight: 600, color: ok ? "#166534" : "#9f1239", margin: 0 }}>{toast.message}</p>
-                <button onClick={() => removeToast(toast.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#94a3b8", display: "flex" }}><X style={{ width: 14, height: 14 }} /></button>
+                <button onClick={() => removeToast(toast.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#475569", display: "flex" }}><X style={{ width: 14, height: 14 }} /></button>
               </div>
               <div style={{ position: "absolute", bottom: 0, left: 0, height: 3, background: ok ? "#22c55e" : "#f43f5e", width: `${progress}%`, transition: "width 0.1s linear" }} />
             </div>

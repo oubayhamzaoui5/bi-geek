@@ -1,55 +1,52 @@
-import { MetadataRoute } from "next"
+import type { MetadataRoute } from "next"
+import { absoluteUrl, siteConfig } from "@/lib/seo"
 
-type Course = {
+type Program = {
   id: string
-  title: string
+  slug?: string
 }
 
-type Bootcamp = {
-  id: string
-  title: string
+async function fetchPrograms(endpoint: "courses" | "bootcamps"): Promise<Program[]> {
+  try {
+    const res = await fetch(absoluteUrl(`/api/${endpoint}`), {
+      next: { revalidate: 3600 },
+    })
+    if (!res.ok) return []
+
+    const data = await res.json()
+    return data[endpoint] ?? []
+  } catch {
+    return []
+  }
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+  const now = new Date()
+  const [courses, bootcamps] = await Promise.all([
+    fetchPrograms("courses"),
+    fetchPrograms("bootcamps"),
+  ])
 
-  if (!siteUrl) {
-    throw new Error("NEXT_PUBLIC_SITE_URL is missing in .env")
-  }
-
-  // Fetch courses
-  let courses: Course[] = []
-  let bootcamps: Bootcamp[] = []
-  try {
-    const coursesRes = await fetch(`${siteUrl}/api/courses`)
-    if (coursesRes.ok) {
-      const coursesData = await coursesRes.json()
-      courses = coursesData.courses ?? []
-    }
-  } catch {}
-  try {
-    const bootcampsRes = await fetch(`${siteUrl}/api/bootcamps`)
-    if (bootcampsRes.ok) {
-      const bootcampsData = await bootcampsRes.json()
-      bootcamps = bootcampsData.bootcamps ?? []
-    }
-  } catch {}
-
-  const courseUrls = courses.map((c) => ({
-    url: `${siteUrl}/course/${c.id}`,
-    lastModified: new Date().toISOString(),
-  }))
-
-  const bootcampUrls = bootcamps.map((b) => ({
-    url: `${siteUrl}/bootcamp/${b.id}`,
-    lastModified: new Date().toISOString(),
-  }))
-
-  return [
-    { url: `${siteUrl}`, lastModified: new Date() },
-    { url: `${siteUrl}/courses`, lastModified: new Date() },
-    { url: `${siteUrl}/bootcamps`, lastModified: new Date() },
-    ...courseUrls,
-    ...bootcampUrls,
+  const staticUrls: MetadataRoute.Sitemap = [
+    { url: siteConfig.url, lastModified: now, changeFrequency: "weekly", priority: 1 },
+    { url: absoluteUrl("/formations"), lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    { url: absoluteUrl("/entreprises"), lastModified: now, changeFrequency: "monthly", priority: 0.75 },
+    { url: absoluteUrl("/a-propos"), lastModified: now, changeFrequency: "monthly", priority: 0.6 },
   ]
+
+  const courseUrls: MetadataRoute.Sitemap = courses.map((course) => ({
+    url: absoluteUrl(`/course/${course.slug || course.id}`),
+    lastModified: now,
+    changeFrequency: "weekly",
+    priority: 0.8,
+  }))
+
+  const bootcampUrls: MetadataRoute.Sitemap = bootcamps.map((bootcamp) => ({
+    url: absoluteUrl(`/bootcamp/${bootcamp.slug || bootcamp.id}`),
+    lastModified: now,
+    changeFrequency: "weekly",
+    priority: 0.85,
+  }))
+
+  return [...staticUrls, ...bootcampUrls, ...courseUrls]
 }

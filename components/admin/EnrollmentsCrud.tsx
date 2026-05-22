@@ -56,12 +56,12 @@ function SelectField({ value, onChange, children }: {
       >
         {children}
       </select>
-      <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none", fontSize: 11 }}>▾</div>
+      <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#475569", pointerEvents: "none", fontSize: 11 }}>▾</div>
     </div>
   )
 }
 
-function IconBtn({ onClick, title, color = "#64748b", hoverBg = "#f1f5f9", children }: {
+function IconBtn({ onClick, title, color = "#475569", hoverBg = "#f1f5f9", children }: {
   onClick: (e: React.MouseEvent) => void; title?: string; color?: string; hoverBg?: string; children: React.ReactNode
 }) {
   const [hover, setHover] = useState(false)
@@ -143,12 +143,12 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
       <div style={{
         width: 32, height: 32, borderRadius: 9, flexShrink: 0,
         background: "#f8fafc", border: "1px solid #e8ecf3",
-        display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8",
+        display: "flex", alignItems: "center", justifyContent: "center", color: "#475569",
       }}>
         {icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", letterSpacing: "0.04em", textTransform: "uppercase" }}>{label}</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#475569", letterSpacing: "0.04em", textTransform: "uppercase" }}>{label}</div>
         <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", marginTop: 1 }}>{value || "—"}</div>
       </div>
     </div>
@@ -266,13 +266,13 @@ export default function EnrollmentsCrud({
         {/* Header */}
         <div style={{ padding: "22px 20px 16px", borderBottom: "1px solid #f1f5f9" }}>
           <div style={{ marginBottom: 14 }}>
-            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8", margin: "0 0 2px" }}>Gestion</p>
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#475569", margin: "0 0 2px" }}>Gestion</p>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", margin: 0 }}>Inscriptions</h1>
           </div>
 
           {/* Search */}
           <div style={{ position: "relative", marginBottom: 12 }}>
-            <Search style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#94a3b8" }} />
+            <Search style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#475569" }} />
             <input
               type="text"
               placeholder="Rechercher..."
@@ -309,7 +309,7 @@ export default function EnrollmentsCrud({
               >
                 <Icon size={13} color={s.color} style={{ margin: "0 auto 3px" }} />
                 <div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>{statusCounts[s.value]}</div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                   {s.label.split(" ")[0]}
                 </div>
               </div>
@@ -322,7 +322,7 @@ export default function EnrollmentsCrud({
           {filtered.length === 0 ? (
             <div style={{ padding: "48px 24px", textAlign: "center" }}>
               <Users style={{ width: 36, height: 36, color: "#e2e8f0", margin: "0 auto 10px" }} />
-              <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>Aucune inscription trouvée</p>
+              <p style={{ fontSize: 13, color: "#475569", margin: 0 }}>Aucune inscription trouvée</p>
             </div>
           ) : filtered.map(e => {
             const isActive = selectedEnrollment?.id === e.id
@@ -351,12 +351,12 @@ export default function EnrollmentsCrud({
                     }}>
                       {e.firstName} {e.lastName}
                     </p>
-                    <p style={{ fontSize: 11, color: "#94a3b8", margin: "0 0 7px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <p style={{ fontSize: 11, color: "#475569", margin: "0 0 7px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {e.courseTitle || e.bootcampTitle || "—"}
                     </p>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <StatusBadge status={e.status} />
-                      <span style={{ fontSize: 11, color: "#94a3b8" }}>{formatDate(e.created)}</span>
+                      <span style={{ fontSize: 11, color: "#475569" }}>{formatDate(e.created)}</span>
                     </div>
                   </div>
                 </div>
@@ -395,7 +395,7 @@ export default function EnrollmentsCrud({
               flexShrink: 0,
             }}>
               <div>
-                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8", margin: 0 }}>Détails</p>
+                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#475569", margin: 0 }}>Détails</p>
                 <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", margin: "2px 0 0" }}>
                   {selectedEnrollment.firstName} {selectedEnrollment.lastName}
                 </h2>
@@ -405,7 +405,7 @@ export default function EnrollmentsCrud({
                   onClick={() => setSelectedEnrollment(null)}
                   style={{
                     padding: "8px 16px", borderRadius: 10, border: "1.5px solid #e2e8f0",
-                    background: "#fff", fontSize: 13, fontWeight: 600, color: "#64748b",
+                    background: "#fff", fontSize: 13, fontWeight: 600, color: "#475569",
                     cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
                   }}
                 >
@@ -445,11 +445,11 @@ export default function EnrollmentsCrud({
                   <InfoRow icon={<Users size={14} />} label="Nom complet" value={`${selectedEnrollment.firstName} ${selectedEnrollment.lastName}`} />
                   <InfoRow icon={<Mail size={14} />} label="Date de naissance" value={selectedEnrollment.birthDate?.split(" ")[0] || "—"} />
                   <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 0" }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: "#f8fafc", border: "1px solid #e8ecf3", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8" }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: "#f8fafc", border: "1px solid #e8ecf3", display: "flex", alignItems: "center", justifyContent: "center", color: "#475569" }}>
                       <CheckCircle size={14} />
                     </div>
                     <div>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", letterSpacing: "0.04em", textTransform: "uppercase" }}>Expérience préalable</div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "#475569", letterSpacing: "0.04em", textTransform: "uppercase" }}>Expérience préalable</div>
                       <span style={{
                         display: "inline-flex", alignItems: "center", gap: 4, marginTop: 3,
                         padding: "2px 8px", borderRadius: 999, fontSize: 12, fontWeight: 600,
@@ -516,7 +516,7 @@ export default function EnrollmentsCrud({
             </div>
             <div style={{ textAlign: "center" }}>
               <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", margin: "0 0 6px" }}>Aucune inscription sélectionnée</h3>
-              <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>Choisissez une inscription dans la liste pour voir les détails.</p>
+              <p style={{ fontSize: 13, color: "#475569", margin: 0 }}>Choisissez une inscription dans la liste pour voir les détails.</p>
             </div>
           </div>
         )}

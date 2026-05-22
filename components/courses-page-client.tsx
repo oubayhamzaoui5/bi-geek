@@ -1,58 +1,97 @@
 "use client"
 
-import { useRef, useState, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { useState, useEffect } from "react"
 import { ProgramCard } from "@/components/program-card"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+
+type ProgramType = "bootcamp" | "course"
 
 type Program = {
   id: string
+  type: ProgramType
   title: string
   shortDescription: string
   durationLabel: string
   levelLabel: string
   tags: string[]
   image?: string | null
+  slug?: string
 }
 
 function SkeletonCard() {
   return (
-    <div className="border border-border animate-pulse flex flex-col">
-      <div className="aspect-video bg-muted" />
-      <div className="p-4 flex flex-col gap-3">
-        <div className="h-5 w-2/3 bg-muted" />
-        <div className="h-3 w-full bg-muted" />
-        <div className="h-3 w-4/5 bg-muted" />
-        <div className="h-3 w-1/2 bg-muted mt-auto pt-3" />
+    <div className="animate-pulse overflow-hidden rounded-lg border border-zinc-200 bg-white">
+      <div className="aspect-[16/10] bg-zinc-100" />
+      <div className="p-5 flex flex-col gap-3">
+        <div className="h-4 w-2/3 rounded bg-zinc-100" />
+        <div className="h-3 w-full rounded bg-zinc-100" />
+        <div className="h-3 w-4/5 rounded bg-zinc-100" />
+        <div className="mt-3 h-3 w-1/2 rounded bg-zinc-100 border-t border-zinc-100 pt-4" />
       </div>
     </div>
   )
 }
 
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <div className="mb-4 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.22em] text-[#8b0f82]">
+      <span className="h-px w-8 bg-[#8b0f82]" />
+      {children}
+    </div>
+  )
+}
+
 export default function CoursesPage() {
-  const [courses, setCourses] = useState<Program[]>([])
+  const [programs, setPrograms] = useState<Program[]>([])
   const router = useRouter()
 
-  const initialCategory =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("category") || "All"
-      : "All"
-  const [selectedTag, setSelectedTag] = useState<string>(initialCategory)
-  const [animKey, setAnimKey] = useState(0)
+  const searchParams = useSearchParams()
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => {
+    const c = searchParams.get("category")
+    return c ? [c] : []
+  })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        const res = await fetch("/api/courses")
-        if (!res.ok) throw new Error(`Failed to fetch courses (${res.status})`)
-        const data = await res.json()
-        const PB_URL = process.env.NEXT_PUBLIC_PB_URL
+    const c = searchParams.get("category")
+    setSelectedTags(c ? [c] : [])
+  }, [searchParams])
 
-        const normalizedCourses: Program[] = (data.courses || []).map((c: any) => ({
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        const PB_URL = process.env.NEXT_PUBLIC_PB_URL
+        const [bootcampsRes, coursesRes] = await Promise.all([
+          fetch("/api/bootcamps"),
+          fetch("/api/courses"),
+        ])
+
+        const [bootcampsData, coursesData] = await Promise.all([
+          bootcampsRes.ok ? bootcampsRes.json() : { bootcamps: [] },
+          coursesRes.ok ? coursesRes.json() : { courses: [] },
+        ])
+
+        const bootcamps: Program[] = (bootcampsData.bootcamps || []).map((b: any) => ({
+          id: b.id,
+          type: "bootcamp" as ProgramType,
+          title: b.title,
+          shortDescription: b.shortDescription || "",
+          durationLabel: b.durationLabel || "--",
+          levelLabel: b.levelLabel || "Tous niveaux",
+          tags: b.tags ?? [],
+          image: b.coverImage
+            ? b.coverImage.startsWith("http")
+              ? b.coverImage
+              : `${PB_URL}/api/files/bootcamps/${b.id}/${b.coverImage}`
+            : null,
+          slug: b.slug,
+        }))
+
+        const courses: Program[] = (coursesData.courses || []).map((c: any) => ({
           id: c.id,
+          type: "course" as ProgramType,
           title: c.title,
           shortDescription: c.shortDescription,
           durationLabel: c.durationLabel,
@@ -63,22 +102,23 @@ export default function CoursesPage() {
               ? c.coverImage
               : `${PB_URL}/api/files/courses/${c.id}/${c.coverImage}`
             : null,
+          slug: c.slug,
         }))
 
-        setCourses(normalizedCourses)
+        setPrograms([...bootcamps, ...courses])
       } catch (err) {
-        console.error("Error fetching courses", err)
+        console.error("Error fetching programs", err)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchCourses()
+    fetchAll()
   }, [])
 
   const tagMap = new Map<string, string>()
-  courses.forEach((course) => {
-    course.tags.forEach((rawTag) => {
+  programs.forEach((p) => {
+    p.tags.forEach((rawTag) => {
       const tag = (rawTag ?? "").trim()
       if (!tag) return
       const key = tag.toLowerCase()
@@ -87,177 +127,160 @@ export default function CoursesPage() {
   })
   const categories = ["All", ...Array.from(tagMap.values())]
 
-  const filteredCourses =
-    selectedTag === "All"
-      ? courses
-      : courses.filter((course) =>
-          course.tags.some((t) => t.toLowerCase() === selectedTag.toLowerCase()),
+  const filtered =
+    selectedTags.length === 0
+      ? programs
+      : programs.filter((p) =>
+          selectedTags.every(s => p.tags.some(t => t.toLowerCase() === s.toLowerCase()))
         )
 
-  const handleCategoryClick = (category: string) => {
-    setSelectedTag(category)
-    setAnimKey((k) => k + 1)
-    const url =
-      category === "All" ? "/courses" : `/courses?category=${encodeURIComponent(category)}`
-    router.push(url)
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev =>
+      prev.some(t => t.toLowerCase() === tag.toLowerCase())
+        ? prev.filter(t => t.toLowerCase() !== tag.toLowerCase())
+        : [...prev, tag]
+    )
+  }
+
+  const removeTag = (tag: string) => {
+    setSelectedTags(prev => prev.filter(t => t.toLowerCase() !== tag.toLowerCase()))
   }
 
   return (
     <>
       <Navbar />
 
-      <main className="px-4 md:px-16">
+      <main>
 
-      {/* ── Hero ── */}
-      <section className="relative overflow-hidden -mx-4 md:-mx-16 px-4 md:px-16 pt-20 pb-16 md:pt-28 md:pb-20 border-b border-border"
-        style={{ backgroundColor: "oklch(0.965 0.004 80)" }}
-      >
-        {/* Ghost word */}
-        <div
-          aria-hidden
-          className="pointer-events-none select-none absolute right-0 top-1/2 -translate-y-1/2 font-display font-black leading-none text-accent"
-          style={{ fontSize: "clamp(5rem, 18vw, 18rem)", opacity: 0.045, letterSpacing: "-0.04em" }}
-        >
-          FORM.
-        </div>
+        {/* ── Hero ── */}
+        <section className="border-b border-zinc-200 bg-white">
+          <div className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-14">
+            <SectionLabel>Catalogue de formations</SectionLabel>
+            <h1 className="mt-2 text-4xl font-semibold tracking-tight text-zinc-950 sm:text-5xl md:text-6xl">
+              Maîtrisez les outils<br />
+              <span className="text-[#8b0f82]">qui recrutent.</span>
+            </h1>
+          </div>
+        </section>
 
-        <div className="relative z-10 max-w-4xl">
-          {/* Eyebrow */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex items-center gap-3 mb-8"
-          >
-            <div className="h-px w-8 bg-accent" />
-            <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-accent font-medium">
-              Catalogue de formations
-            </span>
-          </motion.div>
+        {/* ── Filters + Grid ── */}
+        <section className="py-8 md:py-10">
 
-          {/* Headline */}
-          <motion.h1
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, delay: 0.1 }}
-            className="font-display font-black text-foreground leading-[0.95] tracking-tight mb-6"
-            style={{ fontSize: "clamp(2.6rem, 6.5vw, 5.5rem)" }}
-          >
-            Maîtrisez les outils<br />
-            <span className="text-accent">qui recrutent.</span>
-          </motion.h1>
+          <style>{`
+            @keyframes marquee-left  { from { transform: translateX(0) }    to { transform: translateX(-50%) } }
+            @keyframes marquee-right { from { transform: translateX(-50%) } to { transform: translateX(0) }    }
+            .marquee-left  { animation: marquee-left  90s linear infinite; }
+            .marquee-right { animation: marquee-right 65s linear infinite; }
+            .marquee-left:hover, .marquee-right:hover { animation-play-state: paused; }
+          `}</style>
 
-          {/* Description + stat */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.25 }}
-            className="flex flex-col sm:flex-row sm:items-end gap-6"
-          >
-            <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-md">
-              Explorez nos parcours par domaine — de la data à la BI, du cloud au
-              développement — et progressez à votre rythme.
-            </p>
-            {!loading && (
-              <div className="shrink-0 border-l-2 border-accent pl-5">
-                <div className="font-display font-black text-4xl text-foreground leading-none">
-                  {courses.length}
+          <div className="mx-auto max-w-7xl px-4 md:px-6">
+
+          {/* Active filter chips */}
+          {selectedTags.length > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Filtres :</span>
+              {selectedTags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => removeTag(tag)}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-[#8b0f82] px-3 py-1 text-xs font-semibold text-white transition hover:bg-[#710c6a]"
+                >
+                  {tag}
+                  <svg viewBox="0 0 12 12" fill="none" className="h-3 w-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M2 2l8 8M10 2l-8 8"/>
+                  </svg>
+                </button>
+              ))}
+              <button onClick={() => setSelectedTags([])} className="cursor-pointer text-xs text-zinc-400 underline transition hover:text-zinc-700">
+                Tout effacer
+              </button>
+            </div>
+          )}
+
+          {/* Marquee rows */}
+          {loading ? (
+            <div className="mb-8 space-y-2">
+              {[0,1].map(r => (
+                <div key={r} className="flex gap-2 overflow-hidden">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="h-8 w-28 shrink-0 animate-pulse rounded-full bg-zinc-100" />
+                  ))}
                 </div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mt-1">
-                  formations disponibles
+              ))}
+            </div>
+          ) : (() => {
+            const tags = categories.filter(c => c !== "All")
+            const mid = Math.ceil(tags.length / 2)
+            const row1 = tags.slice(0, mid)
+            const row2 = tags.slice(mid)
+            const renderTag = (tag: string, key: string) => {
+              const active = selectedTags.some(t => t.toLowerCase() === tag.toLowerCase())
+              return (
+                <button
+                  key={key}
+                  onClick={() => toggleTag(tag)}
+                  className={[
+                    "shrink-0 cursor-pointer rounded-full border px-4 py-1.5 text-sm font-medium transition",
+                    active
+                      ? "border-[#8b0f82] bg-[#8b0f82] text-white"
+                      : "border-zinc-200 bg-white text-zinc-700 hover:border-[#8b0f82]/40 hover:text-[#8b0f82]",
+                  ].join(" ")}
+                >
+                  {tag}
+                </button>
+              )
+            }
+            return (
+              <div className="mb-8 space-y-2.5 overflow-hidden">
+                {/* Row 1 — slides left */}
+                <div className="flex w-max gap-2.5 marquee-left">
+                  {[...row1, ...row1].map((t, i) => renderTag(t, `r1-${i}`))}
+                </div>
+                {/* Row 2 — slides right */}
+                <div className="flex w-max gap-2.5 marquee-right">
+                  {[...row2, ...row2].map((t, i) => renderTag(t, `r2-${i}`))}
                 </div>
               </div>
-            )}
-          </motion.div>
-        </div>
-      </section>
+            )
+          })()}
 
-      {/* ── Filters + Grid ── */}
-      <section className="py-12 md:py-16 min-h-[60vh]">
-        <div className="container mx-auto px-4 md:px-6">
+          </div>{/* end max-w-7xl wrapper */}
 
-          {/* Filters */}
-          <div className="mb-10">
+          {/* Grid */}
+          <div className="mx-auto max-w-7xl px-4 md:px-6">
             {loading ? (
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="h-8 w-20 bg-muted animate-pulse shrink-0" />
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <SkeletonCard key={i} />
                 ))}
               </div>
+            ) : filtered.length === 0 ? (
+              <div className="rounded-lg border border-zinc-200 bg-white p-12 text-center">
+                <p className="font-semibold text-zinc-950">Aucune formation trouvée</p>
+                <p className="mt-2 text-sm text-zinc-600">Essayez une autre catégorie ou revenez bientôt.</p>
+              </div>
             ) : (
-              <div className="flex gap-2 flex-wrap">
-                {categories.map((category, i) => (
-                  <motion.button
-                    key={category}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: i * 0.05 }}
-                    onClick={() => handleCategoryClick(category)}
-                    className={[
-                      "font-mono text-[11px] uppercase tracking-[0.15em] px-4 py-2 border transition-all duration-200",
-                      selectedTag === category
-                        ? "border-accent bg-accent text-white"
-                        : "border-border text-muted-foreground hover:border-accent hover:text-accent",
-                    ].join(" ")}
-                  >
-                    {category === "All" ? "Tous" : category}
-                  </motion.button>
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                {filtered.map((p) => (
+                  <ProgramCard
+                    key={`${p.type}-${p.id}`}
+                    program={{
+                      id: p.id,
+                      title: p.title,
+                      shortDescription: p.shortDescription,
+                      durationLabel: p.durationLabel,
+                      tags: p.type === "bootcamp" ? ["Bootcamp", ...p.tags] : p.tags,
+                      image: p.image,
+                      slug: p.slug,
+                    }}
+                    variant={p.type}
+                  />
                 ))}
               </div>
             )}
           </div>
-
-          {/* Grid */}
-          {loading ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <SkeletonCard key={i} />
-              ))}
-            </div>
-          ) : filteredCourses.length === 0 ? (
-            <div className="py-24 text-center">
-              <div
-                aria-hidden
-                className="font-display font-black text-accent/10 leading-none mb-4 select-none"
-                style={{ fontSize: "clamp(4rem, 12vw, 10rem)" }}
-              >
-                0
-              </div>
-              <p className="font-display font-bold text-xl text-foreground mb-2">
-                Aucune formation trouvée
-              </p>
-              <p className="text-muted-foreground text-sm">
-                Essayez une autre catégorie ou revenez bientôt.
-              </p>
-            </div>
-          ) : (
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={animKey}
-                initial="hidden"
-                animate="show"
-                variants={{
-                  hidden: {},
-                  show: { transition: { staggerChildren: 0.07 } },
-                }}
-                className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
-              >
-                {filteredCourses.map((course) => (
-                  <motion.div
-                    key={course.id}
-                    variants={{
-                      hidden: { opacity: 0, y: 20 },
-                      show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
-                    }}
-                  >
-                    <ProgramCard program={course} />
-                  </motion.div>
-                ))}
-              </motion.div>
-            </AnimatePresence>
-          )}
-        </div>
-      </section>
+        </section>
 
       </main>
 

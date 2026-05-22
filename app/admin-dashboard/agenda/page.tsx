@@ -4,15 +4,12 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   ChevronLeft, ChevronRight, Calendar, List, Grid3X3,
-  Wifi, MapPin, MonitorSmartphone, HelpCircle,
   X, Save, Trash2, Clock, Users, AlertCircle,
-  Plus, Check, Loader2,
+  Plus, Check, Loader2, MapPin, Monitor, HelpCircle, XCircle, RefreshCw,
 } from "lucide-react"
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-
-type SessionMode = "live" | "presentiel" | "live_presentiel" | "not_set"
 
 type Session = {
   id: string | null
@@ -21,7 +18,7 @@ type Session = {
   date: string          // YYYY-MM-DD
   start_time: string    // HH:MM
   duration: number      // minutes
-  mode: SessionMode
+  mode: string
   title: string | null
   notes: string
   is_cancelled: boolean
@@ -54,27 +51,6 @@ const MONTHS_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
 const HOUR_START = 7
 const HOUR_END = 22
 const SLOT_HEIGHT = 64 // px per hour
-
-const MODE_META: Record<SessionMode, {
-  label: string; color: string; bg: string; border: string; icon: React.ElementType
-}> = {
-  live: {
-    label: "Live", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe",
-    icon: Wifi,
-  },
-  presentiel: {
-    label: "Présentiel", color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0",
-    icon: MapPin,
-  },
-  live_presentiel: {
-    label: "Live + Présentiel", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe",
-    icon: MonitorSmartphone,
-  },
-  not_set: {
-    label: "Non défini", color: "#64748b", bg: "#f8fafc", border: "#e2e8f0",
-    icon: HelpCircle,
-  },
-}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -186,6 +162,7 @@ function SessionPanel({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [updateMode, setUpdateMode] = useState<"single" | "all_following">("single")
+  const [activeTab, setActiveTab] = useState<"details" | "presences">("details")
   const isPast = session.date < toYMD(new Date())
 
   const group = groups.find(g => g.id === draft.group)
@@ -193,9 +170,6 @@ function SessionPanel({
     const d = new Date(draft.date + "T12:00:00")
     return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
   })()
-
-  const meta = MODE_META[draft.mode]
-  const ModeIcon = meta.icon
 
   async function save() {
     setSaving(true)
@@ -226,25 +200,57 @@ function SessionPanel({
           <div className="flex items-center gap-2.5">
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ background: meta.bg, border: `1px solid ${meta.border}` }}
+              style={{ background: "#f1f5f9", border: "1px solid #e2e8f0" }}
             >
-              <ModeIcon size={16} style={{ color: meta.color }} />
+              <Calendar size={16} style={{ color: "#475569" }} />
             </div>
             <div>
               <p className="text-[13px] font-semibold text-gray-900">
                 {draft.title || group?.title || "Session"}
               </p>
-              <p className="text-[11px] text-gray-400 capitalize">{dateFmt}</p>
+              <p className="text-[11px] text-gray-600 capitalize">{dateFmt}</p>
             </div>
           </div>
           <button onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-600
               hover:bg-gray-100 hover:text-gray-600 transition-colors">
             <X size={16} />
           </button>
         </div>
 
+        {/* Tabs */}
+        <div className="flex items-center gap-1 px-5 py-2 border-b border-gray-100 bg-gray-50/60">
+          {([
+            { key: "details" as const,   label: "Détails" },
+            { key: "presences" as const, label: "Présences" },
+          ]).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`h-7 px-3 rounded-md text-[11px] font-semibold transition-all
+                ${activeTab === tab.key
+                  ? "bg-white text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Presences tab */}
+        {activeTab === "presences" && session.id && (
+          <PresenceTab sessionId={session.id} />
+        )}
+        {activeTab === "presences" && !session.id && (
+          <div className="flex-1 flex items-center justify-center px-6 py-10 text-center">
+            <p className="text-[12px] text-gray-500">
+              Enregistrez d&apos;abord la session pour voir les présences.
+            </p>
+          </div>
+        )}
+
         {/* Body */}
+        {activeTab === "details" && (
         <div className={`flex-1 overflow-y-auto px-6 py-5 space-y-5 ${isPast ? "pointer-events-none" : ""}`}>
 
           {/* Past session banner */}
@@ -264,7 +270,7 @@ function SessionPanel({
           )}
 
           {/* Group info */}
-          <div className="flex items-center gap-2 text-[12px] text-gray-500">
+          <div className="flex items-center gap-2 text-[12px] text-gray-600">
             <Users size={13} />
             <span className="font-medium text-gray-700">{group?.title || draft.group}</span>
           </div>
@@ -272,7 +278,7 @@ function SessionPanel({
           {/* Time / Duration */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">
                 Heure de début
               </label>
               <input
@@ -284,7 +290,7 @@ function SessionPanel({
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">
                 Durée (min)
               </label>
               <input
@@ -300,42 +306,11 @@ function SessionPanel({
             </div>
           </div>
 
-          {/* Mode */}
-          <div>
-            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
-              Mode de session
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(MODE_META) as SessionMode[]).map((m) => {
-                const mm = MODE_META[m]
-                const MIcon = mm.icon
-                const active = draft.mode === m
-                return (
-                  <button
-                    key={m}
-                    onClick={() => setDraft(d => ({ ...d, mode: m }))}
-                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg border text-[12px]
-                      font-medium transition-all"
-                    style={{
-                      background: active ? mm.bg : "#fff",
-                      borderColor: active ? mm.color : "#e5e7eb",
-                      color: active ? mm.color : "#6b7280",
-                    }}
-                  >
-                    <MIcon size={13} />
-                    <span>{mm.label}</span>
-                    {active && <Check size={12} className="ml-auto" />}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
           {/* Cancel toggle */}
           <div className="flex items-center justify-between py-3 px-3 rounded-lg bg-gray-50 border border-gray-100">
             <div>
               <p className="text-[12px] font-semibold text-gray-700">Annuler la session</p>
-              <p className="text-[11px] text-gray-400">Marquer comme annulée</p>
+              <p className="text-[11px] text-gray-600">Marquer comme annulée</p>
             </div>
             <button
               onClick={() => setDraft(d => ({ ...d, is_cancelled: !d.is_cancelled }))}
@@ -349,18 +324,19 @@ function SessionPanel({
             </button>
           </div>
         </div>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 space-y-3">
-          {/* Update scope — only for existing, non-past sessions */}
-          {!isPast && session.id && (
+          {/* Update scope — only in details tab for existing, non-past sessions */}
+          {activeTab === "details" && !isPast && session.id && (
             <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setUpdateMode("single")}
                 className={`flex-1 h-7 rounded-md text-[11px] font-medium transition-all
                   ${updateMode === "single"
                     ? "bg-white text-gray-800 shadow-sm"
-                    : "text-gray-400 hover:text-gray-600"}`}
+                    : "text-gray-600 hover:text-gray-600"}`}
               >
                 Cette session
               </button>
@@ -369,14 +345,14 @@ function SessionPanel({
                 className={`flex-1 h-7 rounded-md text-[11px] font-medium transition-all
                   ${updateMode === "all_following"
                     ? "bg-white text-gray-800 shadow-sm"
-                    : "text-gray-400 hover:text-gray-600"}`}
+                    : "text-gray-600 hover:text-gray-600"}`}
               >
                 Toutes les suivantes
               </button>
             </div>
           )}
           <div className="flex items-center gap-2">
-            {session.id && !isPast && (
+            {activeTab === "details" && session.id && !isPast && (
               <button
                 onClick={del}
                 disabled={deleting}
@@ -391,11 +367,11 @@ function SessionPanel({
             <button
               onClick={onClose}
               className="h-9 px-4 rounded-lg border border-gray-200 text-[12px] font-medium
-                text-gray-500 hover:bg-gray-50 transition-colors ml-auto"
+                text-gray-600 hover:bg-gray-50 transition-colors ml-auto"
             >
               Fermer
             </button>
-            {!isPast && (
+            {activeTab === "details" && !isPast && (
               <button
                 onClick={save}
                 disabled={saving}
@@ -408,6 +384,140 @@ function SessionPanel({
             )}
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Presence Status Helpers ───────────────────────────────────────────────────
+
+const PRESENCE_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
+  presentiel: { label: "Présentiel",  color: "#16A34A", bg: "#F0FDF4", icon: MapPin },
+  en_ligne:   { label: "En ligne",    color: "#2563EB", bg: "#EFF6FF", icon: Monitor },
+  pas_sur:    { label: "Pas sûr",     color: "#D97706", bg: "#FFFBEB", icon: HelpCircle },
+  absent:     { label: "Absent",      color: "#DC2626", bg: "#FEF2F2", icon: XCircle },
+}
+
+type StudentPresence = {
+  id: string
+  name: string
+  surname: string
+  email: string
+  status: string | null
+  confirmed_at: string | null
+}
+
+function PresenceTab({ sessionId }: { sessionId: string }) {
+  const [data, setData] = useState<StudentPresence[]>([])
+  const [loading, setLoading] = useState(true)
+  const [groupTitle, setGroupTitle] = useState("")
+
+  function load() {
+    setLoading(true)
+    fetch(`/api/admin/sessions/${sessionId}/presence`)
+      .then(r => r.json())
+      .then(d => {
+        setData(d.students || [])
+        setGroupTitle(d.groupTitle || "")
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [sessionId])
+
+  const counts = {
+    presentiel: data.filter(s => s.status === "presentiel").length,
+    en_ligne:   data.filter(s => s.status === "en_ligne").length,
+    pas_sur:    data.filter(s => s.status === "pas_sur").length,
+    absent:     data.filter(s => s.status === "absent").length,
+    no_reply:   data.filter(s => !s.status).length,
+  }
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 size={18} className="animate-spin text-gray-300" />
+      </div>
+    )
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center py-10 px-6">
+        <Users size={28} className="text-gray-200 mb-2" />
+        <p className="text-[12px] text-gray-500 font-medium">Aucun étudiant dans ce groupe</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      {/* Summary pills */}
+      <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-1.5 flex-wrap">
+        {Object.entries(PRESENCE_CONFIG).map(([key, cfg]) => {
+          const count = counts[key as keyof typeof counts]
+          if (count === 0) return null
+          const Icon = cfg.icon
+          return (
+            <span
+              key={key}
+              className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full"
+              style={{ background: cfg.bg, color: cfg.color }}
+            >
+              <Icon size={9} />
+              {count} {cfg.label}
+            </span>
+          )
+        })}
+        {counts.no_reply > 0 && (
+          <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-500">
+            {counts.no_reply} Sans réponse
+          </span>
+        )}
+        <button
+          onClick={load}
+          className="ml-auto w-6 h-6 flex items-center justify-center rounded-md text-gray-400
+            hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          title="Actualiser"
+        >
+          <RefreshCw size={11} />
+        </button>
+      </div>
+
+      {/* Student list */}
+      <div className="divide-y divide-gray-100">
+        {data.map(s => {
+          const cfg = s.status ? PRESENCE_CONFIG[s.status] : null
+          const Icon = cfg?.icon
+          return (
+            <div key={s.id} className="flex items-center gap-3 px-5 py-2.5">
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+                style={{ background: cfg?.bg ?? "#F3F4F6", color: cfg?.color ?? "#9CA3AF" }}
+              >
+                {(s.name || s.surname || "?")[0].toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-semibold text-gray-800 truncate">
+                  {s.name} {s.surname}
+                </p>
+                <p className="text-[10px] text-gray-400 truncate">{s.email}</p>
+              </div>
+              {cfg && Icon ? (
+                <span
+                  className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                  style={{ background: cfg.bg, color: cfg.color }}
+                >
+                  <Icon size={9} />
+                  {cfg.label}
+                </span>
+              ) : (
+                <span className="text-[10px] text-gray-400 font-medium shrink-0">—</span>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -445,12 +555,12 @@ function SlotRow({
   return (
     <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-3 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+        <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
           Séance {index + 1}
         </span>
         <button
           onClick={() => onRemove(index)}
-          className="w-6 h-6 flex items-center justify-center rounded-md text-gray-300
+          className="w-6 h-6 flex items-center justify-center rounded-md text-gray-400
             hover:text-red-400 hover:bg-red-50 transition-colors"
         >
           <X size={13} />
@@ -466,7 +576,7 @@ function SlotRow({
             className={`px-2 py-1 rounded-md text-[11px] font-semibold border transition-all
               ${slot.day === d.val
                 ? "bg-violet-600 text-white border-violet-600"
-                : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
               }`}
           >
             {d.short}
@@ -477,7 +587,7 @@ function SlotRow({
       {/* Time + Duration */}
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+          <label className="block text-[9px] font-bold text-gray-600 uppercase tracking-wider mb-1">
             Heure
           </label>
           <input
@@ -489,7 +599,7 @@ function SlotRow({
           />
         </div>
         <div>
-          <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+          <label className="block text-[9px] font-bold text-gray-600 uppercase tracking-wider mb-1">
             Durée (min)
           </label>
           <input
@@ -552,10 +662,10 @@ function GroupScheduleModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <div>
             <h2 className="text-[14px] font-bold text-gray-900">Planning hebdomadaire</h2>
-            <p className="text-[12px] text-gray-400 mt-0.5">{group.title}</p>
+            <p className="text-[12px] text-gray-600 mt-0.5">{group.title}</p>
           </div>
           <button onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">
             <X size={16} />
           </button>
         </div>
@@ -570,7 +680,7 @@ function GroupScheduleModal({
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-[9px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">
                   Date de début
                 </label>
                 <input
@@ -582,7 +692,7 @@ function GroupScheduleModal({
                 />
               </div>
               <div>
-                <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-[9px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">
                   Date de fin
                 </label>
                 <input
@@ -598,15 +708,15 @@ function GroupScheduleModal({
 
           {/* Séances */}
           <div className="space-y-3">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+            <p className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
               Séances hebdomadaires
             </p>
 
             {slots.length === 0 && (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Clock size={28} className="text-gray-200 mb-2" />
-                <p className="text-[12px] text-gray-400">Aucune séance définie</p>
-                <p className="text-[11px] text-gray-300 mt-0.5">Ajoutez une séance pour générer les sessions automatiquement</p>
+                <p className="text-[12px] text-gray-600">Aucune séance définie</p>
+                <p className="text-[11px] text-gray-600 mt-0.5">Ajoutez une séance pour générer les sessions automatiquement</p>
               </div>
             )}
 
@@ -623,7 +733,7 @@ function GroupScheduleModal({
             <button
               onClick={() => setSlots(prev => [...prev, emptySlot()])}
               className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-dashed
-                border-gray-300 text-[12px] font-medium text-gray-400 hover:border-violet-400
+                border-gray-300 text-[12px] font-medium text-gray-600 hover:border-violet-400
                 hover:text-violet-600 hover:bg-violet-50/50 transition-all"
             >
               <Plus size={14} />
@@ -634,12 +744,12 @@ function GroupScheduleModal({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 flex justify-between items-center shrink-0">
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-gray-600">
             {slots.length} séance{slots.length > 1 ? "s" : ""} / semaine
           </p>
           <div className="flex gap-2">
             <button onClick={onClose}
-              className="h-9 px-4 rounded-lg border border-gray-200 text-[12px] font-medium text-gray-500 hover:bg-gray-50 transition-colors">
+              className="h-9 px-4 rounded-lg border border-gray-200 text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition-colors">
               Annuler
             </button>
             <button onClick={save} disabled={saving}
@@ -725,7 +835,7 @@ function WeekGrid({
               key={i}
               className="flex-1 min-w-0 flex flex-col items-center py-2.5 gap-0.5 border-r border-gray-100 last:border-r-0"
             >
-              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+              <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
                 {DAYS_FR[i]}
               </span>
               <div
@@ -747,7 +857,7 @@ function WeekGrid({
             {hours.map(h => (
               <div
                 key={h}
-                className="absolute right-2 text-[10px] text-gray-400 font-medium leading-none"
+                className="absolute right-2 text-[10px] text-gray-600 font-medium leading-none"
                 style={{ top: (h - HOUR_START) * SLOT_HEIGHT - 6 }}
               >
                 {String(h).padStart(2, "0")}:00
@@ -930,7 +1040,7 @@ function MonthGrid({
       {/* Day headers */}
       <div className="grid grid-cols-7 border-b border-gray-100 bg-white shrink-0">
         {DAYS_FR.map(d => (
-          <div key={d} className="py-2 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+          <div key={d} className="py-2 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider">
             {d}
           </div>
         ))}
@@ -971,7 +1081,6 @@ function MonthGrid({
                           const chipBorder = isCancelled ? "#fecaca" : gc
                           const chipText = isCancelled ? "#dc2626" : "#ffffff"
                           const chipAccent = isCancelled ? "#ef4444" : "#ffffff"
-                          const ModeIcon = MODE_META[s.mode].icon
                           return (
                             <button
                               key={si}
@@ -993,7 +1102,7 @@ function MonthGrid({
                           )
                         })}
                         {daySessions.length > 3 && (
-                          <p className="text-[10px] text-gray-400 pl-1">+{daySessions.length - 3} autres</p>
+                          <p className="text-[10px] text-gray-600 pl-1">+{daySessions.length - 3} autres</p>
                         )}
                       </div>
                     </>
@@ -1034,7 +1143,7 @@ function ListView({
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <Calendar size={40} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-[13px] text-gray-400">Aucune session à venir</p>
+          <p className="text-[13px] text-gray-600">Aucune session à venir</p>
         </div>
       </div>
     )
@@ -1053,7 +1162,7 @@ function ListView({
             <div className="flex items-center gap-2 mb-2">
               <span
                 className={`text-[12px] font-bold capitalize
-                  ${isToday ? "text-violet-600" : "text-gray-500"}`}
+                  ${isToday ? "text-violet-600" : "text-gray-600"}`}
               >
                 {dayLabel}
               </span>
@@ -1065,7 +1174,6 @@ function ListView({
             </div>
             <div className="space-y-2">
               {grouped[date].map((s, i) => {
-                const ModeIcon = MODE_META[s.mode].icon
                 const gc = groupColorMap.get(s.group) ?? "#475569"
                 const isCancelled = s.is_cancelled
                 const cardBg = isCancelled ? "#f3f4f6" : gc
@@ -1091,10 +1199,8 @@ function ListView({
                     >
                       {isCancelled ? (
                         <AlertCircle size={16} style={{ color: "#dc2626" }} />
-                      ) : s.mode === "not_set" ? (
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#ffffff", opacity: 0.92 }} />
                       ) : (
-                        <ModeIcon size={16} style={{ color: "#ffffff" }} />
+                        <Calendar size={16} style={{ color: "#ffffff" }} />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -1106,9 +1212,6 @@ function ListView({
                           <Clock size={10} />
                           {s.start_time} · {formatDuration(s.duration)}
                         </span>
-                        <span className="text-[10px] font-medium" style={{ color: isCancelled ? "#ef4444" : "#ffffff", opacity: 0.92 }}>
-                          {MODE_META[s.mode].label}
-                        </span>
                       </div>
                     </div>
                     {s.is_cancelled && (
@@ -1117,7 +1220,7 @@ function ListView({
                       </span>
                     )}
                     {s.virtual && !s.is_cancelled && (
-                      <span className="text-[10px] bg-gray-50 text-gray-400 border border-gray-100 px-2 py-0.5 rounded font-medium shrink-0">
+                      <span className="text-[10px] bg-gray-50 text-gray-600 border border-gray-100 px-2 py-0.5 rounded font-medium shrink-0">
                         Auto
                       </span>
                     )}
@@ -1191,7 +1294,7 @@ export default function AgendaPage() {
             schedule_start_date: g.schedule_start_date || undefined,
             schedule_end_date: g.schedule_end_date || undefined,
           }))
-          .filter((g: Group) => g.status !== "completed")
+          .filter((g: Group) => g.status === "in_progress")
           .sort((a: Group, b: Group) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99))
         setGroups(g)
       })
@@ -1387,7 +1490,7 @@ export default function AgendaPage() {
               date: draft.date,
               start_time: matchingSlot.start_time,
               duration: matchingSlot.duration,
-              mode: "not_set",
+              mode: "live_presentiel",
               title: null,
               notes: "",
               is_cancelled: false,
@@ -1516,13 +1619,13 @@ export default function AgendaPage() {
             <div className="flex items-center gap-1">
               <button
                 onClick={prevPeriod}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 onClick={nextPeriod}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
               >
                 <ChevronRight size={16} />
               </button>
@@ -1545,7 +1648,7 @@ export default function AgendaPage() {
           <span className="text-[14px] font-semibold text-gray-800">Toutes les sessions</span>
         )}
 
-        {loading && <Loader2 size={14} className="text-gray-400 animate-spin ml-1" />}
+        {loading && <Loader2 size={14} className="text-gray-600 animate-spin ml-1" />}
 
         {/* View switcher */}
         <div className="ml-auto flex items-center gap-1 bg-gray-100 rounded-lg p-1">
@@ -1560,7 +1663,7 @@ export default function AgendaPage() {
               className={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium transition-all
                 ${view === val
                   ? "bg-white text-gray-800 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"}`}
+                  : "text-gray-600 hover:text-gray-700"}`}
             >
               <Icon size={12} />
               <span className="hidden sm:inline">{label}</span>
@@ -1577,7 +1680,7 @@ export default function AgendaPage() {
             ${sidebarOpen ? "w-52" : "w-0 overflow-hidden"}`}
         >
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Groupes</span>
+            <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Groupes</span>
           </div>
           <div className="flex-1 overflow-y-auto py-2 px-2">
             {(["in_progress", "not_started"] as const).map(status => {
@@ -1586,7 +1689,7 @@ export default function AgendaPage() {
               const label = status === "in_progress" ? "En cours" : "Pas commencé"
               return (
                 <div key={status} className="mb-3">
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-1.5 mb-1">{label}</p>
+                  <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest px-1.5 mb-1">{label}</p>
                   <div className="space-y-0.5">
                   {statusGroups.map(g => {
               const hidden = focusedGroupId !== null && focusedGroupId !== g.id
@@ -1611,14 +1714,14 @@ export default function AgendaPage() {
                   </button>
                   <button
                     onClick={() => setScheduleGroup(g)}
-                    className="w-5 h-5 flex items-center justify-center rounded text-gray-300
+                    className="w-5 h-5 flex items-center justify-center rounded text-gray-400
                       opacity-0 group-hover/item:opacity-100 hover:text-gray-600 hover:bg-gray-100 transition-all"
                     title="Modifier le planning"
                   >
                     <Clock size={11} />
                   </button>
                   {hasSchedule ? (
-                    <span className="text-[9px] font-bold text-gray-300 shrink-0"
+                    <span className="text-[9px] font-bold text-gray-400 shrink-0"
                       title={`${g.schedules.length} séance${g.schedules.length > 1 ? "s" : ""}/semaine`}>
                       ×{g.schedules.length}
                     </span>
@@ -1634,27 +1737,13 @@ export default function AgendaPage() {
             })}
           </div>
 
-          {/* Legend */}
-          <div className="px-3 py-3 border-t border-gray-100 space-y-1.5">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Modes</p>
-            {(Object.keys(MODE_META) as SessionMode[]).filter(m => m !== "not_set").map(m => {
-              const mm = MODE_META[m]
-              const MIcon = mm.icon
-              return (
-                <div key={m} className="flex items-center gap-1.5">
-                  <MIcon size={11} style={{ color: mm.color }} />
-                  <span className="text-[11px] text-gray-500">{mm.label}</span>
-                </div>
-              )
-            })}
-          </div>
         </div>
 
         {/* Toggle sidebar button */}
         <button
           onClick={() => setSidebarOpen(p => !p)}
           className="shrink-0 w-4 flex items-center justify-center border-r border-gray-100
-            bg-white text-gray-300 hover:text-gray-500 hover:bg-gray-50 transition-colors cursor-pointer"
+            bg-white text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
         >
           <div className="flex flex-col gap-0.5">
             <span className="w-1 h-1 rounded-full bg-current" />

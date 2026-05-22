@@ -4,15 +4,14 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Menu, X, User as UserIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 const navLinks = [
-  { href: "/#about",   label: "À propos",   type: "home-section" },
-  { href: "/courses",  label: "Formations", type: "page" },
-  { href: "/bootcamps",label: "Bootcamps",  type: "page" },
-  { href: "/#contact", label: "Contact",    type: "home-section" },
-  { href: "/#faq",     label: "FAQ",        type: "home-section" },
+  { href: "/",            label: "Accueil",            type: "page",         accent: false },
+  { href: "/a-propos",    label: "À propos",          type: "page",         accent: false },
+  { href: "/formations",   label: "Formations",         type: "page",         accent: false },
+  { href: "/#contact",    label: "Contact",            type: "home-section", accent: false },
+  { href: "/entreprises", label: "Offres entreprise",  type: "page",         accent: true  },
 ]
 
 function Spinner() {
@@ -68,12 +67,15 @@ export function Navbar() {
           {/* Desktop nav — centred */}
           <div className="hidden lg:flex items-center gap-1 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             {navLinks.map((link) => {
+              const accentCls = link.accent
+                ? "text-[#8b0f82] font-semibold hover:text-[#710c6a]"
+                : "text-muted-foreground hover:text-foreground"
               if (link.type === "page") {
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-sm"
+                    className={`px-4 py-2 text-sm font-medium transition-colors rounded-sm ${accentCls}`}
                   >
                     {link.label}
                   </Link>
@@ -85,7 +87,7 @@ export function Navbar() {
                   <button
                     key={link.href}
                     onClick={() => smoothScrollTo(`#${hash}`, 64)}
-                    className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-sm"
+                    className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer rounded-sm ${accentCls}`}
                   >
                     {link.label}
                   </button>
@@ -95,7 +97,7 @@ export function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-sm"
+                  className={`px-4 py-2 text-sm font-medium transition-colors rounded-sm ${accentCls}`}
                 >
                   {link.label}
                 </Link>
@@ -105,40 +107,39 @@ export function Navbar() {
 
           {/* Right side */}
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              className={cn(
-                "min-w-[104px] flex items-center justify-center gap-2 cursor-pointer rounded-none text-sm font-semibold",
-                "bg-accent hover:bg-accent/90 text-white"
-              )}
-              disabled={authLoading}
-              onClick={() => {
-                if (!user) return
-                if (user.role === "admin") router.push("/admin-dashboard")
-                else if (user.role === "instructor") router.push("/instructor-dashboard")
-                else router.push("/student-dashboard")
-              }}
-            >
-              {authLoading ? (
+            {authLoading ? (
+              <div className="min-w-[104px] flex items-center justify-center gap-2 h-8 px-3 rounded-none text-sm font-semibold bg-accent text-white opacity-50">
                 <Spinner />
-              ) : user ? (
-                <>
-                  <UserIcon size={15} />
-                  {user.username}
-                </>
-              ) : (
-                <Link href="/login" className="w-full text-center">Se connecter</Link>
-              )}
-            </Button>
+              </div>
+            ) : user ? (
+              <button
+                type="button"
+                className="min-w-[104px] flex items-center justify-center gap-2 h-8 px-3 rounded-none text-sm font-semibold bg-accent hover:bg-accent/90 text-white transition-colors cursor-pointer"
+                onClick={() => {
+                  if (user.role === "admin") router.push("/admin-dashboard")
+                  else if (user.role === "instructor") router.push("/instructor-dashboard")
+                  else router.push("/student-dashboard")
+                }}
+              >
+                <UserIcon size={15} />
+                {user.username}
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="min-w-[104px] flex items-center justify-center gap-2 h-8 px-3 rounded-none text-sm font-semibold bg-accent hover:bg-accent/90 text-white transition-colors"
+              >
+                Se connecter
+              </Link>
+            )}
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="lg:hidden"
+            <button
+              type="button"
+              className="lg:hidden flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent/10 transition-colors"
               onClick={() => setMobileMenuOpen((v) => !v)}
             >
               {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
+            </button>
           </div>
         </div>
 
@@ -147,12 +148,15 @@ export function Navbar() {
           <div className="lg:hidden border-t border-border py-4 bg-background">
             <div className="flex flex-col">
               {navLinks.map((link) => {
+                const accentCls = link.accent
+                  ? "text-[#8b0f82] font-semibold"
+                  : "text-muted-foreground"
                 if (link.type === "page") {
                   return (
                     <Link
                       key={link.href}
                       href={link.href}
-                      className="px-2 py-3 text-sm font-medium text-muted-foreground hover:text-foreground border-b border-border/50 last:border-0"
+                      className={`px-2 py-3 text-sm font-medium border-b border-border/50 last:border-0 ${accentCls}`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {link.label}
@@ -168,7 +172,7 @@ export function Navbar() {
                         setMobileMenuOpen(false)
                         requestAnimationFrame(() => smoothScrollTo(`#${hash}`, 64))
                       }}
-                      className="px-2 py-3 text-sm text-left font-medium text-muted-foreground hover:text-foreground border-b border-border/50 last:border-0 cursor-pointer"
+                      className={`px-2 py-3 text-sm text-left font-medium border-b border-border/50 last:border-0 cursor-pointer ${accentCls}`}
                     >
                       {link.label}
                     </button>
@@ -178,7 +182,7 @@ export function Navbar() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="px-2 py-3 text-sm font-medium text-muted-foreground hover:text-foreground border-b border-border/50 last:border-0"
+                    className={`px-2 py-3 text-sm font-medium border-b border-border/50 last:border-0 ${accentCls}`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     {link.label}

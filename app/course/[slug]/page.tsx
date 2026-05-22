@@ -1,57 +1,113 @@
-import type { Metadata } from "next";
-import PocketBase from "pocketbase";
-import CourseDetailsClient from "@/components/course-details-client";
+import type { Metadata } from "next"
+import PocketBase from "pocketbase"
+import Script from "next/script"
+import CourseDetailsClient from "@/components/course-details-client"
+import { absoluteUrl, getOgImage, siteConfig } from "@/lib/seo"
 
-type Params = Promise<{ slug: string }>;
+type Params = Promise<{ slug: string }>
+
+function getPocketBaseUrl() {
+  return process.env.NEXT_PUBLIC_PB_URL || process.env.POCKETBASE_URL || "http://127.0.0.1:8090"
+}
+
+async function getCourseBySlug(slug: string) {
+  const pbUrl = getPocketBaseUrl()
+  const pb = new PocketBase(pbUrl)
+  const course = await pb.collection("courses").getFirstListItem(`slug="${slug}"`)
+  const title = course.title || "Formation BI Geek"
+  const description =
+    course.shortDescription ||
+    "Formation pratique BI Geek en Data, IA, Cloud, Cyber Security, développement web et technologies professionnelles."
+  const image = course.coverImage
+    ? `${pbUrl}/api/files/courses/${course.id}/${course.coverImage}`
+    : getOgImage(siteConfig.og.formations)
+  const canonical = `/course/${course.slug || slug}`
+
+  return { course, title, description, image, canonical }
+}
 
 export async function generateMetadata(props: { params: Params }): Promise<Metadata> {
-  console.log("generateMetadata started");
-
-  const params = await props.params;
-  console.log("params resolved:", params);
-
-  const { slug } = params;
-  console.log("slug:", slug);
-
-  const pb = new PocketBase(process.env.POCKETBASE_URL ?? "http://127.0.0.1:8090");
-  console.log("PocketBase URL:", process.env.POCKETBASE_URL);
+  const { slug } = await props.params
+  const safeSlug = decodeURIComponent(slug)
 
   try {
-    const course = await pb.collection("courses").getFirstListItem(`slug="${slug}"`);
-    console.log("course found:", course);
-
-    const title = course.title || "Course";
-    const description = course.shortDescription || "Course details";
+    const { title, description, image, canonical } = await getCourseBySlug(safeSlug)
 
     return {
       title,
       description,
+      alternates: {
+        canonical,
+      },
       openGraph: {
+        title: `${title} | BI Geek`,
+        description,
+        url: canonical,
+        siteName: siteConfig.name,
+        images: [
+          {
+            url: image,
+            width: 1200,
+            height: 630,
+            alt: title,
+          },
+        ],
+        locale: siteConfig.locale,
+        type: "article",
+      },
+      twitter: {
+        card: "summary_large_image",
         title,
         description,
-        url: `https://bi-geek.net/course/${slug}`,
-        images: course.coverImage
-          ? [
-              {
-                url: `${process.env.POCKETBASE_URL}/api/files/courses/${course.id}/${course.coverImage}`,
-                width: 1200,
-                height: 630,
-              },
-            ]
-          : undefined,
+        images: [image],
       },
-    };
+    }
   } catch (err) {
-    console.error("Failed to fetch course for metadata:", err);
+    console.error("Failed to fetch course for metadata:", err)
 
-    // return minimal metadata so it doesn't block rendering
     return {
-      title: "Course",
-      description: "Course details",
-    };
+      title: "Formation BI Geek",
+      description:
+        "Découvrez une formation BI Geek pratique et certifiante pour développer vos compétences tech.",
+      alternates: {
+        canonical: `/course/${safeSlug}`,
+      },
+    }
   }
 }
 
-export default function CourseDetailsPageWrapper() {
-  return <CourseDetailsClient />;
+export default async function CourseDetailsPageWrapper(props: { params: Params }) {
+  const { slug } = await props.params
+  const safeSlug = decodeURIComponent(slug)
+  let jsonLd: Record<string, unknown> | null = null
+
+  try {
+    const { title, description, image, canonical } = await getCourseBySlug(safeSlug)
+    jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "Course",
+      name: title,
+      description,
+      url: absoluteUrl(canonical),
+      image,
+      provider: {
+        "@type": "EducationalOrganization",
+        name: siteConfig.name,
+        sameAs: siteConfig.url,
+      },
+    }
+  } catch {
+    jsonLd = null
+  }
+
+  return (
+    <>
+      {jsonLd ? (
+        <Script id={`ld-json-course-${safeSlug}`} type="application/ld+json" strategy="afterInteractive">
+          {JSON.stringify(jsonLd)}
+        </Script>
+      ) : null}
+      <CourseDetailsClient />
+    </>
+  )
 }

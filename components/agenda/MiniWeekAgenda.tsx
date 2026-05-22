@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react"
 import {
   CalendarDays, ChevronLeft, ChevronRight, ArrowRight, Loader2,
-  Wifi, MapPin, MonitorSmartphone, HelpCircle,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -102,7 +101,9 @@ function computeColumns(sessions: AgSession[]): Map<string, { col: number; total
 export interface MiniWeekAgendaProps {
   /** When set, uses instructor APIs (read from /api/instructor/*). Otherwise uses admin APIs. */
   instructorId?: string
-  /** href for the "Ouvrir" link and for session click navigation */
+  /** When set, uses student APIs (read from /api/student/*). */
+  studentId?: string
+  /** href for the "Ouvrir" link in the header */
   agendaHref: string
   /** Header title (defaults to "Agenda") */
   title?: string
@@ -110,13 +111,20 @@ export interface MiniWeekAgendaProps {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function MiniWeekAgenda({ instructorId, agendaHref, title = "Agenda" }: MiniWeekAgendaProps) {
+export function MiniWeekAgenda({ instructorId, studentId, agendaHref, title = "Agenda" }: MiniWeekAgendaProps) {
   const [weekStart, setWeekStart] = useState<Date>(() => getWeekStart(new Date()))
   const [sessions, setSessions] = useState<AgSession[]>([])
   const [groupMap, setGroupMap] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(false)
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mode = instructorId ? "instructor" : studentId ? "student" : "admin"
+
+  function getSessionHref(s: AgSession): string {
+    if (mode === "instructor") return `/instructor-dashboard/groups/${s.group}`
+    if (mode === "student") return `/student-dashboard/groups/${s.group}`
+    return `${agendaHref}?group=${s.group}&date=${s.date}&start_time=${s.start_time}`
+  }
 
   useEffect(() => () => { if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current) }, [])
 
@@ -130,10 +138,16 @@ export function MiniWeekAgenda({ instructorId, agendaHref, title = "Agenda" }: M
 
   // Fetch groups for color map
   useEffect(() => {
-    if (instructorId !== undefined && !instructorId) return
-    const url = instructorId
-      ? `/api/instructor/groups?instructorId=${instructorId}`
-      : "/api/admin/groups"
+    if (mode === "instructor" && !instructorId) return
+    if (mode === "student" && !studentId) return
+
+    const url =
+      mode === "instructor"
+        ? `/api/instructor/groups?instructorId=${instructorId}`
+        : mode === "student"
+          ? `/api/student/groups?studentId=${studentId}`
+          : "/api/admin/groups"
+
     fetch(url)
       .then(r => r.json())
       .then(d => {
@@ -142,23 +156,29 @@ export function MiniWeekAgenda({ instructorId, agendaHref, title = "Agenda" }: M
         setGroupMap(map)
       })
       .catch(() => {})
-  }, [instructorId])
+  }, [instructorId, mode, studentId])
 
   // Fetch sessions when week changes
   useEffect(() => {
-    if (instructorId !== undefined && !instructorId) return
+    if (mode === "instructor" && !instructorId) return
+    if (mode === "student" && !studentId) return
+
     const from = toYMD(weekStart)
     const to = toYMD(addDays(weekStart, 6))
     setLoading(true)
-    const url = instructorId
-      ? `/api/instructor/sessions?instructorId=${instructorId}&from=${from}&to=${to}`
-      : `/api/admin/sessions?from=${from}&to=${to}`
+    const url =
+      mode === "instructor"
+        ? `/api/instructor/sessions?instructorId=${instructorId}&from=${from}&to=${to}`
+        : mode === "student"
+          ? `/api/student/sessions?studentId=${studentId}&from=${from}&to=${to}`
+          : `/api/admin/sessions?from=${from}&to=${to}`
+
     fetch(url)
       .then(r => r.json())
       .then(d => setSessions(d.sessions || []))
       .catch(() => setSessions([]))
       .finally(() => setLoading(false))
-  }, [weekStart, instructorId])
+  }, [weekStart, instructorId, mode, studentId])
 
   const today = toYMD(new Date())
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -177,13 +197,13 @@ export function MiniWeekAgenda({ instructorId, agendaHref, title = "Agenda" }: M
       {/* Header */}
       <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(180deg,#fafbfd 0%,#fff 100%)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(99,102,241,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent,#6366f1)" }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
             <CalendarDays size={13} strokeWidth={2} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <h2 style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h2>
-            <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>{periodLabel}</span>
-            {loading && <Loader2 size={12} color="#94a3b8" className="animate-spin" />}
+            <span style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>{periodLabel}</span>
+            {loading && <Loader2 size={12} color="#475569" className="animate-spin" />}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -197,13 +217,13 @@ export function MiniWeekAgenda({ instructorId, agendaHref, title = "Agenda" }: M
           )}
           <button
             onClick={() => setWeekStart(p => addDays(p, -7))}
-            style={{ width: 26, height: 26, borderRadius: 7, border: "1.5px solid #f1f5f9", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#64748b" }}
+            style={{ width: 26, height: 26, borderRadius: 7, border: "1.5px solid #f1f5f9", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#475569" }}
           >
             <ChevronLeft size={13} />
           </button>
           <button
             onClick={() => setWeekStart(p => addDays(p, 7))}
-            style={{ width: 26, height: 26, borderRadius: 7, border: "1.5px solid #f1f5f9", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#64748b" }}
+            style={{ width: 26, height: 26, borderRadius: 7, border: "1.5px solid #f1f5f9", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#475569" }}
           >
             <ChevronRight size={13} />
           </button>
@@ -222,7 +242,7 @@ export function MiniWeekAgenda({ instructorId, agendaHref, title = "Agenda" }: M
           const isToday = toYMD(d) === today
           return (
             <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 4px", borderRight: i < 6 ? "1px solid #f1f5f9" : undefined }}>
-              <span style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>{DAYS_FR[i]}</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>{DAYS_FR[i]}</span>
               <div style={{ width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, background: isToday ? "var(--accent,#6366f1)" : "transparent" }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: isToday ? "#fff" : "#0f172a" }}>{d.getDate()}</span>
               </div>
@@ -305,7 +325,7 @@ export function MiniWeekAgenda({ instructorId, agendaHref, title = "Agenda" }: M
                   return (
                     <button
                       key={si}
-                      onClick={() => { window.location.href = `${agendaHref}?group=${s.group}&date=${s.date}&start_time=${s.start_time}` }}
+                      onClick={() => { window.location.href = getSessionHref(s) }}
                       onMouseEnter={() => onEnter(sessionKey)}
                       onMouseLeave={onLeave}
                       style={{

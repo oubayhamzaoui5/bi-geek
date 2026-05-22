@@ -25,7 +25,9 @@ function mapInstructor(pb: PocketBase, rec: RecordModel) {
 
   let avatar: string | null = null
   if (r.avatar) {
-    avatar = pb.files.getUrl(rec, r.avatar, { thumb: "100x100" }).toString()
+    avatar = typeof r.avatar === "string" && r.avatar.startsWith("http")
+      ? r.avatar
+      : pb.files.getUrl(rec, r.avatar, { thumb: "100x100" }).toString()
   }
 
   return {

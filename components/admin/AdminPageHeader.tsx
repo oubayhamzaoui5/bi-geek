@@ -8,17 +8,18 @@ interface AdminPageHeaderProps {
   description?: string
   breadcrumbs?: { label: string; href?: string }[]
   actions?: React.ReactNode
+  overviewHref?: string
 }
 
-export function AdminPageHeader({ title, description, breadcrumbs, actions }: AdminPageHeaderProps) {
+export function AdminPageHeader({ title, description, breadcrumbs, actions, overviewHref = "/admin-dashboard/overview" }: AdminPageHeaderProps) {
   return (
     <div className="border-b border-gray-100 bg-white px-6 md:px-8 py-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           {breadcrumbs && breadcrumbs.length > 0 && (
-            <nav className="flex items-center gap-1 text-xs text-gray-400 mb-2">
+            <nav className="flex items-center gap-1 text-xs text-gray-600 mb-2">
               <Link
-                href="/admin-dashboard/overview"
+                href={overviewHref}
                 className="hover:text-gray-700 transition-colors"
               >
                 Accueil
@@ -39,7 +40,7 @@ export function AdminPageHeader({ title, description, breadcrumbs, actions }: Ad
           )}
           <h1 className="text-xl font-bold text-gray-900" style={{ fontFamily: "var(--ff-display)" }}>{title}</h1>
           {description && (
-            <p className="text-sm text-gray-400 mt-0.5">{description}</p>
+            <p className="text-sm text-gray-600 mt-0.5">{description}</p>
           )}
         </div>
         {actions && <div className="flex items-center gap-2 mt-1 shrink-0">{actions}</div>}

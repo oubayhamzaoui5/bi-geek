@@ -10,6 +10,12 @@ async function getAdminPb() {
   return pb
 }
 
+function resolveAvatar(user: any, pbUrl: string) {
+  if (!user?.avatar) return null
+  if (typeof user.avatar === "string" && user.avatar.startsWith("http")) return user.avatar
+  return `${pbUrl}/api/files/${user.collectionId}/${user.id}/${user.avatar}`
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -66,12 +72,72 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           surname: u.surname || "",
           username: u.username || "",
           email: u.email || "",
-          avatar: u.avatar
-            ? `${PB_FILE_URL}/api/files/${u.collectionId}/${u.id}/${u.avatar}`
-            : null,
+          avatar: resolveAvatar(u, PB_FILE_URL),
         }))
       } catch {}
     }
+
+    const today = new Date()
+    const todayYMD = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+    const currentTime = `${String(today.getHours()).padStart(2, "0")}:${String(today.getMinutes()).padStart(2, "0")}`
+    
+    let nextSession = null
+    let nextSessions: any[] = []
+    try {
+      const sessionsRes = await pb.collection("sessions").getList(1, 3, {
+        filter: `group = "${id}" && (date > "${todayYMD}" || (date = "${todayYMD}" && start_time >= "${currentTime}"))`,
+        sort: "date,start_time",
+      })
+      if (sessionsRes.items.length > 0) {
+        nextSessions = sessionsRes.items.map((s: any) => ({
+          id: s.id,
+          title: s.title || null,
+          date: s.date.slice(0, 10),
+          start_time: s.start_time || "",
+          mode: s.mode || "live_presentiel",
+          joinUrl: s.joinUrl || null,
+        }))
+        nextSession = nextSessions[0]
+      }
+    } catch {}
+
+    // Today's live session that already started — kept for "rest of day" display
+    let todaySession: any = null
+    try {
+      const tRes = await pb.collection("sessions").getList(1, 1, {
+        filter: `group = "${id}" && date = "${todayYMD}" && start_time < "${currentTime}" && (mode = "live" || mode = "live_presentiel")`,
+        sort: "-start_time",
+      })
+      if (tRes.items.length > 0) {
+        const s = tRes.items[0]
+        todaySession = {
+          id: s.id,
+          title: s.title || null,
+          date: s.date.slice(0, 10),
+          start_time: s.start_time || "",
+          mode: s.mode || "live_presentiel",
+          joinUrl: s.joinUrl || null,
+        }
+      }
+    } catch {}
+
+    let pastSessions: any[] = []
+    try {
+      const pastRes = await pb.collection("sessions").getFullList({
+        filter: `group = "${id}" && (date < "${todayYMD}" || (date = "${todayYMD}" && start_time < "${currentTime}")) && (mode = "live" || mode = "live_presentiel")`,
+        sort: "-date,-start_time",
+      })
+      pastSessions = pastRes.map(s => ({
+        id: s.id,
+        title: s.title || null,
+        date: s.date.slice(0, 10),
+        start_time: s.start_time || "",
+        mode: s.mode || "live_presentiel",
+        joinUrl: s.joinUrl || null,
+        recordingUrl: s.recordingUrl || null,
+        googleEventId: s.googleEventId || null,
+      }))
+    } catch {}
 
     return NextResponse.json({
       ok: true,
@@ -88,6 +154,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
               id: group.expand.instructor.id,
               name: group.expand.instructor.name || "",
               surname: group.expand.instructor.surname || "",
+              avatar: resolveAvatar(group.expand.instructor, PB_FILE_URL),
             }
           : null,
         studentIds,
@@ -95,6 +162,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         program,
         created: group.created,
       },
+      nextSession,
+      nextSessions,
+      todaySession,
+      pastSessions,
     })
   } catch (err: any) {
     console.error("INSTRUCTOR GROUP GET ERROR:", err)

@@ -1,4 +1,4 @@
-"use client"
+﻿﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -6,7 +6,7 @@ import {
   Search, Plus, Edit, Trash2, Save, X,
   Users, CheckCircle, AlertCircle, Loader2,
   Layers, BookOpen, Lock, Unlock, ChevronRight, Link2,
-  Wifi, MapPin, MonitorSmartphone, HelpCircle, GraduationCap
+  GraduationCap
 } from "lucide-react"
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 
@@ -20,7 +20,7 @@ type AdminStudent = { id: string; name?: string; surname?: string; email?: strin
 
 type GroupStatus = "not_started" | "in_progress" | "completed"
 
-type AdminInstructor = { id: string; name?: string; surname?: string }
+type AdminInstructor = { id: string; name?: string; surname?: string; avatar?: string | null }
 
 type AdminGroup = {
   id?: string
@@ -44,7 +44,7 @@ type AdminSession = {
   date: string
   start_time: string
   duration: number
-  mode?: "live" | "presentiel" | "live_presentiel" | "not_set" | string
+  mode?: string
   title: string | null
   is_cancelled: boolean
 }
@@ -61,15 +61,24 @@ type GroupsCrudProps = {
   initialBootcamps?: AdminBootcamp[]
   initialStudents?: AdminStudent[]
   initialInstructors?: AdminInstructor[]
+  initialSessions?: AdminSession[]
   onSave?: (group: AdminGroup) => Promise<void>
   onDelete?: (id: string) => Promise<void>
   readOnly?: boolean
   onGroupClick?: (group: AdminGroup) => void
+  customTitle?: string
+  customDescription?: string
+  customBreadcrumbs?: { label: string; href?: string }[]
+  customSearchPlaceholder?: string
+  customEmptyText?: string
+  customEmptySubtext?: string
+  customCountLabel?: string
+  customColumnHeader?: string
 }
 
 // ---- Status meta ----
 const STATUS_META: Record<GroupStatus, { label: string; bg: string; text: string }> = {
-  not_started: { label: "Pas commencé", bg: "rgba(148,163,184,0.15)", text: "#64748b" },
+  not_started: { label: "Pas commencé", bg: "rgba(148,163,184,0.15)", text: "#475569" },
   in_progress:  { label: "En cours",     bg: "rgba(59,130,246,0.15)",  text: "#2563eb" },
   completed:    { label: "Terminé",      bg: "rgba(34,197,94,0.15)",   text: "#16a34a" },
 }
@@ -77,6 +86,10 @@ const STATUS_META: Record<GroupStatus, { label: string; bg: string; text: string
 function studentDisplayName(s: AdminStudent) {
   const full = `${s.name ?? ""} ${s.surname ?? ""}`.trim()
   return full || s.username || s.email || s.id
+}
+
+function instructorInitials(i: AdminInstructor) {
+  return [i.name?.[0], i.surname?.[0]].filter(Boolean).join("").toUpperCase() || "?"
 }
 
 function currentMonthLabel() {
@@ -98,19 +111,6 @@ function formatSessionDate(date: string): string {
   return d.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" })
 }
 
-function getSessionModeMeta(mode?: string) {
-  if (mode === "live") {
-    return { label: "Live", color: "#2563eb", icon: Wifi }
-  }
-  if (mode === "presentiel") {
-    return { label: "Presentiel", color: "#16a34a", icon: MapPin }
-  }
-  if (mode === "live_presentiel") {
-    return { label: "Live + Presentiel", color: "#7c3aed", icon: MonitorSmartphone }
-  }
-  return { label: "Mode non defini", color: "#94a3b8", icon: HelpCircle }
-}
-
 function formatDurationHM(minutes?: number): string {
   if (!minutes || minutes <= 0) return ""
   const h = Math.floor(minutes / 60)
@@ -124,7 +124,7 @@ function formatDurationHM(minutes?: number): string {
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#64748b", marginBottom: 7, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 7, letterSpacing: "0.06em", textTransform: "uppercase" }}>
       {children}{required && <span style={{ color: "#ef4444", marginLeft: 4 }}>*</span>}
     </label>
   )
@@ -152,12 +152,12 @@ function SelectField({ value, onChange, children }: { value: string; onChange: (
       >
         {children}
       </select>
-      <ChevronRight style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%) rotate(90deg)", width: 14, height: 14, color: "#94a3b8", pointerEvents: "none" }} />
+      <ChevronRight style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%) rotate(90deg)", width: 14, height: 14, color: "#475569", pointerEvents: "none" }} />
     </div>
   )
 }
 
-function IconBtn({ onClick, title, color = "#64748b", hoverBg = "#f1f5f9", children }: {
+function IconBtn({ onClick, title, color = "#475569", hoverBg = "#f1f5f9", children }: {
   onClick: (e: React.MouseEvent) => void; title?: string; color?: string; hoverBg?: string; children: React.ReactNode
 }) {
   const [hover, setHover] = useState(false)
@@ -176,7 +176,7 @@ function FormCard({ title, icon, children, action }: { title: string; icon?: Rea
     <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #edf0f7", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.04)" }}>
       <div style={{ padding: "14px 22px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(180deg,#fafbfe 0%,#fff 100%)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg,rgba(99,102,241,0.1),rgba(129,140,248,0.05))", color: "var(--accent,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: "var(--accent,#6366f1)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {icon}
           </div>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: 0, letterSpacing: "-0.01em" }}>{title}</h3>
@@ -196,10 +196,19 @@ export default function GroupsCrud({
   initialBootcamps = [],
   initialStudents = [],
   initialInstructors = [],
+  initialSessions,
   onSave,
   onDelete,
   readOnly = false,
   onGroupClick,
+  customTitle = "Groupes",
+  customDescription = "Gérez les groupes et leurs étudiants",
+  customBreadcrumbs = [{ label: "Groupes" }],
+  customSearchPlaceholder = "Rechercher un groupe…",
+  customEmptyText = "Aucun groupe trouvé",
+  customEmptySubtext = "Aucun groupe ne correspond aux filtres actuels.",
+  customCountLabel = "groupe",
+  customColumnHeader = "Groupe",
 }: GroupsCrudProps) {
   const router = useRouter()
   const [toasts, setToasts]             = useState<Toast[]>([])
@@ -216,7 +225,7 @@ export default function GroupsCrud({
   const [filterType, setFilterType]     = useState<"all" | "course" | "bootcamp">("all")
   const [studentSearch, setStudentSearch] = useState("")
   const [loading, setLoading]           = useState(false)
-  const [sessions, setSessions]         = useState<AdminSession[]>([])
+  const [sessions, setSessions]         = useState<AdminSession[]>(initialSessions ?? [])
   const [loadingSessions, setLoadingSessions] = useState(false)
 
   const [curriculum, setCurriculum]               = useState<CurriculumData | null>(null)
@@ -246,6 +255,7 @@ export default function GroupsCrud({
   useEffect(() => { if (initialStudents.length)  setStudents(initialStudents)  }, [initialStudents])
 
   useEffect(() => {
+    if (initialSessions) return
     let active = true
     const loadSessions = async () => {
       setLoadingSessions(true)
@@ -263,6 +273,7 @@ export default function GroupsCrud({
     }
     loadSessions()
     return () => { active = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ---- Curriculum loader ----
@@ -438,6 +449,7 @@ export default function GroupsCrud({
   }
 
   const toggleLockState = (id: string, type: "module" | "lesson") => {
+    if (readOnly) return
     if (!editingGroup) return
     const ng = { ...editingGroup }
     ng.unlockedModules = ng.unlockedModules || []
@@ -459,9 +471,9 @@ export default function GroupsCrud({
     <div style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "'DM Sans','Inter',sans-serif" }}>
 
       <AdminPageHeader
-        title="Groupes"
-        description="Gérez les groupes et leurs étudiants"
-        breadcrumbs={[{ label: "Groupes" }]}
+        title={customTitle}
+        description={customDescription}
+        breadcrumbs={customBreadcrumbs}
         actions={!readOnly ? (
           <button onClick={handleNewGroup}
             style={{ padding: "9px 20px", background: "var(--accent,#6366f1)", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "opacity 0.15s" }}
@@ -473,42 +485,42 @@ export default function GroupsCrud({
         ) : undefined}
       />
 
-      {/* ── Filters bar ── */}
+      {/* â”€â”€ Filters bar â”€â”€ */}
       <div style={{ padding: "14px 32px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, borderBottom: "1px solid #f1f5f9", background: "#fff" }}>
         <div style={{ position: "relative", flex: 1 }}>
-          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#94a3b8" }} />
-          <input type="text" placeholder="Rechercher un groupe…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#475569" }} />
+          <input type="text" placeholder={customSearchPlaceholder} value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
             style={{ width: "100%", padding: "7px 12px 7px 34px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit" }}
             onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.08)" }}
             onBlur={e => { e.target.style.borderColor = "#e8ecf3"; e.target.style.boxShadow = "none" }}
           />
         </div>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as any)}
-          style={{ padding: "7px 12px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, color: filterStatus !== "all" ? "var(--accent,#6366f1)" : "#64748b", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
+          style={{ padding: "7px 12px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, color: filterStatus !== "all" ? "var(--accent,#6366f1)" : "#475569", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
           <option value="all">Statut : tous</option>
           <option value="not_started">Pas commencé</option>
           <option value="in_progress">En cours</option>
           <option value="completed">Terminé</option>
         </select>
         <select value={filterType} onChange={e => setFilterType(e.target.value as any)}
-          style={{ padding: "7px 12px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, color: filterType !== "all" ? "var(--accent,#6366f1)" : "#64748b", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
+          style={{ padding: "7px 12px", background: "#f8fafc", border: "1.5px solid #e8ecf3", borderRadius: 9, fontSize: 13, color: filterType !== "all" ? "var(--accent,#6366f1)" : "#475569", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
           <option value="all">Type : tous</option>
           <option value="course">Formation</option>
           <option value="bootcamp">Bootcamp</option>
         </select>
-        <div style={{ fontSize: 13, color: "#94a3b8", marginLeft: "auto" }}>
-          <span style={{ fontWeight: 600, color: "#0f172a" }}>{filteredGroups.length}</span> groupe{filteredGroups.length !== 1 ? "s" : ""}
+        <div style={{ fontSize: 13, color: "#475569", marginLeft: "auto" }}>
+          <span style={{ fontWeight: 600, color: "#0f172a" }}>{filteredGroups.length}</span> {customCountLabel}{filteredGroups.length !== 1 ? "s" : ""}
         </div>
       </div>
 
-      {/* ── Table ── */}
+      {/* â”€â”€ Table â”€â”€ */}
       <div style={{ padding: "0px 0px" }}>
         {filteredGroups.length === 0 ? (
           <div style={{ background: "#fff", padding: "64px 24px", textAlign: "center" }}>
             <Users style={{ width: 40, height: 40, color: "#e2e8f0", margin: "0 auto 12px" }} />
-            <p style={{ fontSize: 15, fontWeight: 600, color: "#64748b", margin: "0 0 4px" }}>Aucun groupe trouvé</p>
-            <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>
-              {readOnly ? "Aucun groupe ne correspond aux filtres actuels." : "Créez votre premier groupe avec le bouton ci-dessus."}
+            <p style={{ fontSize: 15, fontWeight: 600, color: "#475569", margin: "0 0 4px" }}>{customEmptyText}</p>
+            <p style={{ fontSize: 13, color: "#475569", margin: 0 }}>
+              {readOnly ? customEmptySubtext : "Créez votre premier groupe avec le bouton ci-dessus."}
             </p>
           </div>
         ) : (() => {
@@ -596,19 +608,29 @@ export default function GroupsCrud({
                         onMouseLeave={e => { if (!readOnly || onGroupClick) e.currentTarget.style.color = "#0f172a" }}
                         style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", margin: "0 0 6px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", cursor: (readOnly && !onGroupClick) ? "default" : "pointer", transition: "color 0.15s" }}
                       >{group.title || "Sans titre"}</p>
-                      <p style={{ fontSize: 14, color: "#94a3b8", margin: "0 0 10px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" }}>{description}</p>
+                      <p style={{ fontSize: 14, color: "#475569", margin: "0 0 10px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" }}>{description}</p>
                       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                         {group.instructor && (
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                            <GraduationCap style={{ width: 13, height: 13, color: "#6366f1", flexShrink: 0 }} />
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            {group.instructor.avatar ? (
+                              <img
+                                src={group.instructor.avatar}
+                                alt=""
+                                style={{ width: 22, height: 22, minWidth: 22, minHeight: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0, display: "block", border: "1px solid rgba(99,102,241,0.18)" }}
+                              />
+                            ) : (
+                              <span style={{ width: 22, height: 22, minWidth: 22, minHeight: 22, borderRadius: "50%", background: "rgba(99,102,241,0.12)", color: "#4f46e5", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, flexShrink: 0 }}>
+                                {instructorInitials(group.instructor)}
+                              </span>
+                            )}
                             <span style={{ fontSize: 12, fontWeight: 600, color: "#4f46e5" }}>
                               {[group.instructor.name, group.instructor.surname].filter(Boolean).join(" ")}
                             </span>
                           </span>
                         )}
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                          <Users style={{ width: 13, height: 13, color: "#94a3b8" }} />
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>{group.studentIds.length} étudiant{group.studentIds.length !== 1 ? "s" : ""}</span>
+                          <Users style={{ width: 13, height: 13, color: "#475569" }} />
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>{group.studentIds.length} étudiant{group.studentIds.length !== 1 ? "s" : ""}</span>
                         </span>
                       </div>
                     </div>
@@ -682,38 +704,17 @@ export default function GroupsCrud({
                       <Link2 className="next-session-link-icon" style={{ width: 13, height: 13, color: "#dc2626" }} />
                     </span>
                     {loadingSessions ? (
-                      <span style={{ fontSize: 12, color: "#94a3b8" }}>Chargement...</span>
+                      <span style={{ fontSize: 12, color: "#475569" }}>Chargement...</span>
                     ) : nextSession ? (
                       <>
                         <span style={{ fontSize: 12, color: "#475569", fontWeight: 600 }}>{formatSessionDate(nextSession.date)}</span>
-                        <span style={{ fontSize: 12, color: "#64748b" }}>
+                        <span style={{ fontSize: 12, color: "#475569" }}>
                           {nextSession.start_time || "--:--"}
                           {nextSession.duration ? ` • ${formatDurationHM(nextSession.duration)}` : ""}
                         </span>
-                        {(() => {
-                          const modeMeta = getSessionModeMeta(nextSession.mode)
-                          const ModeIcon = modeMeta.icon
-                          return (
-                            <span
-                              style={{
-                                fontSize: 12,
-                                color: modeMeta.color,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 5,
-                              }}
-                            >
-                              <ModeIcon style={{ width: 12, height: 12, flexShrink: 0 }} />
-                              {modeMeta.label}
-                            </span>
-                          )
-                        })()}
                       </>
                     ) : (
-                      <span style={{ fontSize: 12, color: "#94a3b8" }}>Aucune session planifiee</span>
+                      <span style={{ fontSize: 12, color: "#475569" }}>Aucune session planifiee</span>
                     )}
                   </div>
                 )}
@@ -743,18 +744,18 @@ export default function GroupsCrud({
                     <div style={{ padding: "14px 36px", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid #f1f5f9", background: "#fafbfd" }}>
                       <span style={{ width: 8, height: 8, borderRadius: "50%", background: sm.text, display: "inline-block", flexShrink: 0 }} />
                       <span style={{ fontSize: 13, fontWeight: 700, color: sm.text, textTransform: "uppercase", letterSpacing: "0.07em" }}>{sm.label}</span>
-                      <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>{rows.length} groupe{rows.length !== 1 ? "s" : ""}</span>
+                      <span style={{ fontSize: 12, color: "#475569", fontWeight: 600 }}>{rows.length} {customCountLabel}{rows.length !== 1 ? "s" : ""}</span>
                       <div style={{ flex: 1, height: 1, background: "#f1f5f9", marginLeft: 4 }} />
                     </div>
                     {/* Column header */}
                     {(() => {
                       const showSess = status === "in_progress"
                       const hCols = showSess ? "1fr 220px" : "1fr"
-                      const headers = ["Groupe", ...(showSess ? ["Prochaine session"] : [])]
+                      const headers = [customColumnHeader, ...(showSess ? ["Prochaine session"] : [])]
                       return (
                         <div style={{ display: "grid", gridTemplateColumns: hCols, padding: "12px 36px", borderBottom: "1px solid #f1f5f9", background: "#fff" }}>
                           {headers.map(h => (
-                            <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#c4cdd9", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
+                            <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
                           ))}
                         </div>
                       )
@@ -770,7 +771,7 @@ export default function GroupsCrud({
         })()}
       </div>
 
-      {/* ── Modal overlay ── */}
+      {/* â”€â”€ Modal overlay â”€â”€ */}
       {!readOnly && editingGroup && (
         <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,0.5)", backdropFilter: "blur(6px)" }} onClick={handleCancelEdit} />
@@ -791,7 +792,7 @@ export default function GroupsCrud({
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 {!isCompleted && (
                   <button onClick={handleSaveGroup} disabled={loading}
-                    style={{ padding: "9px 22px", borderRadius: 10, border: "none", background: loading ? "#f1f5f9" : "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: loading ? "#94a3b8" : "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 7, boxShadow: loading ? "none" : "0 4px 14px rgba(99,102,241,0.35)", transition: "all 0.2s" }}
+                    style={{ padding: "9px 22px", borderRadius: 10, border: "none", background: loading ? "#f1f5f9" : "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: loading ? "#475569" : "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 7, boxShadow: loading ? "none" : "0 4px 14px rgba(99,102,241,0.35)", transition: "all 0.2s" }}
                     onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 20px rgba(99,102,241,0.5)" }}
                     onMouseLeave={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 14px rgba(99,102,241,0.35)" }}
                   >
@@ -800,9 +801,9 @@ export default function GroupsCrud({
                   </button>
                 )}
                 <button onClick={handleCancelEdit}
-                  style={{ width: 34, height: 34, borderRadius: 9, border: "1.5px solid #e8ecf3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", transition: "all 0.15s" }}
+                  style={{ width: 34, height: 34, borderRadius: 9, border: "1.5px solid #e8ecf3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#475569", transition: "all 0.15s" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#fca5a5"; (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; (e.currentTarget as HTMLButtonElement).style.background = "#fff5f5" }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#e8ecf3"; (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8"; (e.currentTarget as HTMLButtonElement).style.background = "#fff" }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#e8ecf3"; (e.currentTarget as HTMLButtonElement).style.color = "#475569"; (e.currentTarget as HTMLButtonElement).style.background = "#fff" }}
                 >
                   <X style={{ width: 15, height: 15 }} />
                 </button>
@@ -895,12 +896,12 @@ export default function GroupsCrud({
                   </div>
                 </FormCard>
 
-                {/* Étudiants */}
-                <FormCard title="Étudiants du groupe" icon={<Users style={{ width: 16, height: 16 }} />}
-                  action={<span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>{editingGroup.studentIds.length} sélectionné{editingGroup.studentIds.length !== 1 ? "s" : ""}</span>}>
+                {/* Ã‰tudiants */}
+                <FormCard title="Ã‰tudiants du groupe" icon={<Users style={{ width: 16, height: 16 }} />}
+                  action={<span style={{ fontSize: 12, color: "#475569", fontWeight: 600 }}>{editingGroup.studentIds.length} sélectionné{editingGroup.studentIds.length !== 1 ? "s" : ""}</span>}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     <div style={{ position: "relative" }}>
-                      <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#94a3b8" }} />
+                      <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#475569" }} />
                       <input type="text" placeholder="Rechercher un étudiant…" value={studentSearch} onChange={e => setStudentSearch(e.target.value)}
                         style={{ width: "100%", padding: "9px 12px 9px 34px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit" }}
                         onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.1)" }}
@@ -908,7 +909,7 @@ export default function GroupsCrud({
                       />
                     </div>
                     {filteredStudents.length === 0 ? (
-                      <div style={{ padding: "16px", borderRadius: 10, border: "1px dashed #e2e8f0", background: "#f8fafc", textAlign: "center", fontSize: 12, color: "#94a3b8" }}>
+                      <div style={{ padding: "16px", borderRadius: 10, border: "1px dashed #e2e8f0", background: "#f8fafc", textAlign: "center", fontSize: 12, color: "#475569" }}>
                         Aucun étudiant trouvé.
                       </div>
                     ) : (
@@ -926,7 +927,7 @@ export default function GroupsCrud({
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{studentDisplayName(s)}</div>
-                                <div style={{ fontSize: 11, color: "#94a3b8" }}>{s.email || s.username || s.id}</div>
+                                <div style={{ fontSize: 11, color: "#475569" }}>{s.email || s.username || s.id}</div>
                               </div>
                             </div>
                           )
@@ -942,7 +943,7 @@ export default function GroupsCrud({
                     {loadingCurriculum ? (
                       <div style={{ padding: "32px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
                         <Loader2 style={{ width: 22, height: 22, color: "#a5b4fc", animation: "spin 1s linear infinite" }} />
-                        <span style={{ fontSize: 13, color: "#94a3b8" }}>Chargement du programme…</span>
+                        <span style={{ fontSize: 13, color: "#475569" }}>Chargement du programme…</span>
                       </div>
                     ) : curriculum && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -955,8 +956,8 @@ export default function GroupsCrud({
                             <div key={course.id || "default"}>
                               {course.title && (
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                                  <BookOpen style={{ width: 13, height: 13, color: "#94a3b8", flexShrink: 0 }} />
-                                  <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>{course.title}</span>
+                                  <BookOpen style={{ width: 13, height: 13, color: "#475569", flexShrink: 0 }} />
+                                  <span style={{ fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>{course.title}</span>
                                 </div>
                               )}
                               {mods.map(mod => {
@@ -972,7 +973,7 @@ export default function GroupsCrud({
                                           : <Lock    style={{ width: 13, height: 13, color: "#f43f5e" }} />}
                                       </div>
                                       <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{mod.title}</span>
-                                      {lessons.length > 0 && <span style={{ fontSize: 11, color: "#94a3b8" }}>{lessons.length} leçon{lessons.length !== 1 ? "s" : ""}</span>}
+                                      {lessons.length > 0 && <span style={{ fontSize: 11, color: "#475569" }}>{lessons.length} leçon{lessons.length !== 1 ? "s" : ""}</span>}
                                     </div>
                                     {/* Lessons */}
                                     {lessons.length > 0 && (
@@ -989,13 +990,29 @@ export default function GroupsCrud({
                                                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: lessonUnlocked ? "#22c55e" : "#f43f5e", flexShrink: 0 }} />
                                                 <span style={{ fontSize: 13, color: "#475569" }}>{lesson.title}</span>
                                               </div>
-                                              <button onClick={() => toggleLockState(lesson.id, "lesson")}
-                                                style={{ padding: "3px 12px", borderRadius: 20, border: `1.5px solid ${lessonUnlocked ? "rgba(34,197,94,0.25)" : "rgba(244,63,94,0.2)"}`, background: "transparent", cursor: "pointer", fontSize: 11, fontWeight: 700, color: lessonUnlocked ? "#16a34a" : "#f43f5e", transition: "all 0.15s", whiteSpace: "nowrap" }}
-                                                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = lessonUnlocked ? "rgba(34,197,94,0.08)" : "rgba(244,63,94,0.06)" }}
-                                                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent" }}
-                                              >
-                                                {lessonUnlocked ? "Déverrouillé" : "Verrouillé"}
-                                              </button>
+                                              {readOnly ? (
+                                                <span
+                                                  style={{
+                                                    padding: "3px 12px",
+                                                    borderRadius: 20,
+                                                    border: `1.5px solid ${lessonUnlocked ? "rgba(34,197,94,0.25)" : "rgba(244,63,94,0.2)"}`,
+                                                    fontSize: 11,
+                                                    fontWeight: 700,
+                                                    color: lessonUnlocked ? "#16a34a" : "#f43f5e",
+                                                    whiteSpace: "nowrap",
+                                                  }}
+                                                >
+                                                  {lessonUnlocked ? "Déverrouillé" : "Verrouillé"}
+                                                </span>
+                                              ) : (
+                                                <button onClick={() => toggleLockState(lesson.id, "lesson")}
+                                                  style={{ padding: "3px 12px", borderRadius: 20, border: `1.5px solid ${lessonUnlocked ? "rgba(34,197,94,0.25)" : "rgba(244,63,94,0.2)"}`, background: "transparent", cursor: "pointer", fontSize: 11, fontWeight: 700, color: lessonUnlocked ? "#16a34a" : "#f43f5e", transition: "all 0.15s", whiteSpace: "nowrap" }}
+                                                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = lessonUnlocked ? "rgba(34,197,94,0.08)" : "rgba(244,63,94,0.06)" }}
+                                                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent" }}
+                                                >
+                                                  {lessonUnlocked ? "Déverrouillé" : "Verrouillé"}
+                                                </button>
+                                              )}
                                             </div>
                                           )
                                         })}
@@ -1020,10 +1037,10 @@ export default function GroupsCrud({
                     {[
                       { label: "Programme",  value: programLabel(editingGroup) },
                       { label: "Statut",     value: STATUS_META[editingGroup.status].label },
-                      { label: "Étudiants",  value: String(editingGroup.studentIds.length) },
+                      { label: "Ã‰tudiants",  value: String(editingGroup.studentIds.length) },
                     ].map(({ label, value }) => (
                       <div key={label} style={{ background: "#f8fafc", borderRadius: 12, padding: "14px 16px", border: "1px solid #e8ecf3" }}>
-                        <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
+                        <div style={{ fontSize: 11, color: "#475569", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{value}</div>
                       </div>
                     ))}
@@ -1049,7 +1066,7 @@ export default function GroupsCrud({
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px" }}>
                 {ok ? <CheckCircle style={{ width: 18, height: 18, color: "#22c55e", flexShrink: 0 }} /> : <AlertCircle style={{ width: 18, height: 18, color: "#f43f5e", flexShrink: 0 }} />}
                 <p style={{ flex: 1, fontSize: 13, fontWeight: 600, color: ok ? "#166534" : "#9f1239", margin: 0 }}>{toast.message}</p>
-                <button onClick={() => removeToast(toast.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#94a3b8", display: "flex" }}><X style={{ width: 14, height: 14 }} /></button>
+                <button onClick={() => removeToast(toast.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#475569", display: "flex" }}><X style={{ width: 14, height: 14 }} /></button>
               </div>
               <div style={{ position: "absolute", bottom: 0, left: 0, height: 3, background: ok ? "#22c55e" : "#f43f5e", width: `${progress}%`, transition: "width 0.1s linear" }} />
             </div>

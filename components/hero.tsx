@@ -20,6 +20,28 @@ const COURSES = [
 type Phase = "typing" | "pausing" | "deleting"
 
 function HeroImage() {
+  const [animationData, setAnimationData] = useState<Record<string, unknown> | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    fetch("/hero-animation.json")
+      .then((response) => {
+        if (!response.ok) throw new Error(`Failed to load hero animation (${response.status})`)
+        return response.json()
+      })
+      .then((data) => {
+        if (!cancelled) setAnimationData(data)
+      })
+      .catch((error) => {
+        console.error(error)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <div aria-hidden className="relative pointer-events-none z-10 -ml-4 md:-ml-28">
       <div className="relative">
@@ -27,13 +49,17 @@ function HeroImage() {
           className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[65%] aspect-square rounded-full blur-[100px] opacity-20"
           style={{ background: "radial-gradient(closest-side, #C84FFF, transparent 70%)" }}
         />
-        <DotLottieReact
-          src="/hero.lottie"
-          loop
-          autoplay
-          className="w-full h-auto select-none"
-          style={{ transform: "scaleX(-1)" }}
-        />
+        {animationData ? (
+          <DotLottieReact
+            data={animationData}
+            loop
+            autoplay
+            className="w-full h-auto select-none"
+            style={{ transform: "scaleX(-1)" }}
+          />
+        ) : (
+          <div className="aspect-[185/243] w-full" />
+        )}
       </div>
     </div>
   )
@@ -189,8 +215,8 @@ export function Hero() {
             size="lg"
             className="bg-accent hover:bg-accent/90 text-white cursor-pointer rounded-none px-7 text-sm font-semibold tracking-wide shadow-lg shadow-accent/20"
           >
-            <Link href="/bootcamps">
-              Découvrir nos bootcamps
+            <Link href="/formations">
+              Découvrir nos formations
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
@@ -200,7 +226,7 @@ export function Hero() {
             variant="outline"
             className="border-foreground/20 hover:border-accent hover:text-accent cursor-pointer rounded-none px-7 text-sm font-semibold tracking-wide"
           >
-            <Link href="/courses">Nos formations</Link>
+            <Link href="/formations">Nos formations</Link>
           </Button>
         </motion.div>
 

@@ -1,6 +1,13 @@
 // app/api/login/route.ts
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
+import { AUTH_COOKIE, cookieOptions } from "@/lib/server-auth"
+
+function resolveAvatar(user: any, pbUrl: string) {
+  if (!user?.avatar) return null
+  if (typeof user.avatar === "string" && user.avatar.startsWith("http")) return user.avatar
+  return `${pbUrl}/api/files/${user.collectionId}/${user.id}/${user.avatar}`
+}
 
 export async function POST(req: Request) {
   try {
@@ -51,7 +58,7 @@ export async function POST(req: Request) {
 
     const user = authData?.record
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       ok: true,
       user: {
         id: user?.id,
@@ -59,8 +66,13 @@ export async function POST(req: Request) {
         email: user?.email ?? "",
         role: user?.role ?? "student",
         usePassword: user?.usePassword ?? false,
+        avatar: resolveAvatar(user, PB_URL),
       },
     })
+    if (authData?.token) {
+      res.cookies.set(AUTH_COOKIE, authData.token, cookieOptions())
+    }
+    return res
   } catch (err: any) {
     console.error("LOGIN API ERROR:", err)
     return NextResponse.json(

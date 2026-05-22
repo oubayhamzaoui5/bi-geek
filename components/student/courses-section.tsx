@@ -8,6 +8,8 @@ export type StudentProgram = {
   title: string
   shortDescription: string
   durationLabel: string
+  instructorName?: string
+  groupId?: string | null
   tags?: string[]
   image?: string | null
   slug?: string
@@ -19,21 +21,19 @@ export type StudentProgram = {
 interface CoursesSectionProps {
   showCompleted?: boolean
   programs?: StudentProgram[]
+  basePath?: string
 }
 
 export function CoursesSection({
   showCompleted = false,
   programs = [],
+  basePath = "/student-dashboard",
 }: CoursesSectionProps) {
   const { isCollapsed } = useSidebar()
   const filteredPrograms = programs.filter((p) => !!p.completed === showCompleted)
 
   return (
     <section className="space-y-6">
-      <h2 className="text-3xl font-bold text-accent mb-2">
-        {showCompleted ? "Formations terminées" : "Formations actives"}
-      </h2>
-
       <div
         className={`
           grid gap-6 grid-cols-1
@@ -49,9 +49,11 @@ export function CoursesSection({
           filteredPrograms.map((program) => {
             const variant = program.variant ?? "course"
             const hrefOverride =
-              variant === "bootcamp"
-                ? `/student-dashboard/bootcamp/${program.slug ?? program.id}`
-                : `/student-dashboard/course/${program.slug ?? program.id}`
+              program.groupId
+                ? `${basePath}/groups/${program.groupId}`
+                : variant === "bootcamp"
+                ? `${basePath}/bootcamp/${program.slug ?? program.id}`
+                : `${basePath}/course/${program.slug ?? program.id}`
 
             return (
               <ProgramCard
