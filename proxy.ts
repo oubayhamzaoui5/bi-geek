@@ -5,6 +5,7 @@ const PB_URL = process.env.POCKETBASE_URL ?? "http://127.0.0.1:8090"
 
 const ROLE_RULES = [
   { prefix: "/api/admin", roles: ["admin", "admin_agent"] },
+  { prefix: "/api/dashboard", roles: ["admin", "admin_agent", "instructor", "student"] },
   { prefix: "/api/instructor", roles: ["instructor", "admin", "admin_agent"] },
   { prefix: "/api/student", roles: ["student", "admin", "admin_agent"] },
 ]
@@ -68,6 +69,7 @@ export async function proxy(req: NextRequest) {
 export const config = {
   matcher: [
     "/api/admin/:path*",
+    "/api/dashboard/:path*",
     "/api/instructor/:path*",
     "/api/student/:path*",
     "/admin-dashboard/:path*",

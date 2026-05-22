@@ -11,6 +11,7 @@ import { KpiCard, QuickBtn, SectionCard } from "@/components/dashboard/OverviewS
 import { OverviewSession, UpcomingSessionsPanel } from "@/components/dashboard/UpcomingSessionsPanel"
 import LoadingBI from "@/components/LoadingBI"
 import { CoursesSection, StudentProgram } from "@/components/student/courses-section"
+import { MobileAppInstallAction } from "@/components/dashboard/MobileAppInstallAction"
 
 /* ─── Types ────────────────────────────────────────────────────────────────── */
 type Stats = {
@@ -126,6 +127,7 @@ export default function InstructorOverviewPage() {
   return (
     <div style={{ padding: "24px 32px", background: "#fafafa", minHeight: "100vh", fontFamily: "'DM Sans','Inter',sans-serif" }}>
       <style>{`@keyframes livepulse{0%,100%{opacity:1}50%{opacity:0.35}}`}</style>
+      <MobileAppInstallAction />
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0, fontFamily: "var(--ff-display,'DM Sans')" }}>

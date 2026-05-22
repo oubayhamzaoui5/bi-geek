@@ -31,7 +31,7 @@ export async function registerDashboardPushNotifications(userId: string) {
     applicationServerKey: urlBase64ToUint8Array(vapidKey),
   })
 
-  await fetch("/api/student/push-subscribe", {
+  await fetch("/api/dashboard/push-subscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId, subscription: subscription.toJSON() }),
