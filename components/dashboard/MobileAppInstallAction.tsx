@@ -13,10 +13,17 @@ function isStandaloneApp() {
   return window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone === true
 }
 
+function isIosDevice() {
+  return /iphone|ipad|ipod/i.test(window.navigator.userAgent) || (
+    window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1
+  )
+}
+
 export function MobileAppInstallAction() {
   const [userId, setUserId] = useState("")
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [standalone, setStandalone] = useState(false)
+  const [iosDevice, setIosDevice] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default")
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState("")
@@ -30,6 +37,7 @@ export function MobileAppInstallAction() {
     }
 
     setStandalone(isStandaloneApp())
+    setIosDevice(isIosDevice())
     setNotificationPermission(
       "Notification" in window && "serviceWorker" in navigator && "PushManager" in window
         ? Notification.permission
@@ -61,11 +69,23 @@ export function MobileAppInstallAction() {
     return "available"
   }, [notificationPermission, standalone])
 
+  const label = useMemo(() => {
+    if (busy) return "Activation..."
+    if (status === "ready") return "App et notifications activees"
+    if (iosDevice && !standalone) return "Installer l'app sur iPhone"
+    return "Installer l'app et activer les notifications"
+  }, [busy, iosDevice, standalone, status])
+
   async function handleClick() {
     setBusy(true)
     setMessage("")
 
     try {
+      if (iosDevice && !standalone && !installPrompt) {
+        setMessage("Sur iPhone: ouvrez cette page dans Safari, touchez Partager, puis Ajouter a l'ecran d'accueil. Ensuite ouvrez l'app installee pour activer les notifications.")
+        return
+      }
+
       if (installPrompt && !standalone) {
         await installPrompt.prompt()
         const choice = await installPrompt.userChoice
@@ -135,7 +155,7 @@ export function MobileAppInstallAction() {
           }}
         >
           {status === "ready" ? <CheckCircle2 size={18} /> : <Smartphone size={18} />}
-          <span>{busy ? "Activation..." : status === "ready" ? "App et notifications activees" : "Installer l'app et activer les notifications"}</span>
+          <span>{label}</span>
           {status !== "ready" && (notificationPermission === "granted" ? <Download size={16} /> : <Bell size={16} />)}
         </button>
         {message && (
