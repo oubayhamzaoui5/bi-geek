@@ -7,8 +7,16 @@ type FeaturedType = "course" | "bootcamp"
 
 function imageUrl(type: FeaturedType, record: any) {
   if (!record?.coverImage) return null
-  if (typeof record.coverImage === "string" && record.coverImage.startsWith("http")) return record.coverImage
-  return `${PB_URL}/api/files/${type === "course" ? "courses" : "bootcamps"}/${record.id}/${record.coverImage}`
+  if (typeof record.coverImage === "string" && record.coverImage.startsWith("http")) {
+    try {
+      const url = new URL(record.coverImage)
+      if (url.pathname.startsWith("/api/files/")) return url.pathname
+    } catch {
+      return record.coverImage
+    }
+    return record.coverImage
+  }
+  return `/api/files/${type === "course" ? "courses" : "bootcamps"}/${record.id}/${encodeURIComponent(record.coverImage)}`
 }
 
 function formatProgram(type: FeaturedType, record: any, order: number) {

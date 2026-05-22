@@ -32,14 +32,13 @@ export default function TopPrograms() {
 
         const data = await res.json()
         if (data.ok) {
-          const PB = process.env.NEXT_PUBLIC_PB_URL
           setCourses((data.courses || []).map((c: any) => ({
             ...c,
-            image: c.coverImage ? `${PB}/api/files/courses/${c.id}/${c.coverImage}` : null,
+            image: c.image ?? null,
           })))
           setBootcamps((data.bootcamps || []).map((b: any) => ({
             ...b,
-            image: b.coverImage ? `${PB}/api/files/bootcamps/${b.id}/${b.coverImage}` : null,
+            image: b.image ?? null,
           })))
         }
       } catch {
