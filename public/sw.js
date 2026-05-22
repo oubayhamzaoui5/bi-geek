@@ -2,16 +2,13 @@ self.addEventListener("push", (event) => {
   const data = event.data?.json() || {}
   const title = data.title || "BI Geek"
   const options = {
-    body: data.body || "Vous avez une séance aujourd'hui.",
+    body: data.body || "Nouvelle notification.",
     icon: "/icon.svg",
     badge: "/icon-dark-32x32.png",
     data: { url: data.url || "/student-dashboard" },
-    actions: [
-      { action: "confirm", title: "Confirmer présence" },
-      { action: "dismiss", title: "Plus tard" },
-    ],
-    requireInteraction: true,
-    tag: `seance-${data.sessionId || "today"}`,
+    actions: Array.isArray(data.actions) ? data.actions : [],
+    requireInteraction: data.requireInteraction !== false,
+    tag: data.tag || `notification-${data.sessionId || "today"}`,
   }
   event.waitUntil(self.registration.showNotification(title, options))
 })

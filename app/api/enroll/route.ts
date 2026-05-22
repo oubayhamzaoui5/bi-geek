@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
+import { sendPushToAdmins } from "@/lib/server-push"
 
 export async function POST(req: Request) {
   try {
@@ -78,6 +79,17 @@ export async function POST(req: Request) {
       note: note || "",
     })
 
+    const programTitle = await resolveProgramTitle(pb, courseId, bootcampId)
+    await sendPushToAdmins(pb, {
+      title: "Nouvelle inscription",
+      body: `${firstName} ${lastName} - ${programTitle}`,
+      url: "/admin-dashboard/enrollments",
+      tag: `enrollment-${created.id}`,
+      requireInteraction: true,
+    }).catch((err) => {
+      console.error("ADMIN PUSH ERROR:", err)
+    })
+
     return NextResponse.json({ ok: true, id: created.id })
   } catch (err: any) {
     console.error("ENROLL API ERROR:", err)
@@ -90,4 +102,19 @@ export async function POST(req: Request) {
       { status: 500 },
     )
   }
+}
+
+async function resolveProgramTitle(pb: PocketBase, courseId?: string, bootcampId?: string) {
+  try {
+    if (courseId) {
+      const course = await pb.collection("courses").getOne(courseId, { fields: "title" })
+      return course.title || "formation"
+    }
+    if (bootcampId) {
+      const bootcamp = await pb.collection("bootcamps").getOne(bootcampId, { fields: "title" })
+      return bootcamp.title || "bootcamp"
+    }
+  } catch {}
+
+  return "formation"
 }

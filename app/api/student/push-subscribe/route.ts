@@ -12,17 +12,17 @@ async function getAdminPb() {
 
 export async function POST(req: Request) {
   try {
-    const { studentId, subscription } = await req.json()
-    if (!studentId || !subscription?.endpoint) {
+    const { studentId, userId, subscription } = await req.json()
+    const subscriberId = userId || studentId
+    if (!subscriberId || !subscription?.endpoint) {
       return NextResponse.json({ error: "Données manquantes." }, { status: 400 })
     }
 
     const pb = await getAdminPb()
     const { endpoint, keys } = subscription
 
-    // Upsert: delete existing for this student then create fresh
     const existing = await pb.collection("push_subscriptions").getFullList({
-      filter: `student = "${studentId}"`,
+      filter: `student = "${subscriberId}" && endpoint = "${String(endpoint).replace(/"/g, '\\"')}"`,
     }).catch(() => [])
 
     for (const rec of existing) {
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     }
 
     await pb.collection("push_subscriptions").create({
-      student: studentId,
+      student: subscriberId,
       endpoint,
       p256dh: keys.p256dh,
       auth_key: keys.auth,

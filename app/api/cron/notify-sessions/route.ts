@@ -92,7 +92,17 @@ async function runNotifications(req: Request) {
       try {
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth_key } },
-          JSON.stringify({ title, body, url: `/student-dashboard/seance/${sessionId}`, sessionId })
+          JSON.stringify({
+            title,
+            body,
+            url: `/student-dashboard/seance/${sessionId}`,
+            sessionId,
+            tag: `seance-${sessionId}`,
+            actions: [
+              { action: "confirm", title: "Confirmer présence" },
+              { action: "dismiss", title: "Plus tard" },
+            ],
+          })
         )
         sent++
       } catch (err: any) {

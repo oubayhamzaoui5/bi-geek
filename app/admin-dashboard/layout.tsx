@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { SidebarProvider } from "@/components/ui/sidebar-context"
 import { Sidebar } from "@/components/sidebar"
 import { useRouter } from "next/navigation"
+import { PushNotificationPrompt, registerDashboardPushNotifications } from "@/components/PushNotificationPrompt"
 
 export default function AdminDashboardLayout({
   children,
@@ -11,6 +12,7 @@ export default function AdminDashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const [userId, setUserId] = useState<string | null>(null)
   const [authorized, setAuthorized] = useState<boolean | null>(() => {
     if (typeof window === "undefined") return null
     try {
@@ -31,6 +33,10 @@ export default function AdminDashboardLayout({
       router.push("/")
     } else {
       setAuthorized(true)
+      setUserId(user.id)
+      registerDashboardPushNotifications(user.id).catch((err) => {
+        console.warn("Push registration failed:", err)
+      })
     }
   }, [router])
 
@@ -41,6 +47,7 @@ export default function AdminDashboardLayout({
       <div className="h-screen bg-[#fafafa]">
         <Sidebar variant="admin" />
         <main className="md:ml-[60px] h-screen overflow-auto">{children}</main>
+        {userId && <PushNotificationPrompt userId={userId} />}
       </div>
     </SidebarProvider>
   )

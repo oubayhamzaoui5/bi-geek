@@ -6,39 +6,11 @@ import { Sidebar } from "@/components/sidebar"
 import { MessagesTab } from "@/components/messages-tab"
 import { useRouter } from "next/navigation"
 import { DashboardLoadingProvider, useDashboardLoading } from "@/components/dashboard-loading-context"
-
-async function registerPushNotifications(studentId: string) {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return
-  try {
-    const reg = await navigator.serviceWorker.register("/sw.js")
-    const permission = await Notification.requestPermission()
-    if (permission !== "granted") return
-
-    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
-    const urlBase64ToUint8Array = (base64: string) => {
-      const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, "=")
-      const raw = atob(padded.replace(/-/g, "+").replace(/_/g, "/"))
-      return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)))
-    }
-
-    const existing = await reg.pushManager.getSubscription()
-    const subscription = existing ?? await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey),
-    })
-
-    await fetch("/api/student/push-subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ studentId, subscription: subscription.toJSON() }),
-    })
-  } catch (err) {
-    console.warn("Push registration failed:", err)
-  }
-}
+import { PushNotificationPrompt, registerDashboardPushNotifications } from "@/components/PushNotificationPrompt"
 
 async function checkTodaySessionNotifications(studentId: string) {
   if (!("Notification" in window) || !("serviceWorker" in navigator)) return
+  if (Notification.permission !== "granted") return
   const hour = new Date().getHours()
   if (hour < 8) return
 
@@ -47,11 +19,6 @@ async function checkTodaySessionNotifications(studentId: string) {
   if (localStorage.getItem(key)) return
 
   try {
-    const permission = Notification.permission === "granted"
-      ? "granted"
-      : await Notification.requestPermission()
-    if (permission !== "granted") return
-
     const res = await fetch(`/api/student/sessions/today?studentId=${studentId}`)
     if (!res.ok) return
     const data = await res.json()
@@ -89,6 +56,7 @@ export default function StudentDashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const [userId, setUserId] = useState<string | null>(null)
   const [authorized, setAuthorized] = useState<boolean | null>(() => {
     if (typeof window === "undefined") return null
     try {
@@ -109,7 +77,10 @@ export default function StudentDashboardLayout({
       router.push("/")
     } else {
       setAuthorized(true)
-      registerPushNotifications(user.id)
+      setUserId(user.id)
+      registerDashboardPushNotifications(user.id).catch((err) => {
+        console.warn("Push registration failed:", err)
+      })
       checkTodaySessionNotifications(user.id)
     }
   }, [router])
@@ -123,6 +94,12 @@ export default function StudentDashboardLayout({
           <Sidebar compact />
           <main className="md:ml-[60px] h-screen overflow-auto">{children}</main>
           <MessagesTabConditional />
+          {userId && (
+            <PushNotificationPrompt
+              userId={userId}
+              onEnabled={() => checkTodaySessionNotifications(userId)}
+            />
+          )}
         </div>
       </SidebarProvider>
     </DashboardLoadingProvider>

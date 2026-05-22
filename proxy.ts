@@ -23,7 +23,7 @@ const NOINDEX_PREFIXES = [
   "/meet",
 ]
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname
   const rule = ROLE_RULES.find((item) => pathname.startsWith(item.prefix))
   if (!rule) {
