@@ -3,7 +3,8 @@
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, CalendarDays, CheckCircle2, ClipboardList, Phone, UserRound } from "lucide-react"
+import { ArrowLeft, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Phone, UserRound } from "lucide-react"
+import { registerDashboardPushNotifications } from "@/components/PushNotificationPrompt"
 
 type EnrollmentStatus = "pending" | "contacted" | "confirmed" | "cancelled"
 
@@ -54,6 +55,10 @@ export default function MobileEnrollmentsPage() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [adminId, setAdminId] = useState<string | null>(null)
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushStatus, setPushStatus] = useState<"unknown" | "enabled" | "blocked" | "unsupported">("unknown")
+  const [pushMessage, setPushMessage] = useState("")
 
   useEffect(() => {
     const focus = new URLSearchParams(window.location.search).get("focus")
@@ -66,6 +71,7 @@ export default function MobileEnrollmentsPage() {
         router.replace("/login")
         return
       }
+      setAdminId(user.id)
       setAuthorized(true)
     } catch {
       router.replace("/login")
@@ -97,6 +103,34 @@ export default function MobileEnrollmentsPage() {
     loadEnrollments()
   }, [authorized])
 
+  useEffect(() => {
+    if (!authorized || !adminId) return
+
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushStatus("unsupported")
+      setPushMessage("Notifications non supportées sur ce navigateur.")
+      return
+    }
+
+    if (Notification.permission === "denied") {
+      setPushStatus("blocked")
+      setPushMessage("Notifications bloquées dans les réglages du téléphone.")
+      return
+    }
+
+    if (Notification.permission === "granted") {
+      registerDashboardPushNotifications(adminId)
+        .then((enabled) => {
+          setPushStatus(enabled ? "enabled" : "unknown")
+          setPushMessage(enabled ? "Notifications actives sur cette application." : "")
+        })
+        .catch(() => {
+          setPushStatus("unknown")
+          setPushMessage("Impossible de vérifier les notifications.")
+        })
+    }
+  }, [authorized, adminId])
+
   const sortedEnrollments = useMemo(() => {
     return [...enrollments].sort((a, b) => {
       if (a.id === focusId) return -1
@@ -125,6 +159,53 @@ export default function MobileEnrollmentsPage() {
     }
   }
 
+  async function enableAndTestPush() {
+    if (!adminId) return
+    if (!("Notification" in window)) {
+      setPushStatus("unsupported")
+      setPushMessage("Notifications non supportées sur ce navigateur.")
+      return
+    }
+
+    setPushBusy(true)
+    setPushMessage("")
+    try {
+      if (Notification.permission !== "granted") {
+        const permission = await Notification.requestPermission()
+        if (permission === "denied") {
+          setPushStatus("blocked")
+          setPushMessage("Notifications bloquées. Activez-les dans les réglages de l'application.")
+          return
+        }
+        if (permission !== "granted") {
+          setPushStatus("unknown")
+          setPushMessage("Activation annulée.")
+          return
+        }
+      }
+
+      const registered = await registerDashboardPushNotifications(adminId)
+      if (!registered) {
+        setPushStatus("unknown")
+        setPushMessage("Impossible d'enregistrer ce téléphone.")
+        return
+      }
+
+      const res = await fetch("/api/admin/test-push", { method: "POST" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Test impossible.")
+
+      setPushStatus("enabled")
+      setPushMessage(data.sent > 0 ? "Test envoyé. Vérifiez le centre de notifications." : "Téléphone enregistré, test non livré.")
+    } catch (err) {
+      console.error(err)
+      setPushStatus("unknown")
+      setPushMessage("Erreur pendant le test notification.")
+    } finally {
+      setPushBusy(false)
+    }
+  }
+
   if (!authorized) return null
 
   return (
@@ -150,7 +231,31 @@ export default function MobileEnrollmentsPage() {
           <ArrowLeft size={18} />
           <span><span style={{ color: "#8b0f82" }}>BI</span> GEEK</span>
         </Link>
-        <span style={{ fontSize: 12, fontWeight: 800, color: "#64748b" }}>Inscriptions</span>
+        <button
+          type="button"
+          onClick={enableAndTestPush}
+          disabled={pushBusy || pushStatus === "unsupported"}
+          title="Activer et tester les notifications"
+          style={{
+            height: 36,
+            minWidth: 36,
+            border: `1px solid ${pushStatus === "enabled" ? "#bbf7d0" : "#e2e8f0"}`,
+            borderRadius: 10,
+            background: pushStatus === "enabled" ? "#f0fdf4" : "#ffffff",
+            color: pushStatus === "enabled" ? "#15803d" : "#0f172a",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 10px",
+            gap: 7,
+            fontSize: 12,
+            fontWeight: 900,
+            cursor: pushBusy || pushStatus === "unsupported" ? "not-allowed" : "pointer",
+          }}
+        >
+          {pushStatus === "enabled" ? <BellRing size={16} /> : <Bell size={16} />}
+          {pushBusy ? "..." : pushStatus === "enabled" ? "Actif" : "Notif"}
+        </button>
       </nav>
 
       <section style={{ padding: "16px 14px 28px", maxWidth: 560, margin: "0 auto" }}>
@@ -161,6 +266,20 @@ export default function MobileEnrollmentsPage() {
           <p style={{ margin: "5px 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>
             Touchez une inscription pour changer uniquement son statut.
           </p>
+          {pushMessage && (
+            <p style={{
+              margin: "10px 0 0",
+              borderRadius: 10,
+              padding: "9px 10px",
+              border: "1px solid #e2e8f0",
+              background: "#fff",
+              color: pushStatus === "blocked" ? "#b91c1c" : "#475569",
+              fontSize: 12,
+              fontWeight: 800,
+            }}>
+              {pushMessage}
+            </p>
+          )}
         </div>
 
         {loading ? (

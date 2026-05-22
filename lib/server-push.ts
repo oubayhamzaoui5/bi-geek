@@ -6,6 +6,7 @@ type PushPayload = {
   body: string
   url: string
   tag?: string
+  icon?: string
   requireInteraction?: boolean
   actions?: Array<{ action: string; title: string }>
 }
