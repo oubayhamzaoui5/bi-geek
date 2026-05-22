@@ -3,8 +3,8 @@ self.addEventListener("push", (event) => {
   const title = data.title || "BI Geek"
   const options = {
     body: data.body || "Nouvelle notification.",
-    icon: "/icon.svg",
-    badge: "/icon-dark-32x32.png",
+    icon: "/icon.png",
+    badge: "/apple-icon.png",
     data: { url: data.url || "/student-dashboard" },
     actions: Array.isArray(data.actions) ? data.actions : [],
     requireInteraction: data.requireInteraction !== false,

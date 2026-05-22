@@ -33,7 +33,7 @@ async function checkTodaySessionNotifications(studentId: string) {
       await reg.showNotification(`Séance aujourd'hui — ${groupTitle}`, {
         body: `${s.start_time} · Confirmez votre présence`,
         icon: "/icon.svg",
-        badge: "/icon-dark-32x32.png",
+        badge: "/apple-icon.png",
         data: { url: `/student-dashboard/seance/${s.id}` },
         tag: `seance-${s.id}`,
         requireInteraction: true,
