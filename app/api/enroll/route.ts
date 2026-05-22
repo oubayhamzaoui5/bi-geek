@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     await sendPushToAdmins(pb, {
       title: "Nouvelle inscription",
       body: `${firstName} ${lastName} - ${programTitle}`,
-      url: "/admin-dashboard/enrollments",
+      url: `/admin-mobile/enrollments?focus=${created.id}`,
       tag: `enrollment-${created.id}`,
       requireInteraction: true,
     }).catch((err) => {

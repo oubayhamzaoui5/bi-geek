@@ -3,7 +3,7 @@ self.addEventListener("push", (event) => {
   const title = data.title || "BI Geek"
   const options = {
     body: data.body || "Nouvelle notification.",
-    icon: "/icon.png",
+    icon: data.icon || "/notification-icon.png",
     badge: "/notification-badge.png",
     data: { url: data.url || "/student-dashboard" },
     actions: Array.isArray(data.actions) ? data.actions : [],
