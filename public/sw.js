@@ -4,7 +4,7 @@ self.addEventListener("push", (event) => {
   const options = {
     body: data.body || "Nouvelle notification.",
     icon: "/icon.png",
-    badge: "/apple-icon.png",
+    badge: "/notification-badge.png",
     data: { url: data.url || "/student-dashboard" },
     actions: Array.isArray(data.actions) ? data.actions : [],
     requireInteraction: data.requireInteraction !== false,

@@ -32,8 +32,8 @@ async function checkTodaySessionNotifications(studentId: string) {
       const groupTitle = s.groupTitle || s.title || "Séance"
       await reg.showNotification(`Séance aujourd'hui — ${groupTitle}`, {
         body: `${s.start_time} · Confirmez votre présence`,
-        icon: "/icon.svg",
-        badge: "/apple-icon.png",
+        icon: "/icon.png",
+        badge: "/notification-badge.png",
         data: { url: `/student-dashboard/seance/${s.id}` },
         tag: `seance-${s.id}`,
         requireInteraction: true,
