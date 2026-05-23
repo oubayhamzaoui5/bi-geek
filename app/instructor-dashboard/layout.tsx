@@ -41,7 +41,7 @@ export default function InstructorDashboardLayout({
     <SidebarProvider>
       <div className="h-screen bg-[#fafafa]">
         <Sidebar variant="instructor" />
-        <main className="md:ml-[60px] h-screen overflow-auto">{children}</main>
+        <main className="dashboard-responsive-main md:ml-[60px] h-screen overflow-auto">{children}</main>
         <MessagesOverlay />
       </div>
     </SidebarProvider>

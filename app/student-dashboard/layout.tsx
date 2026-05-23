@@ -92,7 +92,7 @@ export default function StudentDashboardLayout({
       <SidebarProvider>
         <div className="h-screen bg-[#fafafa]">
           <Sidebar compact />
-          <main className="md:ml-[60px] h-screen overflow-auto">{children}</main>
+          <main className="dashboard-responsive-main md:ml-[60px] h-screen overflow-auto">{children}</main>
           <MessagesTabConditional />
           {userId && (
             <PushNotificationPrompt

@@ -132,7 +132,7 @@ export default function InstructorOverviewPage() {
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0, fontFamily: "var(--ff-display,'DM Sans')" }}>
           {greeting},{" "}
-          <span style={{ color: "var(--accent,#6366f1)" }}>{instructorName}</span>
+          <span className="dashboard-greeting-name" style={{ color: "var(--accent,#6366f1)" }}>{instructorName}</span>
         </h1>
         <p style={{ fontSize: 12, color: "#475569", margin: "3px 0 0", fontWeight: 500 }}>
           Tableau de bord — {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}

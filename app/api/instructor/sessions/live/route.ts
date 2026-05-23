@@ -11,6 +11,32 @@ async function getAdminPb() {
   return pb
 }
 
+async function getMeetingAttendees(pb: PocketBase, group: any) {
+  const emails = new Set<string>()
+
+  if (group?.expand?.instructor?.email) {
+    emails.add(String(group.expand.instructor.email))
+  } else if (group?.instructor) {
+    try {
+      const instructor = await pb.collection("users").getOne(group.instructor)
+      if (instructor.email) emails.add(String(instructor.email))
+    } catch {}
+  }
+
+  const studentIds: string[] = Array.isArray(group?.students) ? group.students : []
+  if (studentIds.length > 0) {
+    try {
+      const filter = studentIds.map(id => `id = "${id}"`).join(" || ")
+      const students = await pb.collection("users").getFullList({ filter })
+      for (const student of students as any[]) {
+        if (student.email) emails.add(String(student.email))
+      }
+    } catch {}
+  }
+
+  return Array.from(emails)
+}
+
 export async function POST(req: Request) {
   try {
     const { sessionId, instructorId } = await req.json()
@@ -20,8 +46,9 @@ export async function POST(req: Request) {
 
     const pb = await getAdminPb()
     const session = await pb.collection("sessions").getOne(sessionId, { expand: "group" })
+    const group = session.expand?.group
     
-    if (session.expand?.group?.instructor !== instructorId) {
+    if (group?.instructor !== instructorId) {
       return NextResponse.json({ error: "Unauthorized access to this group" }, { status: 403 })
     }
 
@@ -36,7 +63,8 @@ export async function POST(req: Request) {
     const sessionDateStr = session.date ? session.date.substring(0, 10) : new Date().toISOString().substring(0, 10)
     const sessionTimeStr = session.start_time || "10:00"
     const durationMins = session.duration || 120
-    const title = `${session.title || "Séance Live"} - ${session.expand?.group?.title || "Groupe"}`
+    const title = `${session.title || "Séance Live"} - ${group?.title || "Groupe"}`
+    const attendees = await getMeetingAttendees(pb, group)
 
     const { googleEventId, joinUrl: link } = await createMeetEvent({
       requestId: sessionId,
@@ -44,6 +72,7 @@ export async function POST(req: Request) {
       date: sessionDateStr,
       startTime: sessionTimeStr,
       duration: durationMins,
+      attendees,
     })
 
     const gEventId = googleEventId || ""

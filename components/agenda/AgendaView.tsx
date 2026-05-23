@@ -1164,7 +1164,7 @@ export function AgendaView({ readOnly = false, instructorId, studentId }: Agenda
   const groupColor = (id: string) => groupColorMap.get(id) ?? "#475569"
 
   return (
-    <div className="flex flex-1 overflow-hidden">
+    <div className="dashboard-agenda-view flex flex-1 overflow-hidden">
       {/* Toolbar */}
       <div className="absolute top-0 left-0 right-0" style={{ zIndex: -1 }} />
 
@@ -1212,9 +1212,9 @@ export function AgendaView({ readOnly = false, instructorId, studentId }: Agenda
         </div>
 
         {/* Content row */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="dashboard-agenda-shell flex flex-1 overflow-hidden">
           {/* Groups sidebar */}
-          <div className={`shrink-0 border-r border-gray-100 bg-white flex flex-col transition-all duration-200
+          <div className={`dashboard-agenda-sidebar shrink-0 border-r border-gray-100 bg-white flex flex-col transition-all duration-200
             ${sidebarOpen ? "w-52" : "w-0 overflow-hidden"}`}>
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
               <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Groupes</span>
@@ -1281,7 +1281,7 @@ export function AgendaView({ readOnly = false, instructorId, studentId }: Agenda
           </button>
 
           {/* Calendar */}
-          <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-white">
+          <div className="dashboard-agenda-canvas flex-1 min-w-0 flex flex-col overflow-hidden bg-white">
             {view === "week" && (
               <WeekGrid weekStart={weekStart} sessions={visibleSessions}
                 onSessionClick={handleSessionClick} groupColorMap={groupColorMap} />

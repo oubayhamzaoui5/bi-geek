@@ -21,6 +21,27 @@ function resolveAvatar(user: any, pbUrl: string) {
   return `${pbUrl}/api/files/${user.collectionId}/${user.id}/${user.avatar}`
 }
 
+function sessionStartMs(session: any) {
+  const date = session.date?.slice(0, 10) || "1970-01-01"
+  const time = session.start_time || "00:00"
+  return new Date(`${date}T${time}:00`).getTime()
+}
+
+function formatSession(s: any) {
+  return {
+    id: s.id,
+    title: s.title || null,
+    date: s.date.slice(0, 10),
+    start_time: s.start_time || "",
+    mode: s.mode || "live_presentiel",
+    joinUrl: s.joinUrl || null,
+    recordingUrl: s.recordingUrl || null,
+    googleEventId: s.googleEventId || null,
+    is_ended: s.is_ended || false,
+    ended_at: s.ended_at || null,
+  }
+}
+
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -81,63 +102,33 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       } catch {}
     }
 
-    const today = new Date()
-    const todayYMD = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
-    const currentTime = `${String(today.getHours()).padStart(2, "0")}:${String(today.getMinutes()).padStart(2, "0")}`
+    const now = new Date()
+    const todayYMD = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+    const nowMs = now.getTime()
 
     let nextSession = null
     let nextSessions: any[] = []
-    try {
-      const sessionsRes = await pb.collection("sessions").getList(1, 3, {
-        filter: `group = "${id}" && (date > "${todayYMD}" || (date = "${todayYMD}" && start_time >= "${currentTime}"))`,
-        sort: "date,start_time",
-      })
-      nextSessions = sessionsRes.items.map((s: any) => ({
-        id: s.id,
-        title: s.title || null,
-        date: s.date.slice(0, 10),
-        start_time: s.start_time || "",
-        mode: s.mode || "live_presentiel",
-        joinUrl: s.joinUrl || null,
-      }))
-      nextSession = nextSessions[0] ?? null
-    } catch {}
-
     let todaySession: any = null
-    try {
-      const tRes = await pb.collection("sessions").getList(1, 1, {
-        filter: `group = "${id}" && date = "${todayYMD}" && start_time < "${currentTime}" && (mode = "live" || mode = "live_presentiel")`,
-        sort: "-start_time",
-      })
-      const s = tRes.items[0]
-      if (s) {
-        todaySession = {
-          id: s.id,
-          title: s.title || null,
-          date: s.date.slice(0, 10),
-          start_time: s.start_time || "",
-          mode: s.mode || "live_presentiel",
-          joinUrl: s.joinUrl || null,
-        }
-      }
-    } catch {}
-
     let pastSessions: any[] = []
     try {
-      const pastRes = await pb.collection("sessions").getFullList({
-        filter: `group = "${id}" && (date < "${todayYMD}" || (date = "${todayYMD}" && start_time < "${currentTime}")) && (mode = "live" || mode = "live_presentiel")`,
-        sort: "-date,-start_time",
+      const sessionsRes = await pb.collection("sessions").getFullList({
+        filter: `group = "${id}" && (mode = "live" || mode = "live_presentiel")`,
+        sort: "date,start_time",
       })
-      pastSessions = pastRes.map((s: any) => ({
-        id: s.id,
-        title: s.title || null,
-        date: s.date.slice(0, 10),
-        start_time: s.start_time || "",
-        mode: s.mode || "live_presentiel",
-        joinUrl: s.joinUrl || null,
-        recordingUrl: s.recordingUrl || null,
-        googleEventId: s.googleEventId || null,
-      }))
+      const active = sessionsRes.filter((s: any) => !s.is_cancelled && !s.is_ended)
+      nextSessions = active
+        .filter((s: any) => sessionStartMs(s) >= nowMs)
+        .slice(0, 3)
+        .map(formatSession)
+      nextSession = nextSessions[0] ?? null
+      const todayStarted = active
+        .filter((s: any) => s.date?.slice(0, 10) === todayYMD && sessionStartMs(s) < nowMs)
+        .sort((a: any, b: any) => sessionStartMs(b) - sessionStartMs(a))[0]
+      todaySession = todayStarted ? formatSession(todayStarted) : null
+      pastSessions = sessionsRes
+        .filter((s: any) => !!s.is_ended || sessionStartMs(s) < nowMs)
+        .sort((a: any, b: any) => sessionStartMs(b) - sessionStartMs(a))
+        .map(formatSession)
     } catch {}
 
     return NextResponse.json({

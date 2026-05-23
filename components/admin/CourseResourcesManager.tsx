@@ -219,7 +219,7 @@ export default function CourseResourcesManager({ courseId }: { courseId: string 
   if (loading) return <LoadingBI />
 
   return (
-    <div style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "'DM Sans','Inter',sans-serif" }}>
+    <div className="dashboard-resource-manager" style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "'DM Sans','Inter',sans-serif" }}>
       <AdminPageHeader
         title="Ressources du cours"
         description={course ? `${course.title} · programme par defaut` : "Programme par defaut"}

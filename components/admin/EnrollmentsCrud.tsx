@@ -251,13 +251,13 @@ export default function EnrollmentsCrud({
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{
+    <div className="dashboard-split-workspace" style={{
       height: "100vh", display: "flex", overflow: "hidden",
       background: "#f8fafc", fontFamily: "'DM Sans','Inter',sans-serif",
     }}>
 
       {/* ── Left panel ── */}
-      <div style={{
+      <div className="dashboard-split-master" style={{
         width: 400, minWidth: 400,
         background: "#fff", borderRight: "1px solid #e8ecf3",
         display: "flex", flexDirection: "column", overflow: "hidden",
@@ -384,7 +384,7 @@ export default function EnrollmentsCrud({
       </div>
 
       {/* ── Right panel ── */}
-      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div className="dashboard-split-detail" style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
         {selectedEnrollment ? (
           <>
             {/* Right header */}

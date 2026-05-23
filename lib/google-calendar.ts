@@ -45,17 +45,23 @@ export async function createMeetEvent(opts: {
   date:      string
   startTime: string
   duration:  number
+  attendees?: string[]
 }) {
   const cal = getClient()
   const { start, end } = buildStartEnd(opts.date, opts.startTime, opts.duration)
+  const attendees = Array.from(
+    new Set((opts.attendees ?? []).map(email => email.trim().toLowerCase()).filter(Boolean))
+  ).map(email => ({ email }))
 
   const res = await cal.events.insert({
     calendarId:            CALENDAR_ID,
     conferenceDataVersion: 1,
+    sendUpdates:           attendees.length > 0 ? "all" : "none",
     requestBody: {
       summary: opts.title || "Séance de formation",
       start,
       end,
+      attendees,
       conferenceData: {
         createRequest: {
           requestId:           opts.requestId,

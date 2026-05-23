@@ -408,7 +408,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
           />
         </div>
         {/* Role filter pills */}
-        <div style={{ display: "flex", gap: 6 }}>
+        <div className="dashboard-role-filter-pills" style={{ display: "flex", gap: 6 }}>
           {([
             { value: "student",     label: "Étudiants",     count: stats.student },
             { value: "instructor",  label: "Instructeurs",  count: stats.instructor },

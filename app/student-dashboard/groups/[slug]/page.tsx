@@ -71,18 +71,6 @@ type HomeworkItem = {
 
 function isPdf(name: string) { return name.split(".").pop()?.toLowerCase() === "pdf" }
 
-function sessMinutesUntil(sess: { date: string; start_time: string } | null | undefined): number {
-  if (!sess) return Infinity
-  const [y, m, d] = sess.date.split("-").map(Number)
-  const [h, min] = (sess.start_time || "00:00").split(":").map(Number)
-  return (new Date(y, m - 1, d, h, min).getTime() - Date.now()) / 60000
-}
-
-function todayYMD() {
-  const n = new Date()
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`
-}
-
 const moduleExpandVariants = {
   open: {
     height: "auto",
@@ -256,8 +244,7 @@ export default function StudentGroupDetailPage() {
     ? group.nextSessions
     : (nextSess ? [nextSess] : [])
   const relevantSess = nextSess ?? todaySession
-  const minsUntil = sessMinutesUntil(relevantSess)
-  const showBanner = !!relevantSess && relevantSess.date === todayYMD() && minsUntil <= 5
+  const showBanner = !!relevantSess && !!relevantSess.joinUrl
   const hasLiveNext = showBanner
   const sortedModules = [...modules].sort((a, b) => a.order - b.order)
 
@@ -1018,17 +1005,9 @@ export default function StudentGroupDetailPage() {
                         </p>
                       </div>
                     </div>
-                    {s.recordingUrl ? (
-                      <button onClick={() => window.open(s.recordingUrl!, "_blank")}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "color-mix(in oklch, var(--accent) 7%, transparent)", color: "color-mix(in oklch, var(--accent) 85%, black)", border: "1px solid color-mix(in oklch, var(--accent) 18%, transparent)", borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "background 0.15s" }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "color-mix(in oklch, var(--accent) 12%, transparent)")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "color-mix(in oklch, var(--accent) 7%, transparent)")}
-                      >
-                        <Play size={12} /> Voir l'enregistrement
-                      </button>
-                    ) : (
-                      <span style={{ fontSize: 12, color: "#9ca3af", padding: "7px 14px" }}>Pas encore disponible</span>
-                    )}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: 9, fontSize: 12, fontWeight: 700 }}>
+                      Terminée
+                    </span>
                   </div>
                 ))}
               </div>

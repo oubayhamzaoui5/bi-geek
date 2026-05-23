@@ -46,7 +46,7 @@ export default function AdminDashboardLayout({
     <SidebarProvider>
       <div className="h-screen bg-[#fafafa]">
         <Sidebar variant="admin" />
-        <main className="md:ml-[60px] h-screen overflow-auto">{children}</main>
+        <main className="dashboard-responsive-main md:ml-[60px] h-screen overflow-auto">{children}</main>
         {userId && <PushNotificationPrompt userId={userId} />}
       </div>
     </SidebarProvider>

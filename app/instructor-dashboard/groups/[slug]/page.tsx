@@ -132,18 +132,6 @@ function fmtDate(d: string) {
   return new Date(d + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })
 }
 
-function sessMinutesUntil(sess: { date: string; start_time: string } | null | undefined): number {
-  if (!sess) return Infinity
-  const [y, m, d] = sess.date.split("-").map(Number)
-  const [h, min] = (sess.start_time || "00:00").split(":").map(Number)
-  return (new Date(y, m - 1, d, h, min).getTime() - Date.now()) / 60000
-}
-
-function todayYMD() {
-  const n = new Date()
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`
-}
-
 const moduleExpandVariants = {
   open: {
     height: "auto",
@@ -204,6 +192,7 @@ export default function GroupDetailPage() {
   const [switchingResources,   setSwitchingResources]   = useState(false)
   const [generatingMeet,       setGeneratingMeet]       = useState(false)
   const [syncingRecordings,    setSyncingRecordings]    = useState<Record<string, boolean>>({})
+  const [endedSessionIds,      setEndedSessionIds]      = useState<Set<string>>(new Set())
   const [expandedModules,      setExpandedModules]      = useState<Set<string>>(new Set())
   const [selectedLessonId,     setSelectedLessonId]     = useState<string | null>(null)
   const [activeContentTab,     setActiveContentTab]     = useState<"contenu" | "videos" | "fichiers">("contenu")
@@ -359,6 +348,60 @@ export default function GroupDetailPage() {
       push("ok", "Enregistrement synchronisé !")
     } catch (err: any) { push("err", err.message) }
     finally { setSyncingRecordings(p => ({ ...p, [sessionId]: false })) }
+  }
+
+  async function finishAndSyncSession(session: NonNullable<Group["nextSession"]>) {
+    if (syncingRecordings[session.id]) return
+    setSyncingRecordings(p => ({ ...p, [session.id]: true }))
+    try {
+      const res = await fetch("/api/instructor/sessions/sync-recording", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: session.id, instructorId: group?.instructor?.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Erreur de synchronisation")
+
+      setTodaySession(p => p?.id === session.id ? null : p)
+      setGroup(p => {
+        if (!p) return p
+        const finished = { ...session, recordingUrl: data.recordingUrl || null, googleEventId: null }
+        return {
+          ...p,
+          nextSession: p.nextSession?.id === session.id ? null : p.nextSession,
+          nextSessions: (p.nextSessions || []).filter(s => s.id !== session.id),
+          pastSessions: [finished, ...(p.pastSessions || []).filter(s => s.id !== session.id)],
+        }
+      })
+      push("ok", "Séance terminée et synchronisée !")
+    } catch (err: any) { push("err", err.message) }
+    finally { setSyncingRecordings(p => ({ ...p, [session.id]: false })) }
+  }
+
+  async function finishSession(session: NonNullable<Group["nextSession"]>) {
+    if (endedSessionIds.has(session.id)) return
+    try {
+      const res = await fetch("/api/instructor/sessions/end", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: session.id, instructorId: group?.instructor?.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Erreur")
+      setEndedSessionIds(prev => new Set([...prev, session.id]))
+      setTodaySession(p => p?.id === session.id ? null : p)
+      setGroup(p => {
+        if (!p) return p
+        const finished = { ...session, recordingUrl: null, googleEventId: null }
+        return {
+          ...p,
+          nextSession: p.nextSession?.id === session.id ? null : p.nextSession,
+          nextSessions: (p.nextSessions || []).filter(s => s.id !== session.id),
+          pastSessions: [finished, ...(p.pastSessions || []).filter(s => s.id !== session.id)],
+        }
+      })
+      push("ok", "Séance marquée comme terminée.")
+    } catch (err: any) { push("err", err.message) }
   }
 
   // ── Curriculum helpers ──────────────────────────────────────────────────────
@@ -757,9 +800,8 @@ export default function GroupDetailPage() {
     ? group.nextSessions
     : (nextSess ? [nextSess] : [])
   const relevantSess = nextSess ?? todaySession
-  const minsUntil = sessMinutesUntil(relevantSess)
-  const showBanner = !!relevantSess && relevantSess.date === todayYMD() && minsUntil <= 60
-  const canJoinNow = minsUntil <= 5
+  const showBanner = !!relevantSess
+  const canJoinNow = !!relevantSess
   const hasLiveNext = showBanner
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -903,6 +945,7 @@ export default function GroupDetailPage() {
               </div>
               <div style={{ display: "flex", gap: 10 }}>
                 {relevantSess!.joinUrl ? (
+                  <>
                   <button
                     onClick={() => canJoinNow && window.open(relevantSess!.joinUrl!, "_blank")}
                     disabled={!canJoinNow}
@@ -911,6 +954,15 @@ export default function GroupDetailPage() {
                   >
                     <ExternalLink size={14} /> Lancer le Live
                   </button>
+                  <button
+                    onClick={() => finishSession(relevantSess!)}
+                    disabled={endedSessionIds.has(relevantSess!.id)}
+                    title="Marquer la séance comme terminée"
+                    style={{ background: "rgba(255,255,255,0.16)", color: "#fff", border: "1px solid rgba(255,255,255,0.35)", padding: "11px 16px", borderRadius: 11, fontSize: 14, fontWeight: 700, cursor: endedSessionIds.has(relevantSess!.id) ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 8, opacity: endedSessionIds.has(relevantSess!.id) ? 0.7 : 1 }}
+                  >
+                    <ClipboardCheck size={14} /> Terminer
+                  </button>
+                  </>
                 ) : (
                   <button
                     onClick={generateMeet}
@@ -1698,9 +1750,18 @@ export default function GroupDetailPage() {
                 </div>
                 {hasLiveNext && (
                   nextSess.joinUrl ? (
-                    <button onClick={() => window.open(nextSess.joinUrl!, "_blank")} style={primaryBtnStyle}>
-                      <ExternalLink size={13} /> Lancer
-                    </button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => window.open(nextSess.joinUrl!, "_blank")} style={primaryBtnStyle}>
+                        <ExternalLink size={13} /> Lancer
+                      </button>
+                      <button
+                        onClick={() => finishSession(nextSess)}
+                        disabled={endedSessionIds.has(nextSess.id)}
+                        style={{ ...primaryBtnStyle, background: "#f4f6fb", color: "#374151", boxShadow: "none", opacity: endedSessionIds.has(nextSess.id) ? 0.7 : 1, cursor: endedSessionIds.has(nextSess.id) ? "not-allowed" : "pointer" }}
+                      >
+                        <ClipboardCheck size={13} /> Terminer
+                      </button>
+                    </div>
                   ) : (
                     <button onClick={generateMeet} disabled={generatingMeet} style={{ ...primaryBtnStyle, opacity: generatingMeet ? 0.7 : 1 }}>
                       {generatingMeet ? <Loader2 size={13} className="animate-spin" /> : <Video size={13} />}
@@ -1732,24 +1793,9 @@ export default function GroupDetailPage() {
                         </p>
                       </div>
                     </div>
-                    {s.recordingUrl ? (
-                      <button onClick={() => window.open(s.recordingUrl!, "_blank")}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "color-mix(in oklch, var(--accent) 7%, transparent)", color: "color-mix(in oklch, var(--accent) 85%, black)", border: "1px solid color-mix(in oklch, var(--accent) 18%, transparent)", borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "background 0.15s" }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "color-mix(in oklch, var(--accent) 12%, transparent)")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "color-mix(in oklch, var(--accent) 7%, transparent)")}
-                      >
-                        <Play size={12} /> Voir l'enregistrement
-                      </button>
-                    ) : (
-                      <button onClick={() => syncRecording(s.id)} disabled={syncingRecordings[s.id]}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "#f4f6fb", color: "#6b7280", border: "1px solid #e2e8f0", borderRadius: 9, fontSize: 12, fontWeight: 600, cursor: syncingRecordings[s.id] ? "not-allowed" : "pointer", opacity: syncingRecordings[s.id] ? 0.65 : 1, transition: "all 0.15s" }}
-                        onMouseEnter={e => { if (!syncingRecordings[s.id]) { (e.currentTarget as HTMLButtonElement).style.background = "#eef0f5"; (e.currentTarget as HTMLButtonElement).style.color = "#374151" }}}
-                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#f4f6fb"; (e.currentTarget as HTMLButtonElement).style.color = "#6b7280" }}
-                      >
-                        {syncingRecordings[s.id] ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
-                        {syncingRecordings[s.id] ? "Sync…" : "Synchroniser"}
-                      </button>
-                    )}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: 9, fontSize: 12, fontWeight: 700 }}>
+                      <ClipboardCheck size={12} /> Terminée
+                    </span>
                   </div>
                 ))}
               </div>
