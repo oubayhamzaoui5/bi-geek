@@ -35,10 +35,14 @@ export function cookieOptions() {
 
 export async function getAdminPb() {
   const pb = getServerPb()
-  await pb.collection("_superusers").authWithPassword(
-    process.env.POCKETBASE_ADMIN_EMAIL!,
-    process.env.POCKETBASE_ADMIN_PASSWORD!,
-  )
+  const email = process.env.POCKETBASE_ADMIN_EMAIL!
+  const password = process.env.POCKETBASE_ADMIN_PASSWORD!
+  try {
+    await pb.collection("_superusers").authWithPassword(email, password)
+  } catch {
+    // PocketBase < v0.23 fallback
+    await (pb as any).admins.authWithPassword(email, password)
+  }
   return pb
 }
 
