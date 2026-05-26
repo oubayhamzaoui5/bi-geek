@@ -152,12 +152,9 @@ export async function GET(req: Request) {
     let studentRecords: any[] = []
     let instructorRecords: any[] = []
     try {
-      const [allUsers, instructors] = await Promise.all([
-        pb.collection("users").getFullList({ sort: "name" }).catch(() => []),
-        getUsersByRole(pb, "instructor", { fields: "id,collectionId,name,surname,avatar", sort: "name" }).catch(() => []),
-      ])
+      const allUsers = await pb.collection("users").getFullList({ sort: "name" }).catch(() => [] as any[])
+      const instructors = await getUsersByRole(pb, "instructor", { fields: "id,collectionId,name,surname,avatar", sort: "name" }).catch(() => [] as any[])
       instructorRecords = instructors
-      // Treat everyone who is not admin/admin_agent/instructor as a student
       const nonStudentRoles = new Set(["admin", "admin_agent", "instructor"])
       studentRecords = (allUsers as any[]).filter((u: any) => !nonStudentRoles.has(u.role))
     } catch {
