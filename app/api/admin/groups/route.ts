@@ -18,6 +18,7 @@ type IncomingGroup = {
   courseId?: string | null
   bootcampId?: string | null
   instructorId?: string | null
+  instructorIds?: string[]
   studentIds?: string[]
   lockedModules?: string[]
   unlockedModules?: string[]
@@ -27,6 +28,69 @@ type IncomingGroup = {
   schedules?: ScheduleSlot[]
   schedule_start_date?: string | null
   schedule_end_date?: string | null
+}
+
+const PB_FILE_URL = process.env.NEXT_PUBLIC_PB_URL || process.env.POCKETBASE_URL || "http://127.0.0.1:8090"
+
+function resolveAvatar(user: any): string | null {
+  if (!user?.avatar) return null
+  if (typeof user.avatar === "string" && user.avatar.startsWith("http")) return user.avatar
+  const collection = user.collectionId || user.collectionName || "users"
+  return `${PB_FILE_URL}/api/files/${collection}/${user.id}/${user.avatar}`
+}
+
+function normalizeIds(value: any): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  return value ? [String(value)] : []
+}
+
+function groupInstructorIds(record: any): string[] {
+  const ids = normalizeIds(record?.instructor)
+  return record?.programType === "bootcamp" ? ids : ids.slice(0, 1)
+}
+
+function uniqueIds(ids: string[]) {
+  return [...new Set(ids.filter(Boolean))]
+}
+
+function pocketbaseOrFilter(field: string, ids: string[]) {
+  return uniqueIds(ids).map(id => `${field}="${id.replace(/"/g, '\\"')}"`).join(" || ")
+}
+
+async function getUsersByRole(pb: PocketBase, role: string, options: { fields?: string; sort?: string } = {}) {
+  const sort = options.sort || "name"
+  const fields = options.fields
+  const filteredOptions = fields
+    ? { filter: `role = "${role}"`, fields, sort }
+    : { filter: `role = "${role}"`, sort }
+
+  try {
+    const records = await pb.collection("users").getFullList(filteredOptions)
+    if (records.length > 0) return records
+  } catch (err) {
+    console.error(`ADMIN GROUPS GET WARN: users role filter failed for ${role}`, err)
+  }
+
+  const fallbackOptions = fields
+    ? { fields: `${fields},role`, sort }
+    : { sort }
+  const records = await pb.collection("users").getFullList(fallbackOptions)
+  return records.filter((u: any) => u.role === role)
+}
+
+async function getAssignedUsersById(pb: PocketBase, ids: string[]) {
+  const unique = uniqueIds(ids)
+  if (unique.length === 0) return []
+
+  try {
+    return await pb.collection("users").getFullList({
+      filter: pocketbaseOrFilter("id", unique),
+      sort: "name",
+    })
+  } catch (err) {
+    console.error("ADMIN GROUPS GET WARN: assigned students fetch failed", err)
+    return []
+  }
 }
 
 async function getAdminPb() {
@@ -103,10 +167,8 @@ export async function GET(req: Request) {
     let instructorRecords: any[] = []
     try {
       ;[studentRecords, instructorRecords] = await Promise.all([
-        pb.collection("users").getFullList({ filter: 'role="student"', sort: "name" }).catch(() =>
-          pb.collection("users").getFullList({ sort: "name" })
-        ),
-        pb.collection("users").getFullList({ filter: 'role="instructor"', fields: "id,name,surname", sort: "name" }).catch(() => []),
+        getUsersByRole(pb, "student").catch(() => []),
+        getUsersByRole(pb, "instructor", { fields: "id,collectionId,name,surname,avatar", sort: "name" }).catch(() => []),
       ])
     } catch {
       studentRecords = []
@@ -114,16 +176,41 @@ export async function GET(req: Request) {
     }
 
     const instructorMap = new Map(instructorRecords.map((u: any) => [u.id, u]))
+    const assignedStudentIds = uniqueIds(
+      (groupRecords as any[]).flatMap((g) => Array.isArray(g.students) ? g.students : [])
+    )
+    const studentMap = new Map(studentRecords.map((u: any) => [u.id, u]))
+    const missingAssignedStudentIds = assignedStudentIds.filter(id => !studentMap.has(id))
+    if (missingAssignedStudentIds.length > 0) {
+      const assignedUsers = await getAssignedUsersById(pb, missingAssignedStudentIds)
+      for (const user of assignedUsers) {
+        if (!studentMap.has(user.id)) studentRecords.push(user)
+        studentMap.set(user.id, user)
+      }
+    }
+
+    const resolveInstructors = (g: any) => {
+      const ids = groupInstructorIds(g)
+      const expanded = g.expand?.instructor
+      const expandedList = Array.isArray(expanded) ? expanded : expanded ? [expanded] : []
+      const expandedMap = new Map(expandedList.map((i: any) => [i.id, i]))
+      return ids
+        .map(id => expandedMap.get(id) || instructorMap.get(id))
+        .filter(Boolean)
+        .map((i: any) => ({ id: i.id, name: i.name || "", surname: i.surname || "", avatar: resolveAvatar(i) }))
+    }
 
     const resolveInstructor = (g: any) => {
       // Prefer expand (most reliable), fall back to instructorMap lookup
-      if (g.expand?.instructor) {
+      const instructors = resolveInstructors(g)
+      if (instructors[0]) return instructors[0]
+      if (g.expand?.instructor && !Array.isArray(g.expand.instructor)) {
         const i = g.expand.instructor
-        return { id: i.id, name: i.name || "", surname: i.surname || "" }
+        return { id: i.id, name: i.name || "", surname: i.surname || "", avatar: resolveAvatar(i) }
       }
       if (g.instructor) {
         const i = instructorMap.get(g.instructor)
-        if (i) return { id: i.id, name: i.name || "", surname: i.surname || "" }
+        if (i) return { id: i.id, name: i.name || "", surname: i.surname || "", avatar: resolveAvatar(i) }
       }
       return null
     }
@@ -136,8 +223,10 @@ export async function GET(req: Request) {
       courseId: g.course || "",
       bootcampId: g.bootcamp || "",
       studentIds: Array.isArray(g.students) ? g.students : [],
-      instructorId: g.instructor || null,
+      instructorIds: groupInstructorIds(g),
+      instructorId: groupInstructorIds(g)[0] || null,
       instructor: resolveInstructor(g),
+      instructors: resolveInstructors(g),
       lockedModules: Array.isArray(g.lockedModules) ? g.lockedModules : [],
       unlockedModules: Array.isArray(g.unlockedModules) ? g.unlockedModules : [],
       lockedLessons: Array.isArray(g.lockedLessons) ? g.lockedLessons : [],
@@ -176,12 +265,15 @@ export async function GET(req: Request) {
       surname: u.surname || "",
       email: u.email || "",
       username: u.username || "",
+      role: u.role || "student",
+      avatar: resolveAvatar(u),
     }))
 
     const instructors = instructorRecords.map((u: any) => ({
       id: u.id,
       name: u.name || "",
       surname: u.surname || "",
+      avatar: resolveAvatar(u),
     }))
 
     const sessions = (sessionRecords as any[]).map((s) => ({
@@ -195,13 +287,15 @@ export async function GET(req: Request) {
       is_cancelled: s.is_cancelled || false,
     }))
 
-    // Pre-sort in_progress groups by next upcoming session
+    // Pre-sort in_progress groups by next upcoming session.
+    // A session becomes past only after its derived end time.
     const now = Date.now()
     const nextTimeByGroup = new Map<string, number>()
     for (const s of sessions) {
       if (s.is_cancelled) continue
       const t = new Date(`${s.date}T${s.start_time || "00:00"}:00`).getTime()
-      if (!Number.isFinite(t) || t < now) continue
+      const end = t + Math.max(s.duration || 120, 1) * 60_000
+      if (!Number.isFinite(t) || end < now) continue
       const existing = nextTimeByGroup.get(s.group)
       if (existing === undefined || t < existing) nextTimeByGroup.set(s.group, t)
     }
@@ -233,7 +327,10 @@ export async function POST(req: Request) {
     const programType = payload.programType
     const courseId = payload.courseId || ""
     const bootcampId = payload.bootcampId || ""
-    const instructorId = payload.instructorId || null
+    const rawInstructorIds = Array.isArray(payload.instructorIds)
+      ? payload.instructorIds.filter(Boolean)
+      : payload.instructorId ? [payload.instructorId] : []
+    const instructorIds = programType === "bootcamp" ? rawInstructorIds : rawInstructorIds.slice(0, 1)
     const studentIds = Array.isArray(payload.studentIds) ? payload.studentIds : []
     const lockedModules = Array.isArray(payload.lockedModules) ? payload.lockedModules : []
     const unlockedModules = Array.isArray(payload.unlockedModules) ? payload.unlockedModules : []
@@ -259,7 +356,7 @@ export async function POST(req: Request) {
       programType,
       course: programType === "course" ? courseId : null,
       bootcamp: programType === "bootcamp" ? bootcampId : null,
-      instructor: instructorId,
+      instructor: instructorIds,
       students: studentIds,
       lockedModules,
       unlockedModules,
@@ -281,9 +378,10 @@ export async function POST(req: Request) {
       record = await pb.collection("groups").create(dataToSave, { expand: "instructor" })
     }
 
-    const resolvedInstructor = record.expand?.instructor
-      ? { id: record.expand.instructor.id, name: record.expand.instructor.name || "", surname: record.expand.instructor.surname || "" }
-      : null
+    const expandedInstructor = record.expand?.instructor
+    const expandedInstructors = (Array.isArray(expandedInstructor) ? expandedInstructor : expandedInstructor ? [expandedInstructor] : [])
+      .map((i: any) => ({ id: i.id, name: i.name || "", surname: i.surname || "", avatar: resolveAvatar(i) }))
+    const resolvedInstructor = expandedInstructors[0] ?? null
 
     const group = {
       id: record.id,
@@ -292,8 +390,10 @@ export async function POST(req: Request) {
       programType: record.programType,
       courseId: record.course || "",
       bootcampId: record.bootcamp || "",
-      instructorId: record.instructor || null,
+      instructorIds: groupInstructorIds(record),
+      instructorId: groupInstructorIds(record)[0] || null,
       instructor: resolvedInstructor,
+      instructors: expandedInstructors,
       studentIds: Array.isArray(record.students) ? record.students : [],
       lockedModules: Array.isArray(record.lockedModules) ? record.lockedModules : [],
       unlockedModules: Array.isArray(record.unlockedModules) ? record.unlockedModules : [],

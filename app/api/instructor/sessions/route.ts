@@ -29,6 +29,46 @@ function formatSession(s: any): any {
   }
 }
 
+function nextDate(date: string) {
+  const d = new Date(`${date}T12:00:00`)
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
+function normalizeIds(value: any): string[] {
+  if (!value) return []
+  if (Array.isArray(value)) return value.filter(Boolean).map(String)
+  return [String(value)]
+}
+
+function groupInstructorIds(group: any): string[] {
+  const ids = normalizeIds(group?.instructor)
+  return group?.programType === "bootcamp" ? ids : ids.slice(0, 1)
+}
+
+async function fetchInstructorGroups(pb: PocketBase, instructorId: string) {
+  const byId = new Map<string, any>()
+  const attempts = [
+    () => pb.collection("groups").getFullList({ filter: `instructor = "${instructorId}"`, fields: "id,instructor,programType" }),
+    () => pb.collection("groups").getFullList({ filter: `instructor ~ "${instructorId}"`, fields: "id,instructor,programType" }),
+  ]
+
+  for (const attempt of attempts) {
+    try {
+      const groups = await attempt()
+      groups.forEach((g: any) => byId.set(g.id, g))
+    } catch {}
+  }
+
+  try {
+    const all = await pb.collection("groups").getFullList({ fields: "id,instructor,programType" })
+    all
+      .filter((g: any) => groupInstructorIds(g).includes(instructorId))
+      .forEach((g: any) => byId.set(g.id, g))
+  } catch {}
+  return Array.from(byId.values())
+}
+
 // GET — fetch sessions for instructor's groups, optionally filtered by date range
 export async function GET(req: Request) {
   try {
@@ -42,17 +82,14 @@ export async function GET(req: Request) {
     const pb = await getAdminPb()
 
     // Get instructor's group IDs
-    const groups = await pb.collection("groups").getFullList({
-      filter: `instructor = "${instructorId}"`,
-      fields: "id",
-    })
+    const groups = await fetchInstructorGroups(pb, instructorId)
 
     if (groups.length === 0) {
       return NextResponse.json({ ok: true, sessions: [] })
     }
 
     const groupFilter = groups.map((g: any) => `group = "${g.id}"`).join(" || ")
-    const dateFilter = from && to ? ` && date >= "${from}" && date <= "${to}"` : ""
+    const dateFilter = from && to ? ` && date >= "${from}" && date < "${nextDate(to)}"` : ""
 
     const records = await pb.collection("sessions").getFullList({
       filter: `(${groupFilter})${dateFilter}`,

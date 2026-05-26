@@ -20,7 +20,7 @@ export function Header({ variant = "student", announcementCount = 0 }: HeaderPro
       const name =
         user?.username?.trim() ||
         user?.email?.split("@")?.[0]?.trim() ||
-        (variant === "admin" ? "Admin" : "Étudiant")
+        (variant === "admin" ? "Admin" : "Apprenant")
       setUserName(name)
       setUserInitials(
         name
@@ -31,7 +31,7 @@ export function Header({ variant = "student", announcementCount = 0 }: HeaderPro
           .slice(0, 2)
       )
     } catch {
-      setUserName(variant === "admin" ? "Admin" : "Étudiant")
+      setUserName(variant === "admin" ? "Admin" : "Apprenant")
       setUserInitials("U")
     }
   }, [variant])

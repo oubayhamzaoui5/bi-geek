@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BookOpen, CalendarDays, Clock, ExternalLink, GraduationCap, MessageSquare, Settings, Star, TrendingUp, Users, Video } from "lucide-react"
+import { Award, BookOpen, CalendarDays, Clock, ExternalLink, GraduationCap, Settings, Star, Users } from "lucide-react"
 
 import { CoursesSection, StudentProgram } from "@/components/student/courses-section"
 import { KpiCard, QuickBtn, SectionCard } from "@/components/dashboard/OverviewShared"
@@ -64,6 +64,7 @@ export default function StudentOverviewPage() {
   useEffect(() => {
     if (!studentId) {
       setPrograms([])
+      setUpcomingSessions([])
       return
     }
     const controller = new AbortController()
@@ -71,9 +72,16 @@ export default function StudentOverviewPage() {
 
     const load = async () => {
       try {
-        const coursesRes = await fetch(`/api/student-programs?studentId=${encodeURIComponent(studentId)}`, {
-          signal: controller.signal,
-        })
+        const from = toYMD(new Date())
+        const to = toYMD(addDays(new Date(), 60))
+        const [coursesRes, sessionsRes] = await Promise.all([
+          fetch(`/api/student-programs?studentId=${encodeURIComponent(studentId)}`, {
+            signal: controller.signal,
+          }),
+          fetch(`/api/student/sessions?studentId=${encodeURIComponent(studentId)}&from=${from}&to=${to}`, {
+            signal: controller.signal,
+          }),
+        ])
 
         if (coursesRes.ok) {
           const data = await coursesRes.json()
@@ -97,10 +105,26 @@ export default function StudentOverviewPage() {
               }
             }),
           )
+        } else {
+          setPrograms([])
+        }
+
+        if (sessionsRes.ok) {
+          const data = await sessionsRes.json()
+          const items = ((data.sessions ?? []) as StudentSessionApiItem[])
+            .filter((s) => !s.is_cancelled)
+            .sort((a, b) => {
+              const aKey = `${a.date}T${a.start_time || "00:00"}:00`
+              const bKey = `${b.date}T${b.start_time || "00:00"}:00`
+              return new Date(aKey).getTime() - new Date(bKey).getTime()
+            })
+          setUpcomingSessions(items)
+        } else {
+          setUpcomingSessions([])
         }
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
-          console.error("Student overview programs fetch error:", err)
+          console.error("Student overview fetch error:", err)
         }
       } finally {
         const elapsed = Date.now() - start
@@ -109,42 +133,6 @@ export default function StudentOverviewPage() {
     }
 
     load()
-    return () => controller.abort()
-  }, [studentId])
-
-  useEffect(() => {
-    if (!studentId) {
-      setUpcomingSessions([])
-      return
-    }
-
-    const controller = new AbortController()
-
-    const loadUpcoming = async () => {
-      try {
-        const from = toYMD(new Date())
-        const to = toYMD(addDays(new Date(), 60))
-        const res = await fetch(`/api/student/sessions?studentId=${encodeURIComponent(studentId)}&from=${from}&to=${to}`, {
-          signal: controller.signal,
-        })
-        if (!res.ok) return
-        const data = await res.json()
-        const items = ((data.sessions ?? []) as StudentSessionApiItem[])
-          .filter((s) => !s.is_cancelled)
-          .sort((a, b) => {
-            const aKey = `${a.date}T${a.start_time || "00:00"}:00`
-            const bKey = `${b.date}T${b.start_time || "00:00"}:00`
-            return new Date(aKey).getTime() - new Date(bKey).getTime()
-          })
-        setUpcomingSessions(items)
-      } catch (err) {
-        if ((err as Error).name !== "AbortError") {
-          console.error("Student overview sessions fetch error:", err)
-        }
-      }
-    }
-
-    loadUpcoming()
     return () => controller.abort()
   }, [studentId])
 
@@ -164,7 +152,6 @@ export default function StudentOverviewPage() {
   const activeCount = programs.filter((p) => !p.completed).length
   const completedCount = programs.filter((p) => p.completed).length
   const totalCount = programs.length
-  const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
   const greetingHour = new Date().getHours()
   const greeting = greetingHour < 12 ? "Bonjour" : greetingHour < 18 ? "Bon apres-midi" : "Bonsoir"
 
@@ -173,7 +160,7 @@ export default function StudentOverviewPage() {
       icon: BookOpen,
       label: "Formations actives",
       value: activeCount,
-      href: "/student-dashboard/courses",
+      href: "/student-dashboard/groups",
       iconBg: "rgba(99,102,241,0.08)",
       iconColor: "#6366f1",
       sublabel: "en cours",
@@ -182,35 +169,34 @@ export default function StudentOverviewPage() {
       icon: GraduationCap,
       label: "Total programmes",
       value: totalCount,
-      href: "/student-dashboard/courses",
+      href: "/student-dashboard/groups",
       iconBg: "rgba(14,165,233,0.08)",
       iconColor: "#0ea5e9",
       sublabel: "inscrits",
     },
     {
       icon: CalendarDays,
-      label: "Sessions à venir",
+      label: "Séances à venir",
       value: upcomingSessions.length,
-      href: "/student-dashboard/groups",
+      href: "/student-dashboard/agenda",
       iconBg: "rgba(22,163,74,0.08)",
       iconColor: "#16a34a",
       sublabel: "planifiées",
     },
     {
-      icon: TrendingUp,
-      label: "Progression globale",
-      value: `${completionRate}%`,
-      href: "/student-dashboard/courses",
+      icon: Award,
+      label: "Programmes terminés",
+      value: completedCount,
+      href: "/student-dashboard/groups",
       iconBg: "rgba(245,158,11,0.08)",
       iconColor: "#f59e0b",
-      sublabel: "terminee",
+      sublabel: "validés",
     },
   ]
 
   const quickActions = [
-    { icon: BookOpen, label: "Mes formations", hint: "Cours et bootcamps", href: "/student-dashboard/courses", tone: "blue" },
-    { icon: Users, label: "Mes formations", hint: "Programme de groupe", href: "/student-dashboard/groups", tone: "indigo" },
-    { icon: MessageSquare, label: "Messages", hint: "Discussions et support", href: "/student-dashboard/overview", tone: "amber" },
+    { icon: Users, label: "Mes formations", hint: "Programme de groupe", href: "/student-dashboard/groups", tone: "blue" },
+    { icon: CalendarDays, label: "Agenda", hint: "Séances à venir", href: "/student-dashboard/agenda", tone: "green" },
     { icon: Settings, label: "Parametres", hint: "Profil et securite", href: "/student-dashboard/settings", tone: "violet" },
   ] as const
 
@@ -238,7 +224,7 @@ export default function StudentOverviewPage() {
               <SectionCard title="Acces rapide" icon={Star}>
                 <div style={{ padding: "10px 12px 12px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 }}>
                   {quickActions.map(({ icon: Icon, label, hint, href, tone }) => (
-                    <QuickBtn key={href} icon={Icon} label={label} hint={hint} href={href} tone={tone} />
+                    <QuickBtn key={`${label}-${href}`} icon={Icon} label={label} hint={hint} href={href} tone={tone} />
                   ))}
                 </div>
               </SectionCard>
@@ -247,7 +233,7 @@ export default function StudentOverviewPage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 16, alignItems: "start" }}>
               <div>
                 {studentId ? (
-                  <MiniWeekAgenda studentId={studentId} agendaHref="/student-dashboard/groups" title="Mon agenda" />
+                  <MiniWeekAgenda studentId={studentId} agendaHref="/student-dashboard/agenda" title="Mon agenda" />
                 ) : (
                   <SectionCard title="Mon agenda" icon={CalendarDays}>
                     <div style={{ padding: "24px 18px", textAlign: "center", fontSize: 12, color: "#475569" }}>
@@ -276,12 +262,12 @@ export default function StudentOverviewPage() {
                     </p>
                   </div>
                 ) : null}
-                <UpcomingSessionsPanel sessions={upcomingSessions.slice(0, 5)} href="/student-dashboard/groups" />
+                <UpcomingSessionsPanel sessions={upcomingSessions.slice(0, 5)} href="/student-dashboard/agenda" />
               </div>
             </div>
 
             <div style={{ marginTop: 16 }}>
-              <SectionCard title="Formations actives" icon={BookOpen} href="/student-dashboard/courses">
+              <SectionCard title="Formations actives" icon={BookOpen} href="/student-dashboard/groups">
                 <div style={{ padding: 18 }}>
                   <CoursesSection showCompleted={false} programs={programs} />
                 </div>

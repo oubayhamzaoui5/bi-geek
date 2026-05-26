@@ -4,15 +4,18 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { AgendaView } from "@/components/agenda/AgendaView"
+import LoadingBI from "@/components/LoadingBI"
 
 export default function StudentAgendaPage() {
-  const [studentId, setStudentId] = useState<string>("")
+  const [studentId, setStudentId] = useState<string | null>(null)
 
   useEffect(() => {
     try {
       const u = JSON.parse(localStorage.getItem("user") || "null")
-      if (u?.id) setStudentId(u.id)
-    } catch {}
+      setStudentId(u?.id || "")
+    } catch {
+      setStudentId("")
+    }
   }, [])
 
   return (
@@ -32,7 +35,13 @@ export default function StudentAgendaPage() {
         </h1>
         <p className="text-sm text-gray-600 mt-0.5">Vos seances de formation</p>
       </div>
-      {studentId && <AgendaView readOnly studentId={studentId} />}
+      {studentId ? (
+        <AgendaView readOnly studentId={studentId} />
+      ) : (
+        <div className="flex-1 min-h-0">
+          <LoadingBI fullScreen={false} />
+        </div>
+      )}
     </div>
   )
 }

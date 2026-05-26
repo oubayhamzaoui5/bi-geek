@@ -81,6 +81,7 @@ export default function AdminUsersPage() {
         ? prev.map(u => (u.id === saved.id ? saved : u))
         : [...prev, saved]
     );
+    return saved;
   };
 
   // DELETE

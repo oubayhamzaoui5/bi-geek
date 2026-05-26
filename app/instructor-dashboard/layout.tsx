@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react"
 import { SidebarProvider } from "@/components/ui/sidebar-context"
 import { Sidebar } from "@/components/sidebar"
-import { MessagesOverlay } from "@/components/instructor/MessagesOverlay"
 import { useRouter } from "next/navigation"
+import LoadingBI from "@/components/LoadingBI"
+import { DashboardLoadingProvider } from "@/components/dashboard-loading-context"
 
 export default function InstructorDashboardLayout({
   children,
@@ -35,15 +36,16 @@ export default function InstructorDashboardLayout({
     }
   }, [router])
 
-  if (authorized === null || !authorized) return null
+  if (authorized === null || !authorized) return <LoadingBI />
 
   return (
-    <SidebarProvider>
-      <div className="h-screen bg-[#fafafa]">
-        <Sidebar variant="instructor" />
-        <main className="dashboard-responsive-main md:ml-[60px] h-screen overflow-auto">{children}</main>
-        <MessagesOverlay />
-      </div>
-    </SidebarProvider>
+    <DashboardLoadingProvider>
+      <SidebarProvider>
+        <div className="h-screen bg-[#fafafa]">
+          <Sidebar variant="instructor" />
+          <main className="dashboard-responsive-main md:ml-[60px] h-screen overflow-auto">{children}</main>
+        </div>
+      </SidebarProvider>
+    </DashboardLoadingProvider>
   )
 }

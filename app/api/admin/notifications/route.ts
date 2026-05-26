@@ -13,11 +13,13 @@ export async function GET(req: Request) {
   try {
     await requireUser(req, ["admin", "admin_agent"])
     const pb = await getAdminPb()
-    const records = await pb.collection("password_reset_requests").getFullList({
-      filter: "status = 'open'",
+    const result = await pb.collection("password_reset_requests").getList(1, 200, {
+      sort: "-created",
       expand: "user",
     })
-    records.sort((a: any, b: any) => new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime())
+    const records = result.items.filter((r: any) =>
+      r.status === "open" && typeof r.note === "string" && !r.note.startsWith("RESET_CODE:")
+    )
 
     return NextResponse.json({
       notifications: records.map((record: any) => {

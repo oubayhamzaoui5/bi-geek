@@ -21,25 +21,14 @@ function resolveAvatar(user: any, pbUrl: string) {
   return `${pbUrl}/api/files/${user.collectionId}/${user.id}/${user.avatar}`
 }
 
-function sessionStartMs(session: any) {
-  const date = session.date?.slice(0, 10) || "1970-01-01"
-  const time = session.start_time || "00:00"
-  return new Date(`${date}T${time}:00`).getTime()
+function normalizeIds(value: any): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  return value ? [String(value)] : []
 }
 
-function formatSession(s: any) {
-  return {
-    id: s.id,
-    title: s.title || null,
-    date: s.date.slice(0, 10),
-    start_time: s.start_time || "",
-    mode: s.mode || "live_presentiel",
-    joinUrl: s.joinUrl || null,
-    recordingUrl: s.recordingUrl || null,
-    googleEventId: s.googleEventId || null,
-    is_ended: s.is_ended || false,
-    ended_at: s.ended_at || null,
-  }
+function groupInstructorIds(group: any): string[] {
+  const ids = normalizeIds(group?.instructor)
+  return group?.programType === "bootcamp" ? ids : ids.slice(0, 1)
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -101,35 +90,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         }))
       } catch {}
     }
-
-    const now = new Date()
-    const todayYMD = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
-    const nowMs = now.getTime()
-
-    let nextSession = null
-    let nextSessions: any[] = []
-    let todaySession: any = null
-    let pastSessions: any[] = []
-    try {
-      const sessionsRes = await pb.collection("sessions").getFullList({
-        filter: `group = "${id}" && (mode = "live" || mode = "live_presentiel")`,
-        sort: "date,start_time",
-      })
-      const active = sessionsRes.filter((s: any) => !s.is_cancelled && !s.is_ended)
-      nextSessions = active
-        .filter((s: any) => sessionStartMs(s) >= nowMs)
-        .slice(0, 3)
-        .map(formatSession)
-      nextSession = nextSessions[0] ?? null
-      const todayStarted = active
-        .filter((s: any) => s.date?.slice(0, 10) === todayYMD && sessionStartMs(s) < nowMs)
-        .sort((a: any, b: any) => sessionStartMs(b) - sessionStartMs(a))[0]
-      todaySession = todayStarted ? formatSession(todayStarted) : null
-      pastSessions = sessionsRes
-        .filter((s: any) => !!s.is_ended || sessionStartMs(s) < nowMs)
-        .sort((a: any, b: any) => sessionStartMs(b) - sessionStartMs(a))
-        .map(formatSession)
-    } catch {}
+    const instructorIds = groupInstructorIds(group)
+    const expanded = group.expand?.instructor
+    const expandedList = Array.isArray(expanded) ? expanded : expanded ? [expanded] : []
+    const expandedMap = new Map(expandedList.map((i: any) => [i.id, i]))
+    const instructors = instructorIds
+      .map(instructorId => expandedMap.get(instructorId))
+      .filter(Boolean)
+      .map((i: any) => ({ id: i.id, name: i.name || "", surname: i.surname || "", avatar: resolveAvatar(i, PB_FILE_URL) }))
 
     return NextResponse.json({
       ok: true,
@@ -140,24 +108,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         programType,
         courseId,
         bootcampId,
-        instructorId: group.instructor || null,
-        instructor: group.expand?.instructor
-          ? {
-              id: group.expand.instructor.id,
-              name: group.expand.instructor.name || "",
-              surname: group.expand.instructor.surname || "",
-              avatar: resolveAvatar(group.expand.instructor, PB_FILE_URL),
-            }
-          : null,
+        instructorIds,
+        instructorId: instructorIds[0] || null,
+        instructors,
+        instructor: instructors[0] ?? null,
         studentIds,
         students,
         program,
         created: group.created,
       },
-      nextSession,
-      nextSessions,
-      todaySession,
-      pastSessions,
     })
   } catch (err: any) {
     const auth = authErrorResponse(err)

@@ -8,14 +8,18 @@ export default function AdminEnrollmentsPage() {
   const [enrollments, setEnrollments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
+  const fetchEnrollments = async () => {
+    const res = await fetch("/api/admin/enrollments")
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error)
+    setEnrollments(data.enrollments)
+  }
+
   useEffect(() => {
-    const fetchEnrollments = async () => {
+    const loadInitialEnrollments = async () => {
       const start = Date.now()
       try {
-        const res = await fetch("/api/admin/enrollments")
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error)
-        setEnrollments(data.enrollments)
+        await fetchEnrollments()
       } catch (err) {
         console.error(err)
       } finally {
@@ -23,7 +27,29 @@ export default function AdminEnrollmentsPage() {
         setTimeout(() => setLoading(false), Math.max(500 - elapsed, 0))
       }
     }
-    fetchEnrollments()
+    loadInitialEnrollments()
+  }, [])
+
+  useEffect(() => {
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined
+    const events = new EventSource("/api/admin/enrollments/events", { withCredentials: true })
+
+    const refresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer)
+      refreshTimer = setTimeout(() => {
+        fetchEnrollments().catch(console.error)
+      }, 150)
+    }
+
+    events.addEventListener("change", refresh)
+    events.onerror = (err) => {
+      console.error("Enrollment realtime disconnected:", err)
+    }
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer)
+      events.close()
+    }
   }, [])
 
   const updateStatus = async (id: string, status: string) => {

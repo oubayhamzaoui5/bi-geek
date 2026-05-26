@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { randomInt } from "node:crypto"
+import { sendCredentialsEmail } from "@/lib/email"
 import { authErrorResponse, getAdminPb, requireUser } from "@/lib/server-auth"
 
 function generatePassword(length = 12) {
@@ -34,7 +35,10 @@ export async function POST(req: Request) {
 
     const pb = await getAdminPb()
     const target = await pb.collection("users").getOne(userId)
-    if (caller.role === "admin_agent" && ["admin", "admin_agent"].includes(target.role)) {
+    if (
+      (caller.role === "admin" && target.role === "admin") ||
+      (caller.role === "admin_agent" && ["admin", "admin_agent"].includes(target.role))
+    ) {
       return NextResponse.json({ error: "Permission refusee." }, { status: 403 })
     }
 
@@ -46,6 +50,18 @@ export async function POST(req: Request) {
       plainPassword: newPassword,
       usePassword: false,
     })
+
+    if (target.email) {
+      await sendCredentialsEmail({
+        to: target.email,
+        username: target.username,
+        password: newPassword,
+        name: target.name,
+        subject: "Nouveau mot de passe BI Geek",
+        title: "Votre mot de passe a ete regenere",
+        intro: "Un administrateur a genere un nouveau mot de passe temporaire pour votre compte.",
+      }).catch((emailErr) => console.error("RESET PASSWORD EMAIL ERROR:", emailErr))
+    }
 
     return NextResponse.json({ ok: true, plainPassword: newPassword })
   } catch (err: any) {

@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react"
 import { SidebarProvider } from "@/components/ui/sidebar-context"
 import { Sidebar } from "@/components/sidebar"
-import { MessagesTab } from "@/components/messages-tab"
 import { useRouter } from "next/navigation"
-import { DashboardLoadingProvider, useDashboardLoading } from "@/components/dashboard-loading-context"
+import { DashboardLoadingProvider } from "@/components/dashboard-loading-context"
+import LoadingBI from "@/components/LoadingBI"
 import { PushNotificationPrompt, registerDashboardPushNotifications } from "@/components/PushNotificationPrompt"
 
 async function checkTodaySessionNotifications(studentId: string) {
@@ -44,12 +44,6 @@ async function checkTodaySessionNotifications(studentId: string) {
   }
 }
 
-function MessagesTabConditional() {
-  const { loading } = useDashboardLoading()
-  if (loading) return null
-  return <MessagesTab />
-}
-
 export default function StudentDashboardLayout({
   children,
 }: {
@@ -85,7 +79,7 @@ export default function StudentDashboardLayout({
     }
   }, [router])
 
-  if (authorized === null || !authorized) return null
+  if (authorized === null || !authorized) return <LoadingBI />
 
   return (
     <DashboardLoadingProvider>
@@ -93,7 +87,6 @@ export default function StudentDashboardLayout({
         <div className="h-screen bg-[#fafafa]">
           <Sidebar compact />
           <main className="dashboard-responsive-main md:ml-[60px] h-screen overflow-auto">{children}</main>
-          <MessagesTabConditional />
           {userId && (
             <PushNotificationPrompt
               userId={userId}

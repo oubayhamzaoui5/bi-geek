@@ -18,6 +18,16 @@ function resolveAvatar(user: any) {
   return `${pbUrl}/api/files/${user.collectionId}/${user.id}/${user.avatar}`
 }
 
+function normalizeIds(value: any): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  return value ? [String(value)] : []
+}
+
+function groupInstructorIds(group: any): string[] {
+  const ids = normalizeIds(group?.instructor)
+  return group?.programType === "bootcamp" ? ids : ids.slice(0, 1)
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
@@ -83,7 +93,16 @@ export async function GET(req: Request) {
         }))
       : []
 
-    const formatted = (groups as any[]).map((g: any) => ({
+    const formatted = (groups as any[]).map((g: any) => {
+      const instructorIds = groupInstructorIds(g)
+      const expanded = g.expand?.instructor
+      const expandedList = Array.isArray(expanded) ? expanded : expanded ? [expanded] : []
+      const expandedMap = new Map(expandedList.map((i: any) => [i.id, i]))
+      const instructors = instructorIds
+        .map(id => expandedMap.get(id))
+        .filter(Boolean)
+        .map((i: any) => ({ id: i.id, name: i.name || "", surname: i.surname || "", avatar: resolveAvatar(i) }))
+      return {
       id: g.id,
       title: g.title,
       status: g.status,
@@ -91,19 +110,15 @@ export async function GET(req: Request) {
       courseId: g.course || "",
       bootcampId: g.bootcamp || "",
       studentIds: Array.isArray(g.students) ? g.students : [],
-      instructorId: g.instructor || null,
+      instructorIds,
+      instructorId: instructorIds[0] || null,
       schedules: Array.isArray(g.schedules) ? g.schedules : [],
       schedule_start_date: g.schedule_start_date || null,
       schedule_end_date: g.schedule_end_date || null,
-      instructor: g.expand?.instructor
-        ? {
-            id: g.expand.instructor.id,
-            name: g.expand.instructor.name || "",
-            surname: g.expand.instructor.surname || "",
-            avatar: resolveAvatar(g.expand.instructor),
-          }
-        : null,
-    }))
+      instructors,
+      instructor: instructors[0] ?? null,
+    }
+    })
 
     // Fetch upcoming sessions so groups can be ordered by their nearest next seance
     const groupIds = formatted.map(g => g.id)
@@ -125,13 +140,14 @@ export async function GET(req: Request) {
       }))).catch(() => [])
     }
 
-    // Pre-sort groups by next upcoming session; groups without future sessions stay at the end.
+    // Pre-sort groups by next upcoming session; sessions stay upcoming until end time.
     const now = Date.now()
     const nextTimeByGroup = new Map<string, number>()
     for (const s of sessions) {
       if (s.is_cancelled) continue
       const t = new Date(`${s.date}T${s.start_time || "00:00"}:00`).getTime()
-      if (!Number.isFinite(t) || t < now) continue
+      const end = t + Math.max(s.duration || 120, 1) * 60_000
+      if (!Number.isFinite(t) || end < now) continue
       const existing = nextTimeByGroup.get(s.group)
       if (existing === undefined || t < existing) nextTimeByGroup.set(s.group, t)
     }

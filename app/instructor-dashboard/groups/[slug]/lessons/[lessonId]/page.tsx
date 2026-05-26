@@ -12,10 +12,10 @@ import LoadingBI from "@/components/LoadingBI"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type Lesson        = { id: string; title: string; description: string; content: string; order: number; moduleId: string }
+type Lesson        = { id: string; title: string; description: string; content: string; order: number; moduleId: string; instructorId?: string; canEdit?: boolean }
 type Module        = { id: string; title: string; order: number }
-type VideoItem     = { id: string; lessonId: string; title: string; driveUrl: string; description: string; order?: number }
-type Attachment    = { id: string; lessonId?: string; videoId?: string; name: string; url: string | null }
+type VideoItem     = { id: string; lessonId: string; title: string; driveUrl: string; description: string; order?: number; instructorId?: string; canEdit?: boolean }
+type Attachment    = { id: string; lessonId?: string; videoId?: string; name: string; url: string | null; order?: number; instructorId?: string; canEdit?: boolean }
 type LessonSummary = { id: string; title: string; order: number; moduleId: string }
 type AiContextStatus = "none" | "pending" | "ready" | "error"
 type AiContextState = { status: AiContextStatus; errorMsg?: string }
@@ -188,6 +188,7 @@ export default function LessonPage() {
   // ── Save lesson ──────────────────────────────────────────────────────────────
 
   async function saveLesson(t: string, d: string, c: string) {
+    if (data?.lesson.canEdit === false) return
     setSaveStatus("saving")
     try {
       const res = await fetch(`/api/instructor/groups/${slug}/lessons/${lessonId}`, {
@@ -202,6 +203,7 @@ export default function LessonPage() {
   }
 
   function scheduleSave(t: string, d: string, c: string) {
+    if (data?.lesson.canEdit === false) return
     latestFields.current = { title: t, description: d, content: c }
     setSaveStatus("pending")
     if (lessonTimerRef.current) clearTimeout(lessonTimerRef.current)
@@ -212,6 +214,7 @@ export default function LessonPage() {
   }
 
   function scheduleVideoSave(videoId: string, edits: { title: string; driveUrl: string; description: string }) {
+    if (videos.find(v => v.id === videoId)?.canEdit === false) return
     if (videoTimerRefs.current[videoId]) clearTimeout(videoTimerRefs.current[videoId])
     videoTimerRefs.current[videoId] = setTimeout(async () => {
       try {
@@ -240,6 +243,7 @@ export default function LessonPage() {
     const sorted = [...videos].sort((a, b) => (a.order||0) - (b.order||0))
     const fromIdx = sorted.findIndex(v => v.id === dragVideoId)
     const toIdx   = sorted.findIndex(v => v.id === targetId)
+    if (sorted[fromIdx]?.canEdit === false || sorted[toIdx]?.canEdit === false) return
     if (fromIdx === toIdx) return
     const targetEl = videoItemRefs.current.get(targetId)
     if (targetEl) {
@@ -261,6 +265,7 @@ export default function LessonPage() {
   function handleVideoDragEnd() {
     setDragVideoId(null)
     const sorted = [...videos].sort((a, b) => (a.order||0) - (b.order||0))
+    if (sorted.some(v => v.canEdit === false)) return
     callCurriculum("PATCH", { type: "reorder_videos", order: sorted.map(v => v.id) })
       .catch((e: any) => push("err", e.message))
   }
@@ -272,6 +277,7 @@ export default function LessonPage() {
     if (!dragAttId || dragAttId === targetId) return
     const fromIdx = lessonAtts.findIndex(a => a.id === dragAttId)
     const toIdx   = lessonAtts.findIndex(a => a.id === targetId)
+    if (lessonAtts[fromIdx]?.canEdit === false || lessonAtts[toIdx]?.canEdit === false) return
     if (fromIdx === toIdx) return
     const targetEl = attItemRefs.current.get(targetId)
     if (targetEl) {
@@ -291,6 +297,7 @@ export default function LessonPage() {
 
   function handleAttDragEnd() {
     setDragAttId(null)
+    if (lessonAtts.some(a => a.canEdit === false)) return
     callCurriculum("PATCH", { type: "reorder_lesson_attachments", order: lessonAtts.map(a => a.id) })
       .catch((e: any) => push("err", e.message))
   }
@@ -298,6 +305,7 @@ export default function LessonPage() {
   // ── CRUD videos ───────────────────────────────────────────────────────────────
 
   async function createVideo() {
+    if (data?.lesson.canEdit === false) return
     if (!newVideo.title.trim()) return
     try {
       const d = await callCurriculum("POST", { type: "video", lessonId: data!.lesson.id, ...newVideo })
@@ -320,6 +328,7 @@ export default function LessonPage() {
   // ── File upload ───────────────────────────────────────────────────────────────
 
   async function handleFileUpload(file: File) {
+    if (data?.lesson.canEdit === false) return
     if (!uploadingFor) return
     setUploading(true)
     const fd = new FormData()
@@ -427,6 +436,7 @@ export default function LessonPage() {
   const modulePad    = String(moduleIndex).padStart(2, "0")
   const lessonPad    = String(lessonIndex).padStart(2, "0")
   const sortedVideos = [...videos].sort((a, b) => (a.order||0) - (b.order||0))
+  const canEditLesson = data.lesson.canEdit !== false
 
   const inputStyle: React.CSSProperties = {
     width: "100%", padding: "9px 12px",
@@ -556,12 +566,14 @@ export default function LessonPage() {
             <input
               value={title}
               onChange={e => { setTitle(e.target.value); scheduleSave(e.target.value, description, content) }}
+              disabled={!canEditLesson}
               placeholder="Titre de la leçon…"
               style={{ display: "block", width: "100%", fontSize: 26, fontWeight: 700, color: "#111827", letterSpacing: "-0.02em", lineHeight: 1.2, border: "none", outline: "none", background: "transparent", fontFamily: "var(--ff-display,'Syne',sans-serif)", padding: 0, marginBottom: 10, boxSizing: "border-box" }}
             />
             <textarea
               value={description}
               onChange={e => { setDescription(e.target.value); scheduleSave(title, e.target.value, content) }}
+              disabled={!canEditLesson}
               rows={2}
               placeholder="Description de la leçon…"
               style={{ display: "block", width: "100%", fontSize: 14, color: "#4b5563", lineHeight: 1.7, border: "none", outline: "none", background: "transparent", resize: "none", fontFamily: "inherit", padding: 0, boxSizing: "border-box" }}
@@ -581,24 +593,25 @@ export default function LessonPage() {
                   </span>
                 )}
               </div>
-              <button
+              {canEditLesson && <button
                 onClick={triggerUpload}
                 style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "color-mix(in oklch, var(--accent) 9%, white)", border: "1.5px solid color-mix(in oklch, var(--accent) 22%, white)", borderRadius: 9, fontSize: 12, fontWeight: 700, color: "var(--accent)", cursor: "pointer" }}
                 onMouseEnter={e => (e.currentTarget.style.background = "color-mix(in oklch, var(--accent) 14%, white)")}
                 onMouseLeave={e => (e.currentTarget.style.background = "color-mix(in oklch, var(--accent) 9%, white)")}
               >
                 <Upload size={12} /> Ajouter
-              </button>
+              </button>}
             </div>
 
             <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
               {/* Drop zone */}
               <div
-                onClick={triggerUpload}
-                onDragOver={e => { e.preventDefault(); setIsDragOver(true) }}
+                onClick={canEditLesson ? triggerUpload : undefined}
+                onDragOver={e => { if (!canEditLesson) return; e.preventDefault(); setIsDragOver(true) }}
                 onDragLeave={() => setIsDragOver(false)}
                 onDrop={e => {
                   e.preventDefault(); setIsDragOver(false)
+                  if (!canEditLesson) return
                   const f = e.dataTransfer.files[0]
                   if (f) { setUploadingFor({ type: "lesson", parentId: data!.lesson.id }); handleFileUpload(f) }
                 }}
@@ -607,7 +620,7 @@ export default function LessonPage() {
                   padding: "14px 16px",
                   background: isDragOver ? "color-mix(in oklch, var(--accent) 3%, transparent)" : "#f8fafc",
                   border: `1.5px dashed ${isDragOver ? "var(--accent)" : "#e2e8f0"}`,
-                  borderRadius: 10, cursor: "pointer", transition: "all 0.15s",
+                  borderRadius: 10, cursor: canEditLesson ? "pointer" : "default", transition: "all 0.15s",
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "color-mix(in oklch, var(--accent) 50%, white)"; (e.currentTarget as HTMLDivElement).style.background = "color-mix(in oklch, var(--accent) 2%, transparent)" }}
                 onMouseLeave={e => { if (!isDragOver) { (e.currentTarget as HTMLDivElement).style.borderColor = "#e2e8f0"; (e.currentTarget as HTMLDivElement).style.background = "#f8fafc" } }}
@@ -632,8 +645,8 @@ export default function LessonPage() {
                   <div
                     key={att.id}
                     ref={el => { if (el) attItemRefs.current.set(att.id, el); else attItemRefs.current.delete(att.id) }}
-                    draggable
-                    onDragStart={e => { setDragAttId(att.id); e.currentTarget.style.opacity = "0.4" }}
+                    draggable={att.canEdit !== false}
+                    onDragStart={e => { if (att.canEdit === false) return; setDragAttId(att.id); e.currentTarget.style.opacity = "0.4" }}
                     onDragEnd={e => { e.currentTarget.style.opacity = "1"; handleAttDragEnd() }}
                     onDragOver={e => handleAttDragOver(e, att.id)}
                     style={{ display: "flex", alignItems: "center", gap: 0, background: "transparent", transition: "background 0.12s", opacity: isAttDragging ? 0.4 : 1, transform: "translate3d(0,0,0)" }}
@@ -641,8 +654,8 @@ export default function LessonPage() {
                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                   >
                     {/* Grip */}
-                    <div style={{ width: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "grab", color: "#d1d5db", alignSelf: "stretch", flexShrink: 0 }}>
-                      <GripVertical size={16} />
+                    <div style={{ width: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: att.canEdit === false ? "default" : "grab", color: "#d1d5db", alignSelf: "stretch", flexShrink: 0 }}>
+                      {att.canEdit !== false && <GripVertical size={16} />}
                     </div>
                     <div
                       onClick={() => { if (pdfUrl) router.push(pdfUrl) }}
@@ -711,14 +724,14 @@ export default function LessonPage() {
                           <ExternalLink size={14} />
                         </a>
                       )}
-                      <button
+                      {att.canEdit !== false && <button
                         onClick={() => deleteAttachment(att.id)}
                         style={{ width: 32, height: 32, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "#9ca3af", transition: "all 0.12s" }}
                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#fef2f2"; (e.currentTarget as HTMLButtonElement).style.color = "#ef4444" }}
                         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#9ca3af" }}
                       >
                         <Trash2 size={14} />
-                      </button>
+                      </button>}
                     </div>
                   </div>
                 )
@@ -744,7 +757,7 @@ export default function LessonPage() {
                   </span>
                 )}
               </div>
-              {!addingVideo && (
+              {canEditLesson && !addingVideo && (
                 <button
                   onClick={() => setAddingVideo(true)}
                   style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "color-mix(in oklch, var(--accent) 9%, white)", border: "1.5px solid color-mix(in oklch, var(--accent) 22%, white)", borderRadius: 9, fontSize: 12, fontWeight: 700, color: "var(--accent)", cursor: "pointer" }}
@@ -769,8 +782,8 @@ export default function LessonPage() {
                   <div
                     key={video.id}
                     ref={el => { if (el) videoItemRefs.current.set(video.id, el); else videoItemRefs.current.delete(video.id) }}
-                    draggable={!isEditing}
-                    onDragStart={e => { setDragVideoId(video.id); e.currentTarget.style.opacity = "0.4" }}
+                    draggable={!isEditing && video.canEdit !== false}
+                    onDragStart={e => { if (video.canEdit === false) return; setDragVideoId(video.id); e.currentTarget.style.opacity = "0.4" }}
                     onDragEnd={e => { e.currentTarget.style.opacity = "1"; handleVideoDragEnd() }}
                     onDragOver={e => handleVideoDragOver(e, video.id)}
                     style={{ opacity: isDragging ? 0.4 : 1, transform: "translate3d(0,0,0)", background: "transparent", overflow: "hidden" }}
@@ -816,8 +829,8 @@ export default function LessonPage() {
                         onMouseLeave={e => (e.currentTarget.parentElement!.style.background = "transparent")}
                       >
                         {/* Grip */}
-                        <div style={{ width: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "grab", color: "#d1d5db", alignSelf: "stretch", flexShrink: 0 }}>
-                          <GripVertical size={16} />
+                        <div style={{ width: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: video.canEdit === false ? "default" : "grab", color: "#d1d5db", alignSelf: "stretch", flexShrink: 0 }}>
+                          {video.canEdit !== false && <GripVertical size={16} />}
                         </div>
 
                         {/* Thumbnail */}
@@ -850,22 +863,22 @@ export default function LessonPage() {
 
                         {/* Actions */}
                         <div style={{ display: "flex", gap: 4, flexShrink: 0, paddingRight: 16 }}>
-                          <button
+                          {video.canEdit !== false && <button
                             onClick={() => { setEditingVideoId(video.id); setVideoEdits(p => ({ ...p, [video.id]: { title: video.title, driveUrl: video.driveUrl, description: video.description } })) }}
                             style={{ width: 32, height: 32, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "#9ca3af", transition: "all 0.12s" }}
                             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#e8ecf3"; (e.currentTarget as HTMLButtonElement).style.color = "#374151" }}
                             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#9ca3af" }}
                           >
                             <Pencil size={13} />
-                          </button>
-                          <button
+                          </button>}
+                          {video.canEdit !== false && <button
                             onClick={() => deleteVideo(video.id)}
                             style={{ width: 32, height: 32, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "#9ca3af", transition: "all 0.12s" }}
                             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#fef2f2"; (e.currentTarget as HTMLButtonElement).style.color = "#ef4444" }}
                             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#9ca3af" }}
                           >
                             <Trash2 size={13} />
-                          </button>
+                          </button>}
                         </div>
                       </div>
                     )}
@@ -874,7 +887,7 @@ export default function LessonPage() {
               })}
 
               {/* Add video form */}
-              {addingVideo && (
+              {canEditLesson && addingVideo && (
                 <div style={{ background: "#f8fafc", borderRadius: 10, border: "1.5px dashed color-mix(in oklch, var(--accent) 35%, #e2e8f0)", padding: "18px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
                   <p style={{ fontSize: 11, fontWeight: 800, color: "var(--accent)", margin: 0, textTransform: "uppercase", letterSpacing: "0.08em" }}>Nouvelle vidéo</p>
                   <div>

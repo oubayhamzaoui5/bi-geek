@@ -7,7 +7,7 @@ export default function StudentSettingsPage() {
     <DashboardSettings
       profileApiPath="/api/student/profile"
       passwordApiPath="/api/student/change-password"
-      roleLabel="Étudiant"
+      roleLabel="Apprenant"
       overviewHref="/student-dashboard/overview"
     />
   )

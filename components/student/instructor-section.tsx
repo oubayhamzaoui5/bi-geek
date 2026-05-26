@@ -34,7 +34,7 @@ export function InstructorSection({
     <div className="flex flex-col items-center">
       {/* Instructor Card */}
       <div className="p-6 rounded-xl w-full flex flex-col items-center text-center space-y-4 border border-border bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/80 shadow-md">
-        <h3 className="text-2xl font-bold text-accent">Instructeur</h3>
+        <h3 className="text-2xl font-bold text-accent">Formateur</h3>
 
         {/* Profile Image */}
         <div className="w-40 h-40 rounded-lg overflow-hidden border-2 border-accent shadow-md">

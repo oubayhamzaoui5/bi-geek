@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Search, Plus, Edit, Trash2, Save, X,
-  Users, CheckCircle, AlertCircle, Loader2,
-  Layers, BookOpen, Lock, Unlock, ChevronRight, Link2,
+  Users, CheckCircle, AlertCircle, Loader2, Activity,
+  Layers, BookOpen, ChevronRight, Link2, Calendar,
   GraduationCap
 } from "lucide-react"
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
@@ -16,11 +16,17 @@ type Toast = { id: string; type: ToastType; message: string; duration: number; c
 
 type AdminCourse = { id: string; title: string; shortDescription?: string; longDescription?: string; coverImage?: string | null }
 type AdminBootcamp = { id: string; title: string; shortDescription?: string; longDescription?: string; coverImage?: string | null }
-type AdminStudent = { id: string; name?: string; surname?: string; email?: string; username?: string }
+type AdminStudent = { id: string; name?: string; surname?: string; email?: string; username?: string; role?: string; avatar?: string | null }
 
 type GroupStatus = "not_started" | "in_progress" | "completed"
 
 type AdminInstructor = { id: string; name?: string; surname?: string; avatar?: string | null }
+
+type ScheduleSlot = {
+  day: string
+  start_time: string
+  duration: number
+}
 
 type AdminGroup = {
   id?: string
@@ -30,12 +36,17 @@ type AdminGroup = {
   courseId?: string | null
   bootcampId?: string | null
   instructorId?: string | null
+  instructorIds?: string[]
   studentIds: string[]
   instructor?: AdminInstructor | null
+  instructors?: AdminInstructor[]
   lockedModules?: string[]
   unlockedModules?: string[]
   lockedLessons?: string[]
   unlockedLessons?: string[]
+  schedules?: ScheduleSlot[]
+  schedule_start_date?: string | null
+  schedule_end_date?: string | null
 }
 
 type AdminSession = {
@@ -49,12 +60,6 @@ type AdminSession = {
   is_cancelled: boolean
 }
 
-type CurriculumData = {
-  courses?: { id: string, title: string }[],
-  modules: { id: string, title: string, courseId?: string, locked: boolean }[],
-  lessons: { id: string, title: string, moduleId: string, locked: boolean }[]
-}
-
 type GroupsCrudProps = {
   initialGroups?: AdminGroup[]
   initialCourses?: AdminCourse[]
@@ -62,7 +67,7 @@ type GroupsCrudProps = {
   initialStudents?: AdminStudent[]
   initialInstructors?: AdminInstructor[]
   initialSessions?: AdminSession[]
-  onSave?: (group: AdminGroup) => Promise<void>
+  onSave?: (group: AdminGroup) => Promise<AdminGroup | void>
   onDelete?: (id: string) => Promise<void>
   readOnly?: boolean
   onGroupClick?: (group: AdminGroup) => void
@@ -76,6 +81,12 @@ type GroupsCrudProps = {
   customColumnHeader?: string
 }
 
+const EMPTY_GROUPS: AdminGroup[] = []
+const EMPTY_COURSES: AdminCourse[] = []
+const EMPTY_BOOTCAMPS: AdminBootcamp[] = []
+const EMPTY_STUDENTS: AdminStudent[] = []
+const EMPTY_INSTRUCTORS: AdminInstructor[] = []
+
 // ---- Status meta ----
 const STATUS_META: Record<GroupStatus, { label: string; bg: string; text: string }> = {
   not_started: { label: "Pas commencé", bg: "rgba(148,163,184,0.15)", text: "#475569" },
@@ -83,13 +94,81 @@ const STATUS_META: Record<GroupStatus, { label: string; bg: string; text: string
   completed:    { label: "Terminé",      bg: "rgba(34,197,94,0.15)",   text: "#16a34a" },
 }
 
+const DAYS_OPTIONS = [
+  { val: "monday", short: "Lun", label: "Lundi" },
+  { val: "tuesday", short: "Mar", label: "Mardi" },
+  { val: "wednesday", short: "Mer", label: "Mercredi" },
+  { val: "thursday", short: "Jeu", label: "Jeudi" },
+  { val: "friday", short: "Ven", label: "Vendredi" },
+  { val: "saturday", short: "Sam", label: "Samedi" },
+  { val: "sunday", short: "Dim", label: "Dimanche" },
+]
+
+const AVATAR_PALETTES = [
+  { from: "#6366f1", to: "#818cf8" },
+  { from: "#8b5cf6", to: "#a78bfa" },
+  { from: "#ec4899", to: "#f472b6" },
+  { from: "#f59e0b", to: "#fbbf24" },
+  { from: "#10b981", to: "#34d399" },
+  { from: "#3b82f6", to: "#60a5fa" },
+  { from: "#ef4444", to: "#f87171" },
+  { from: "#14b8a6", to: "#2dd4bf" },
+]
+
+function emptySlot(): ScheduleSlot {
+  return { day: "monday", start_time: "09:00", duration: 120 }
+}
+
 function studentDisplayName(s: AdminStudent) {
   const full = `${s.name ?? ""} ${s.surname ?? ""}`.trim()
   return full || s.username || s.email || s.id
 }
 
+function avatarColor(name: string): { from: string; to: string } {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  return AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length]
+}
+
+function StudentAvatar({ student, size = 34 }: { student: AdminStudent; size?: number }) {
+  const displayName = studentDisplayName(student)
+  if (student.avatar) {
+    return (
+      <img
+        src={student.avatar}
+        alt={displayName}
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: "2px solid #f1f5f9", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", flexShrink: 0 }}
+      />
+    )
+  }
+  const { from, to } = avatarColor(displayName)
+  return (
+    <div style={{ width: size, height: size, borderRadius: "50%", background: `linear-gradient(135deg,${from},${to})`, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #f1f5f9", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", flexShrink: 0 }}>
+      <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>{displayName[0]?.toUpperCase() || "?"}</span>
+    </div>
+  )
+}
+
 function instructorInitials(i: AdminInstructor) {
   return [i.name?.[0], i.surname?.[0]].filter(Boolean).join("").toUpperCase() || "?"
+}
+
+function instructorDisplayName(i: AdminInstructor) {
+  return [i.name, i.surname].filter(Boolean).join(" ") || i.id
+}
+
+function groupInstructorIds(group: Pick<AdminGroup, "programType" | "instructorIds" | "instructorId" | "instructor">) {
+  const ids = Array.isArray(group.instructorIds) ? group.instructorIds.filter(Boolean) : []
+  const resolved = ids.length > 0 ? ids : [group.instructorId || group.instructor?.id || ""].filter(Boolean)
+  return group.programType === "bootcamp" ? resolved : resolved.slice(0, 1)
+}
+
+function groupInstructors(group: AdminGroup, allInstructors: AdminInstructor[]) {
+  const ids = groupInstructorIds(group)
+  const map = new Map(allInstructors.map(i => [i.id, i]))
+  for (const i of group.instructors ?? []) map.set(i.id, i)
+  if (group.instructor) map.set(group.instructor.id, group.instructor)
+  return ids.map(id => map.get(id)).filter(Boolean) as AdminInstructor[]
 }
 
 function currentMonthLabel() {
@@ -106,6 +185,10 @@ function sessionStartAt(session: AdminSession): number {
   return new Date(`${session.date}T${time}:00`).getTime()
 }
 
+function sessionEndAt(session: AdminSession): number {
+  return sessionStartAt(session) + Math.max(session.duration || 120, 1) * 60_000
+}
+
 function formatSessionDate(date: string): string {
   const d = new Date(`${date}T12:00:00`)
   return d.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" })
@@ -120,6 +203,18 @@ function formatDurationHM(minutes?: number): string {
   return `${h}h${m}`
 }
 
+function parseTimeToMinutes(time: string): number {
+  const [h, m] = (time || "09:00").split(":").map(Number)
+  return (h || 0) * 60 + (m || 0)
+}
+
+function minutesToTime(minutes: number): string {
+  const normalized = ((minutes % 1440) + 1440) % 1440
+  const h = Math.floor(normalized / 60)
+  const m = normalized % 60
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+}
+
 // ---- UI primitives (exact match of CoursesCrud / BootcampsCrud) ----
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
@@ -127,6 +222,15 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
     <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 7, letterSpacing: "0.06em", textTransform: "uppercase" }}>
       {children}{required && <span style={{ color: "#ef4444", marginLeft: 4 }}>*</span>}
     </label>
+  )
+}
+
+function LabelContent({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      {icon}
+      <span>{children}</span>
+    </span>
   )
 }
 
@@ -157,6 +261,246 @@ function SelectField({ value, onChange, children }: { value: string; onChange: (
   )
 }
 
+function InstructorAvatar({ instructor, size = 28 }: { instructor: AdminInstructor | null; size?: number }) {
+  if (!instructor) {
+    return (
+      <div style={{ width: size, height: size, borderRadius: "50%", background: "#f1f5f9", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: Math.max(11, size * 0.42), fontWeight: 800 }}>
+        ?
+      </div>
+    )
+  }
+  if (instructor.avatar) {
+    return (
+      <img
+        src={instructor.avatar}
+        alt={[instructor.name, instructor.surname].filter(Boolean).join(" ") || "Formateur"}
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0", flexShrink: 0 }}
+      />
+    )
+  }
+  return (
+    <div style={{ width: size, height: size, borderRadius: "50%", background: "linear-gradient(135deg,var(--accent,#6366f1),#a78bfa)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: Math.max(10, size * 0.36), fontWeight: 800, flexShrink: 0 }}>
+      {instructorInitials(instructor)}
+    </div>
+  )
+}
+
+function InstructorSelect({ value, instructors, onChange }: {
+  value: string
+  instructors: AdminInstructor[]
+  onChange: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const selected = instructors.find(i => i.id === value) ?? null
+  const selectedLabel = selected ? ([selected.name, selected.surname].filter(Boolean).join(" ") || selected.id) : "Aucun formateur"
+
+  return (
+    <div
+      tabIndex={-1}
+      onBlur={e => {
+        const next = e.relatedTarget as Node | null
+        if (next && e.currentTarget.contains(next)) return
+        setOpen(false)
+      }}
+      style={{ position: "relative" }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        style={{ width: "100%", minHeight: 44, padding: "8px 36px 8px 12px", background: "#fff", border: `1.5px solid ${open ? "var(--accent,#6366f1)" : "#e2e8f0"}`, borderRadius: 10, color: "#0f172a", outline: "none", cursor: "pointer", fontFamily: "inherit", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 10, boxShadow: open ? "0 0 0 3px rgba(99,102,241,0.1)" : "none", transition: "border-color 0.15s, box-shadow 0.15s" }}
+      >
+        <InstructorAvatar instructor={selected} />
+        <span style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedLabel}</span>
+      </button>
+      <ChevronRight style={{ position: "absolute", right: 12, top: 15, transform: `rotate(${open ? 270 : 90}deg)`, width: 14, height: 14, color: "#475569", pointerEvents: "none", transition: "transform 0.15s" }} />
+
+      {open && (
+        <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 80, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 16px 40px rgba(15,23,42,0.14)", padding: 6, maxHeight: 260, overflowY: "auto" }}>
+          <button
+            type="button"
+            onClick={() => { onChange(""); setOpen(false) }}
+            style={{ width: "100%", padding: "9px 10px", border: "none", background: !value ? "rgba(99,102,241,0.08)" : "transparent", borderRadius: 9, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, color: "#0f172a", fontFamily: "inherit", textAlign: "left" }}
+          >
+            <InstructorAvatar instructor={null} />
+            <span style={{ fontSize: 14, fontWeight: !value ? 700 : 500 }}>Aucun formateur</span>
+          </button>
+          {instructors.map(i => {
+            const active = i.id === value
+            const label = [i.name, i.surname].filter(Boolean).join(" ") || i.id
+            return (
+              <button
+                key={i.id}
+                type="button"
+                onClick={() => { onChange(i.id); setOpen(false) }}
+                style={{ width: "100%", padding: "9px 10px", border: "none", background: active ? "rgba(99,102,241,0.08)" : "transparent", borderRadius: 9, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, color: "#0f172a", fontFamily: "inherit", textAlign: "left" }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#f8fafc" }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent" }}
+              >
+                <InstructorAvatar instructor={i} />
+                <span style={{ fontSize: 14, fontWeight: active ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function InstructorMultiSelect({ value, instructors, onChange }: {
+  value: string[]
+  instructors: AdminInstructor[]
+  onChange: (ids: string[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const selected = value.map(id => instructors.find(i => i.id === id)).filter(Boolean) as AdminInstructor[]
+  const available = instructors.filter(i => !value.includes(i.id))
+  const move = (index: number, delta: number) => {
+    const next = [...value]
+    const target = index + delta
+    if (target < 0 || target >= next.length) return
+    const [item] = next.splice(index, 1)
+    next.splice(target, 0, item)
+    onChange(next)
+  }
+
+  return (
+    <div tabIndex={-1} onBlur={e => {
+      const next = e.relatedTarget as Node | null
+      if (next && e.currentTarget.contains(next)) return
+      setOpen(false)
+    }} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        style={{ width: "100%", minHeight: 44, padding: "8px 36px 8px 12px", background: "#fff", border: `1.5px solid ${open ? "var(--accent,#6366f1)" : "#e2e8f0"}`, borderRadius: 10, color: "#0f172a", outline: "none", cursor: "pointer", fontFamily: "inherit", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 10, boxShadow: open ? "0 0 0 3px rgba(99,102,241,0.1)" : "none", transition: "border-color 0.15s, box-shadow 0.15s" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", marginRight: 2 }}>
+          {selected.slice(0, 3).map((i, idx) => (
+            <span key={i.id} style={{ marginLeft: idx === 0 ? 0 : -8, display: "inline-flex" }}>
+              <InstructorAvatar instructor={i} size={26} />
+            </span>
+          ))}
+        </div>
+        <span style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {selected.length === 0 ? "Aucun formateur" : selected.map(instructorDisplayName).join(" → ")}
+        </span>
+      </button>
+      <ChevronRight style={{ position: "absolute", right: 12, top: 15, transform: `rotate(${open ? 270 : 90}deg)`, width: 14, height: 14, color: "#475569", pointerEvents: "none", transition: "transform 0.15s" }} />
+
+      {open && (
+        <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 80, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 16px 40px rgba(15,23,42,0.14)", padding: 8, maxHeight: 320, overflowY: "auto" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {selected.length === 0 ? (
+              <div style={{ padding: "10px", borderRadius: 9, background: "#f8fafc", color: "#64748b", fontSize: 12, fontWeight: 600 }}>Aucun formateur sélectionné.</div>
+            ) : selected.map((i, index) => (
+              <div key={i.id} style={{ padding: "8px 10px", borderRadius: 9, background: "rgba(99,102,241,0.07)", display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ width: 18, height: 18, borderRadius: 6, background: "var(--accent,#6366f1)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800 }}>{index + 1}</span>
+                <InstructorAvatar instructor={i} />
+                <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{instructorDisplayName(i)}</span>
+                <button type="button" onClick={() => move(index, -1)} disabled={index === 0} style={{ border: "none", background: "transparent", color: index === 0 ? "#cbd5e1" : "#475569", cursor: index === 0 ? "default" : "pointer", fontWeight: 900 }}>↑</button>
+                <button type="button" onClick={() => move(index, 1)} disabled={index === selected.length - 1} style={{ border: "none", background: "transparent", color: index === selected.length - 1 ? "#cbd5e1" : "#475569", cursor: index === selected.length - 1 ? "default" : "pointer", fontWeight: 900 }}>↓</button>
+                <button type="button" onClick={() => onChange(value.filter(id => id !== i.id))} style={{ border: "none", background: "transparent", color: "#ef4444", cursor: "pointer", display: "inline-flex" }}><X style={{ width: 14, height: 14 }} /></button>
+              </div>
+            ))}
+          </div>
+          {available.length > 0 && <div style={{ height: 1, background: "#e2e8f0", margin: "8px 0" }} />}
+          {available.map(i => (
+            <button
+              key={i.id}
+              type="button"
+              onClick={() => onChange([...value, i.id])}
+              style={{ width: "100%", padding: "9px 10px", border: "none", background: "transparent", borderRadius: 9, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, color: "#0f172a", fontFamily: "inherit", textAlign: "left" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#f8fafc" }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent" }}
+            >
+              <InstructorAvatar instructor={i} />
+              <span style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{instructorDisplayName(i)}</span>
+              <Plus style={{ width: 14, height: 14, marginLeft: "auto", color: "var(--accent,#6366f1)" }} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ScheduleSlotRow({ slot, index, onChange, onRemove }: {
+  slot: ScheduleSlot
+  index: number
+  onChange: (index: number, slot: ScheduleSlot) => void
+  onRemove: (index: number) => void
+}) {
+  const set = (patch: Partial<ScheduleSlot>) => onChange(index, { ...slot, ...patch })
+  const startMinutes = parseTimeToMinutes(slot.start_time)
+  const endTime = minutesToTime(startMinutes + Math.max(slot.duration || 120, 15))
+  const setStartTime = (start_time: string) => set({ start_time })
+  const setEndTime = (end_time: string) => {
+    const endMinutes = parseTimeToMinutes(end_time)
+    const duration = Math.max(endMinutes - startMinutes, 15)
+    set({ duration })
+  }
+
+  return (
+    <div style={{ borderRadius: 12, border: "1px solid #e8ecf3", background: "#f8fafc", padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>Séance {index + 1}</span>
+        <button
+          type="button"
+          onClick={() => onRemove(index)}
+          style={{ width: 26, height: 26, borderRadius: 8, border: "none", background: "#fff", color: "#f43f5e", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+          title="Supprimer la séance"
+        >
+          <X style={{ width: 13, height: 13 }} />
+        </button>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {DAYS_OPTIONS.map(d => {
+          const active = slot.day === d.val
+          return (
+            <button
+              type="button"
+              key={d.val}
+              onClick={() => set({ day: d.val })}
+              title={d.label}
+              style={{ padding: "6px 9px", borderRadius: 8, border: `1.5px solid ${active ? "var(--accent,#6366f1)" : "#e2e8f0"}`, background: active ? "var(--accent,#6366f1)" : "#fff", color: active ? "#fff" : "#475569", fontSize: 11, fontWeight: 800, cursor: "pointer" }}
+            >
+              {d.short}
+            </button>
+          )
+        })}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <div>
+          <FieldLabel>Heure de départ</FieldLabel>
+          <input
+            type="time"
+            lang="fr-FR"
+            step={900}
+            value={slot.start_time}
+            onChange={e => setStartTime(e.target.value)}
+            style={{ width: "100%", height: 38, padding: "8px 10px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", color: "#0f172a", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+          />
+        </div>
+        <div>
+          <FieldLabel>Heure de fin</FieldLabel>
+          <input
+            type="time"
+            lang="fr-FR"
+            step={900}
+            value={endTime}
+            onChange={e => setEndTime(e.target.value)}
+            style={{ width: "100%", height: 38, padding: "8px 10px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", color: "#0f172a", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+          />
+        </div>
+      </div>
+      <span style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>
+        Durée calculée : {formatDurationHM(slot.duration || 120)}
+      </span>
+    </div>
+  )
+}
+
 function IconBtn({ onClick, title, color = "#475569", hoverBg = "#f1f5f9", children }: {
   onClick: (e: React.MouseEvent) => void; title?: string; color?: string; hoverBg?: string; children: React.ReactNode
 }) {
@@ -173,7 +517,7 @@ function IconBtn({ onClick, title, color = "#475569", hoverBg = "#f1f5f9", child
 
 function FormCard({ title, icon, children, action }: { title: string; icon?: React.ReactNode; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #edf0f7", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.04)" }}>
+    <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #edf0f7", overflow: "visible", boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.04)" }}>
       <div style={{ padding: "14px 22px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(180deg,#fafbfe 0%,#fff 100%)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: 9, background: "var(--accent,#6366f1)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -191,18 +535,18 @@ function FormCard({ title, icon, children, action }: { title: string; icon?: Rea
 // ---- Main component ----
 
 export default function GroupsCrud({
-  initialGroups = [],
-  initialCourses = [],
-  initialBootcamps = [],
-  initialStudents = [],
-  initialInstructors = [],
+  initialGroups = EMPTY_GROUPS,
+  initialCourses = EMPTY_COURSES,
+  initialBootcamps = EMPTY_BOOTCAMPS,
+  initialStudents = EMPTY_STUDENTS,
+  initialInstructors = EMPTY_INSTRUCTORS,
   initialSessions,
   onSave,
   onDelete,
   readOnly = false,
   onGroupClick,
   customTitle = "Groupes",
-  customDescription = "Gérez les groupes et leurs étudiants",
+  customDescription = "Gérez les groupes et leurs apprenants",
   customBreadcrumbs = [{ label: "Groupes" }],
   customSearchPlaceholder = "Rechercher un groupe…",
   customEmptyText = "Aucun groupe trouvé",
@@ -216,7 +560,7 @@ export default function GroupsCrud({
   const [courses, setCourses]           = useState<AdminCourse[]>(initialCourses)
   const [bootcamps, setBootcamps]       = useState<AdminBootcamp[]>(initialBootcamps)
   const [students, setStudents]         = useState<AdminStudent[]>(initialStudents)
-  const [instructors]                   = useState<AdminInstructor[]>(initialInstructors)
+  const [instructors, setInstructors]   = useState<AdminInstructor[]>(initialInstructors)
 
   const [editingGroup, setEditingGroup] = useState<AdminGroup | null>(null)
   const [isCreating, setIsCreating]     = useState(false)
@@ -228,8 +572,6 @@ export default function GroupsCrud({
   const [sessions, setSessions]         = useState<AdminSession[]>(initialSessions ?? [])
   const [loadingSessions, setLoadingSessions] = useState(false)
 
-  const [curriculum, setCurriculum]               = useState<CurriculumData | null>(null)
-  const [loadingCurriculum, setLoadingCurriculum] = useState(false)
   const [statusPopover, setStatusPopover]         = useState<string | null>(null)
 
   // ---- Toast helpers ----
@@ -253,6 +595,40 @@ export default function GroupsCrud({
   useEffect(() => { if (initialCourses.length)   setCourses(initialCourses)   }, [initialCourses])
   useEffect(() => { if (initialBootcamps.length) setBootcamps(initialBootcamps) }, [initialBootcamps])
   useEffect(() => { if (initialStudents.length)  setStudents(initialStudents)  }, [initialStudents])
+  useEffect(() => {
+    if (initialInstructors.length === 0) {
+      setInstructors(prev => (prev.length === 0 ? prev : []))
+      return
+    }
+    setInstructors(initialInstructors)
+  }, [initialInstructors])
+
+  useEffect(() => {
+    if (initialInstructors.length > 0 || instructors.length > 0) return
+    let active = true
+    const loadInstructors = async () => {
+      try {
+        const res = await fetch("/api/admin/users", { cache: "no-store" })
+        if (!res.ok) return
+        const users = await res.json()
+        if (!active || !Array.isArray(users)) return
+        setInstructors(
+          users
+            .filter((u: any) => u.role === "instructor")
+            .map((u: any) => ({
+              id: u.id,
+              name: u.name || "",
+              surname: u.surname || "",
+              avatar: u.avatar || null,
+            }))
+        )
+      } catch {
+        // Keep current-group fallback if users endpoint is unavailable.
+      }
+    }
+    loadInstructors()
+    return () => { active = false }
+  }, [initialInstructors.length, instructors.length])
 
   useEffect(() => {
     if (initialSessions) return
@@ -276,35 +652,12 @@ export default function GroupsCrud({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ---- Curriculum loader ----
-  useEffect(() => {
-    let active = true
-    const load = async () => {
-      setLoadingCurriculum(true)
-      try {
-        let res
-        if (editingGroup?.programType === "course" && editingGroup.courseId)
-          res = await fetch(`/api/admin/courses/${editingGroup.courseId}/curriculum`)
-        else if (editingGroup?.programType === "bootcamp" && editingGroup.bootcampId)
-          res = await fetch(`/api/admin/bootcamps/${editingGroup.bootcampId}/curriculum`)
-        else { if (active) setCurriculum(null); return }
-
-        if (res?.ok) {
-          const data = await res.json()
-          if (data.ok && active) setCurriculum(data.curriculum)
-        }
-      } catch { if (active) setCurriculum(null) }
-      finally  { if (active) setLoadingCurriculum(false) }
-    }
-    load()
-    return () => { active = false }
-  }, [editingGroup?.courseId, editingGroup?.bootcampId, editingGroup?.programType])
-
   // ---- Helpers ----
   const createBlank = (): AdminGroup => ({
     title: "", status: "not_started", programType: "course",
-    courseId: "", bootcampId: "", instructorId: null, studentIds: [],
+    courseId: "", bootcampId: "", instructorId: null, instructorIds: [], studentIds: [],
     lockedModules: [], unlockedModules: [], lockedLessons: [], unlockedLessons: [],
+    schedules: [emptySlot()], schedule_start_date: null, schedule_end_date: null,
   })
 
   const programLabel = (g: AdminGroup) =>
@@ -329,6 +682,16 @@ export default function GroupsCrud({
     )
   }, [students, studentSearch])
 
+  const orderedStudents = useMemo(() => {
+    const selected = new Set(editingGroup?.studentIds ?? [])
+    return [...filteredStudents].sort((a, b) => {
+      const aSelected = selected.has(a.id)
+      const bSelected = selected.has(b.id)
+      if (aSelected !== bSelected) return aSelected ? -1 : 1
+      return studentDisplayName(a).localeCompare(studentDisplayName(b), "fr", { sensitivity: "base" })
+    })
+  }, [filteredStudents, editingGroup?.studentIds])
+
   const nextSessionByGroup = useMemo(() => {
     const now = Date.now()
     const nextMap = new Map<string, AdminSession>()
@@ -341,7 +704,8 @@ export default function GroupsCrud({
     for (const session of sessions) {
       if (!inProgressIds.has(session.group) || session.is_cancelled) continue
       const startsAt = sessionStartAt(session)
-      if (!Number.isFinite(startsAt) || startsAt < now) continue
+      const endsAt = sessionEndAt(session)
+      if (!Number.isFinite(startsAt) || endsAt < now) continue
       const existing = nextMap.get(session.group)
       if (!existing || startsAt < sessionStartAt(existing)) {
         nextMap.set(session.group, session)
@@ -365,8 +729,24 @@ export default function GroupsCrud({
     setLoading(true)
     const lid = showToast("loading", "Enregistrement en cours…")
     try {
-      if (onSave) await onSave(editingGroup)
-      if (editingGroup.id) {
+      const saved = (onSave ? await onSave(editingGroup) : undefined) || editingGroup
+      if (saved.id) {
+        await fetch("/api/admin/sessions/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ groupId: saved.id }),
+        }).catch(() => null)
+        const res = await fetch("/api/admin/sessions").catch(() => null)
+        if (res?.ok) {
+          const data = await res.json()
+          setSessions(Array.isArray(data.sessions) ? data.sessions : [])
+        }
+      }
+      if (saved.id) {
+        setGroups(prev => prev.some(g => g.id === saved.id) ? prev.map(g => g.id === saved.id ? saved : g) : [...prev, saved])
+        setEditingGroup(saved)
+        setIsCreating(false)
+      } else if (editingGroup.id) {
         setGroups(prev => prev.map(g => g.id === editingGroup.id ? editingGroup : g))
       } else {
         const ng = { ...editingGroup, id: `group_${Date.now()}` }
@@ -441,29 +821,37 @@ export default function GroupsCrud({
     setEditingGroup({ ...editingGroup, studentIds: next })
   }
 
-  const getIsUnlocked = (id: string, type: "module" | "lesson") => {
-    if (editingGroup?.status === "completed") return true
-    return type === "module"
-      ? !!editingGroup?.unlockedModules?.includes(id)
-      : !!editingGroup?.unlockedLessons?.includes(id)
+  const setInstructorIds = (ids: string[]) => {
+    if (!editingGroup) return
+    const unique = Array.from(new Set(ids.filter(Boolean)))
+    const nextIds = editingGroup.programType === "bootcamp" ? unique : unique.slice(0, 1)
+    const selectedInstructors = unique
+      .map(id => instructors.find(i => i.id === id) || editingGroup.instructors?.find(i => i.id === id) || (editingGroup.instructor?.id === id ? editingGroup.instructor : null))
+      .filter(Boolean) as AdminInstructor[]
+    setEditingGroup({
+      ...editingGroup,
+      instructorIds: nextIds,
+      instructorId: nextIds[0] || null,
+      instructor: selectedInstructors[0] ?? null,
+      instructors: selectedInstructors.slice(0, nextIds.length),
+    })
   }
 
-  const toggleLockState = (id: string, type: "module" | "lesson") => {
-    if (readOnly) return
+  const handleChangeScheduleSlot = (index: number, slot: ScheduleSlot) => {
     if (!editingGroup) return
-    const ng = { ...editingGroup }
-    ng.unlockedModules = ng.unlockedModules || []
-    ng.unlockedLessons = ng.unlockedLessons || []
-    if (type === "module") {
-      ng.unlockedModules = ng.unlockedModules.includes(id)
-        ? ng.unlockedModules.filter(x => x !== id)
-        : [...ng.unlockedModules, id]
-    } else {
-      ng.unlockedLessons = ng.unlockedLessons.includes(id)
-        ? ng.unlockedLessons.filter(x => x !== id)
-        : [...ng.unlockedLessons, id]
-    }
-    setEditingGroup(ng)
+    const next = [...(editingGroup.schedules ?? [])]
+    next[index] = slot
+    setEditingGroup({ ...editingGroup, schedules: next })
+  }
+
+  const handleAddScheduleSlot = () => {
+    if (!editingGroup) return
+    setEditingGroup({ ...editingGroup, schedules: [...(editingGroup.schedules ?? []), emptySlot()] })
+  }
+
+  const handleRemoveScheduleSlot = (index: number) => {
+    if (!editingGroup) return
+    setEditingGroup({ ...editingGroup, schedules: (editingGroup.schedules ?? []).filter((_, i) => i !== index) })
   }
 
   // ---- Render ----
@@ -610,27 +998,23 @@ export default function GroupsCrud({
                       >{group.title || "Sans titre"}</p>
                       <p style={{ fontSize: 14, color: "#475569", margin: "0 0 10px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" }}>{description}</p>
                       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                        {group.instructor && (
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                            {group.instructor.avatar ? (
-                              <img
-                                src={group.instructor.avatar}
-                                alt=""
-                                style={{ width: 22, height: 22, minWidth: 22, minHeight: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0, display: "block", border: "1px solid rgba(99,102,241,0.18)" }}
-                              />
-                            ) : (
-                              <span style={{ width: 22, height: 22, minWidth: 22, minHeight: 22, borderRadius: "50%", background: "rgba(99,102,241,0.12)", color: "#4f46e5", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, flexShrink: 0 }}>
-                                {instructorInitials(group.instructor)}
+                        {(() => {
+                          const selected = groupInstructors(group, instructors)
+                          const first = selected[0]
+                          if (!first) return null
+                          const rest = selected.slice(1)
+                          return (
+                            <span title={selected.map(instructorDisplayName).join("\n")} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                              <InstructorAvatar instructor={first} size={22} />
+                              <span style={{ fontSize: 12, fontWeight: 600, color: "#4f46e5" }}>
+                                {instructorDisplayName(first)}{rest.length > 0 ? ` +${rest.length}` : ""}
                               </span>
-                            )}
-                            <span style={{ fontSize: 12, fontWeight: 600, color: "#4f46e5" }}>
-                              {[group.instructor.name, group.instructor.surname].filter(Boolean).join(" ")}
                             </span>
-                          </span>
-                        )}
+                          )
+                        })()}
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                           <Users style={{ width: 13, height: 13, color: "#475569" }} />
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>{group.studentIds.length} étudiant{group.studentIds.length !== 1 ? "s" : ""}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>{group.studentIds.length} apprenant{group.studentIds.length !== 1 ? "s" : ""}</span>
                         </span>
                       </div>
                     </div>
@@ -714,7 +1098,7 @@ export default function GroupsCrud({
                         </span>
                       </>
                     ) : (
-                      <span style={{ fontSize: 12, color: "#475569" }}>Aucune session planifiee</span>
+                      <span style={{ fontSize: 12, color: "#475569" }}>Aucune séance planifiée</span>
                     )}
                   </div>
                 )}
@@ -751,7 +1135,7 @@ export default function GroupsCrud({
                     {(() => {
                       const showSess = status === "in_progress"
                       const hCols = showSess ? "1fr 220px" : "1fr"
-                      const headers = [customColumnHeader, ...(showSess ? ["Prochaine session"] : [])]
+                      const headers = [customColumnHeader, ...(showSess ? ["Prochaine séance"] : [])]
                       return (
                         <div style={{ display: "grid", gridTemplateColumns: hCols, padding: "12px 36px", borderBottom: "1px solid #f1f5f9", background: "#fff" }}>
                           {headers.map(h => (
@@ -777,6 +1161,11 @@ export default function GroupsCrud({
           <div style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,0.5)", backdropFilter: "blur(6px)" }} onClick={handleCancelEdit} />
           {(() => {
             const isCompleted = editingGroup.status === "completed"
+            const knownInstructorMap = new Map(instructors.map(i => [i.id, i]))
+            for (const i of editingGroup.instructors ?? []) knownInstructorMap.set(i.id, i)
+            if (editingGroup.instructor) knownInstructorMap.set(editingGroup.instructor.id, editingGroup.instructor)
+            const formInstructors = Array.from(knownInstructorMap.values())
+            const selectedInstructorIds = groupInstructorIds(editingGroup)
             return (
           <div className="group-modal-inner" style={{ position: "relative", background: "#fff", borderRadius: 20, boxShadow: "0 24px 64px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.06)", width: "100%", maxWidth: 880, maxHeight: "94vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             {/* Accent strip */}
@@ -833,7 +1222,9 @@ export default function GroupsCrud({
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                       <div>
-                        <FieldLabel required>Statut</FieldLabel>
+                        <FieldLabel required>
+                          <LabelContent icon={<Activity style={{ width: 12, height: 12 }} />}>Statut</LabelContent>
+                        </FieldLabel>
                         <SelectField value={editingGroup.status} onChange={v => setEditingGroup({ ...editingGroup, status: v as GroupStatus })}>
                           <option value="not_started">Pas commencé</option>
                           <option value="in_progress">En cours</option>
@@ -841,9 +1232,26 @@ export default function GroupsCrud({
                         </SelectField>
                       </div>
                       <div>
-                        <FieldLabel required>Type de programme</FieldLabel>
+                        <FieldLabel required>
+                          <LabelContent icon={<GraduationCap style={{ width: 12, height: 12 }} />}>Type de programme</LabelContent>
+                        </FieldLabel>
                         <SelectField value={editingGroup.programType}
-                          onChange={v => setEditingGroup(prev => prev ? { ...prev, programType: v as "course" | "bootcamp", courseId: "", bootcampId: "" } : prev)}>
+                          onChange={v => setEditingGroup(prev => {
+                            if (!prev) return prev
+                            const programType = v as "course" | "bootcamp"
+                            const instructorIds = programType === "bootcamp" ? groupInstructorIds(prev) : groupInstructorIds(prev).slice(0, 1)
+                            const instructors = (prev.instructors ?? []).filter(i => instructorIds.includes(i.id))
+                            return {
+                              ...prev,
+                              programType,
+                              courseId: "",
+                              bootcampId: "",
+                              instructorIds,
+                              instructorId: instructorIds[0] || null,
+                              instructor: instructors[0] ?? prev.instructor ?? null,
+                              instructors,
+                            }
+                          })}>
                           <option value="course">Formation</option>
                           <option value="bootcamp">Bootcamp</option>
                         </SelectField>
@@ -877,44 +1285,53 @@ export default function GroupsCrud({
                       </div>
                     )}
                     <div>
-                      <FieldLabel>Instructeur</FieldLabel>
-                      <SelectField
-                        value={editingGroup.instructorId ?? ""}
-                        onChange={v => {
-                          const picked = instructors.find(i => i.id === v) ?? null
-                          setEditingGroup(prev => prev ? { ...prev, instructorId: v || null, instructor: picked } : prev)
-                        }}
-                      >
-                        <option value="">Aucun instructeur</option>
-                        {instructors.map(i => (
-                          <option key={i.id} value={i.id}>
-                            {[i.name, i.surname].filter(Boolean).join(" ") || i.id}
-                          </option>
-                        ))}
-                      </SelectField>
+                      <FieldLabel>{editingGroup.programType === "bootcamp" ? "Formateurs" : "Formateur"}</FieldLabel>
+                      {editingGroup.programType === "bootcamp" ? (
+                        <>
+                          <InstructorMultiSelect
+                            value={selectedInstructorIds}
+                            instructors={formInstructors}
+                            onChange={setInstructorIds}
+                          />
+                          <p style={{ margin: "7px 0 0", fontSize: 11, color: "#64748b", fontWeight: 600 }}>
+                            L'ordre défini ici pilote l'ordre des sections et ressources du groupe.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <InstructorSelect
+                            value={selectedInstructorIds[0] || ""}
+                            instructors={formInstructors}
+                            onChange={v => setInstructorIds(v ? [v] : [])}
+                          />
+                          <p style={{ margin: "7px 0 0", fontSize: 11, color: "#64748b", fontWeight: 600 }}>
+                            Les groupes liés à une formation gardent un seul formateur.
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
                 </FormCard>
 
-                {/* Ã‰tudiants */}
-                <FormCard title="Ã‰tudiants du groupe" icon={<Users style={{ width: 16, height: 16 }} />}
+                {/* Apprenants */}
+                <FormCard title="Apprenants du groupe" icon={<Users style={{ width: 16, height: 16 }} />}
                   action={<span style={{ fontSize: 12, color: "#475569", fontWeight: 600 }}>{editingGroup.studentIds.length} sélectionné{editingGroup.studentIds.length !== 1 ? "s" : ""}</span>}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     <div style={{ position: "relative" }}>
                       <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#475569" }} />
-                      <input type="text" placeholder="Rechercher un étudiant…" value={studentSearch} onChange={e => setStudentSearch(e.target.value)}
+                      <input type="text" placeholder="Rechercher un apprenant…" value={studentSearch} onChange={e => setStudentSearch(e.target.value)}
                         style={{ width: "100%", padding: "9px 12px 9px 34px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, outline: "none", boxSizing: "border-box", color: "#0f172a", fontFamily: "inherit" }}
                         onFocus={e => { e.target.style.borderColor = "var(--accent,#6366f1)"; e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.1)" }}
                         onBlur={e => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none" }}
                       />
                     </div>
-                    {filteredStudents.length === 0 ? (
+                    {orderedStudents.length === 0 ? (
                       <div style={{ padding: "16px", borderRadius: 10, border: "1px dashed #e2e8f0", background: "#f8fafc", textAlign: "center", fontSize: 12, color: "#475569" }}>
-                        Aucun étudiant trouvé.
+                        Aucun apprenant trouvé.
                       </div>
                     ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto" }}>
-                        {filteredStudents.map(s => {
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 380, overflowY: "auto" }}>
+                        {orderedStudents.map(s => {
                           const active = editingGroup.studentIds.includes(s.id)
                           return (
                             <div key={s.id} onClick={() => toggleStudent(s.id)}
@@ -925,6 +1342,7 @@ export default function GroupsCrud({
                               <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${active ? "var(--accent,#6366f1)" : "#cbd5e1"}`, background: active ? "var(--accent,#6366f1)" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.12s" }}>
                                 {active && <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                               </div>
+                              <StudentAvatar student={s} />
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{studentDisplayName(s)}</div>
                                 <div style={{ fontSize: 11, color: "#475569" }}>{s.email || s.username || s.id}</div>
@@ -937,115 +1355,64 @@ export default function GroupsCrud({
                   </div>
                 </FormCard>
 
-                {/* Accès au contenu — always shown for completed groups (all unlocked, read-only) */}
-                {(curriculum || loadingCurriculum) && (
-                  <FormCard title="Accès au contenu" icon={<Lock style={{ width: 16, height: 16 }} />}>
-                    {loadingCurriculum ? (
-                      <div style={{ padding: "32px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-                        <Loader2 style={{ width: 22, height: 22, color: "#a5b4fc", animation: "spin 1s linear infinite" }} />
-                        <span style={{ fontSize: 13, color: "#475569" }}>Chargement du programme…</span>
+                {/* Séances hebdomadaires */}
+                <FormCard
+                  title="Séances hebdomadaires"
+                  icon={<Calendar style={{ width: 16, height: 16 }} />}
+                  action={<span style={{ fontSize: 12, color: "#475569", fontWeight: 700 }}>{editingGroup.schedules?.length ?? 0} / semaine</span>}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div>
+                        <FieldLabel>Date de début</FieldLabel>
+                        <input
+                          type="date"
+                          value={editingGroup.schedule_start_date ?? ""}
+                          onChange={e => setEditingGroup({ ...editingGroup, schedule_start_date: e.target.value || null })}
+                          style={{ width: "100%", height: 40, padding: "8px 12px", background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, color: "#0f172a", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+                        />
                       </div>
-                    ) : curriculum && (
+                      <div>
+                        <FieldLabel>Date de fin</FieldLabel>
+                        <input
+                          type="date"
+                          value={editingGroup.schedule_end_date ?? ""}
+                          onChange={e => setEditingGroup({ ...editingGroup, schedule_end_date: e.target.value || null })}
+                          style={{ width: "100%", height: 40, padding: "8px 12px", background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, color: "#0f172a", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+                        />
+                      </div>
+                    </div>
+
+                    {(editingGroup.schedules ?? []).length === 0 ? (
+                      <div style={{ padding: "16px", borderRadius: 12, border: "1px dashed #e2e8f0", background: "#f8fafc", textAlign: "center" }}>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#475569" }}>Aucune séance définie</p>
+                        <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>Ajoutez une séance pour générer le planning automatiquement.</p>
+                      </div>
+                    ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        {(curriculum.courses?.length ? curriculum.courses : [{ id: "default_course", title: "" }]).map(course => {
-                          const mods = curriculum.courses?.length
-                            ? curriculum.modules.filter(m => m.courseId === course.id)
-                            : curriculum.modules
-                          if (mods.length === 0) return null
-                          return (
-                            <div key={course.id || "default"}>
-                              {course.title && (
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                                  <BookOpen style={{ width: 13, height: 13, color: "#475569", flexShrink: 0 }} />
-                                  <span style={{ fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em" }}>{course.title}</span>
-                                </div>
-                              )}
-                              {mods.map(mod => {
-                                const lessons = curriculum.lessons.filter((l: any) => l.moduleId === mod.id)
-                                const modUnlocked = lessons.length > 0 && lessons.some((l: any) => getIsUnlocked(l.id, "lesson"))
-                                return (
-                                  <div key={mod.id} style={{ borderRadius: 12, border: "1px solid #e8ecf3", overflow: "hidden", marginBottom: 6 }}>
-                                    {/* Module row */}
-                                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: modUnlocked ? "rgba(34,197,94,0.04)" : "#fafbfd", borderBottom: lessons.length > 0 ? "1px solid #f1f5f9" : "none" }}>
-                                      <div style={{ width: 28, height: 28, borderRadius: 8, background: modUnlocked ? "rgba(34,197,94,0.1)" : "rgba(244,63,94,0.08)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                        {modUnlocked
-                                          ? <Unlock style={{ width: 13, height: 13, color: "#22c55e" }} />
-                                          : <Lock    style={{ width: 13, height: 13, color: "#f43f5e" }} />}
-                                      </div>
-                                      <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{mod.title}</span>
-                                      {lessons.length > 0 && <span style={{ fontSize: 11, color: "#475569" }}>{lessons.length} leçon{lessons.length !== 1 ? "s" : ""}</span>}
-                                    </div>
-                                    {/* Lessons */}
-                                    {lessons.length > 0 && (
-                                      <div style={{ background: "#fff" }}>
-                                        {lessons.map((lesson: any, li: number) => {
-                                          const lessonUnlocked = getIsUnlocked(lesson.id, "lesson")
-                                          return (
-                                            <div key={lesson.id}
-                                              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 16px 9px 52px", borderBottom: li < lessons.length - 1 ? "1px solid #f8fafc" : "none", transition: "background 0.1s" }}
-                                              onMouseEnter={e => (e.currentTarget.style.background = "#fafbfd")}
-                                              onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
-                                            >
-                                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                                <div style={{ width: 6, height: 6, borderRadius: "50%", background: lessonUnlocked ? "#22c55e" : "#f43f5e", flexShrink: 0 }} />
-                                                <span style={{ fontSize: 13, color: "#475569" }}>{lesson.title}</span>
-                                              </div>
-                                              {readOnly ? (
-                                                <span
-                                                  style={{
-                                                    padding: "3px 12px",
-                                                    borderRadius: 20,
-                                                    border: `1.5px solid ${lessonUnlocked ? "rgba(34,197,94,0.25)" : "rgba(244,63,94,0.2)"}`,
-                                                    fontSize: 11,
-                                                    fontWeight: 700,
-                                                    color: lessonUnlocked ? "#16a34a" : "#f43f5e",
-                                                    whiteSpace: "nowrap",
-                                                  }}
-                                                >
-                                                  {lessonUnlocked ? "Déverrouillé" : "Verrouillé"}
-                                                </span>
-                                              ) : (
-                                                <button onClick={() => toggleLockState(lesson.id, "lesson")}
-                                                  style={{ padding: "3px 12px", borderRadius: 20, border: `1.5px solid ${lessonUnlocked ? "rgba(34,197,94,0.25)" : "rgba(244,63,94,0.2)"}`, background: "transparent", cursor: "pointer", fontSize: 11, fontWeight: 700, color: lessonUnlocked ? "#16a34a" : "#f43f5e", transition: "all 0.15s", whiteSpace: "nowrap" }}
-                                                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = lessonUnlocked ? "rgba(34,197,94,0.08)" : "rgba(244,63,94,0.06)" }}
-                                                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent" }}
-                                                >
-                                                  {lessonUnlocked ? "Déverrouillé" : "Verrouillé"}
-                                                </button>
-                                              )}
-                                            </div>
-                                          )
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )
-                        })}
+                        {(editingGroup.schedules ?? []).map((slot, index) => (
+                          <ScheduleSlotRow
+                            key={`${index}-${slot.day}-${slot.start_time}`}
+                            slot={slot}
+                            index={index}
+                            onChange={handleChangeScheduleSlot}
+                            onRemove={handleRemoveScheduleSlot}
+                          />
+                        ))}
                       </div>
                     )}
-                  </FormCard>
-                )}
 
-                </div>{/* end read-only wrapper */}
-
-                {/* Résumé */}
-                <FormCard title="Résumé" icon={<Layers style={{ width: 16, height: 16 }} />}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                    {[
-                      { label: "Programme",  value: programLabel(editingGroup) },
-                      { label: "Statut",     value: STATUS_META[editingGroup.status].label },
-                      { label: "Ã‰tudiants",  value: String(editingGroup.studentIds.length) },
-                    ].map(({ label, value }) => (
-                      <div key={label} style={{ background: "#f8fafc", borderRadius: 12, padding: "14px 16px", border: "1px solid #e8ecf3" }}>
-                        <div style={{ fontSize: 11, color: "#475569", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{value}</div>
-                      </div>
-                    ))}
+                    <button
+                      type="button"
+                      onClick={handleAddScheduleSlot}
+                      style={{ width: "100%", padding: "11px 14px", borderRadius: 12, border: "1.5px dashed #cbd5e1", background: "#fff", color: "var(--accent,#6366f1)", fontSize: 13, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                    >
+                      <Plus style={{ width: 14, height: 14 }} /> Ajouter une séance
+                    </button>
                   </div>
                 </FormCard>
+
+                </div>{/* end read-only wrapper */}
 
               </div>
             </div>

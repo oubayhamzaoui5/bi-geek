@@ -7,6 +7,8 @@ import {
   X, Save, Trash2, Clock, Users, AlertCircle,
   Plus, Check, Loader2,
 } from "lucide-react"
+import LoadingBI from "@/components/LoadingBI"
+import { getAgendaHourRange } from "./timeRange"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -46,9 +48,7 @@ const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
 const MONTHS_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
 
-const HOUR_START = 7
-const HOUR_END = 22
-const SLOT_HEIGHT = 64
+const SLOT_HEIGHT = 44
 
 const GROUP_COLORS = [
   "#2563EB", "#F59E0B", "#16A34A", "#8B5CF6",
@@ -96,6 +96,10 @@ function parseTime(time: string): number {
 
 function formatTime(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
+}
+
+function sessionEndAt(session: { date: string; start_time: string; duration: number }): number {
+  return new Date(`${session.date}T${session.start_time || "09:00"}:00`).getTime() + Math.max(session.duration, 1) * 60_000
 }
 
 function formatDuration(minutes: number): string {
@@ -169,7 +173,7 @@ function SessionPanel({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [updateMode, setUpdateMode] = useState<"single" | "all_following">("single")
-  const isPast = session.date < toYMD(new Date())
+  const isPast = sessionEndAt(session) < Date.now()
 
   const group = groups.find(g => g.id === draft.group)
   const dateFmt = (() => {
@@ -209,7 +213,7 @@ function SessionPanel({
             </div>
             <div>
               <p className="text-[13px] font-semibold text-gray-900">
-                {draft.title || group?.title || "Session"}
+                {draft.title || group?.title || "Séance"}
               </p>
               <p className="text-[11px] text-gray-600 capitalize">{dateFmt}</p>
             </div>
@@ -236,7 +240,7 @@ function SessionPanel({
           {isPast && !readOnly && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-100">
               <AlertCircle size={14} className="text-amber-500 shrink-0" />
-              <span className="text-[12px] text-amber-700 font-medium">Session passée – non modifiable</span>
+              <span className="text-[12px] text-amber-700 font-medium">Séance passée – non modifiable</span>
             </div>
           )}
 
@@ -244,7 +248,7 @@ function SessionPanel({
           {draft.is_cancelled && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-100">
               <AlertCircle size={14} className="text-red-500 shrink-0" />
-              <span className="text-[12px] text-red-600 font-medium">Session annulée</span>
+              <span className="text-[12px] text-red-600 font-medium">Séance annulée</span>
             </div>
           )}
 
@@ -288,7 +292,7 @@ function SessionPanel({
           {!readOnly && (
             <div className="flex items-center justify-between py-3 px-3 rounded-lg bg-gray-50 border border-gray-100">
               <div>
-                <p className="text-[12px] font-semibold text-gray-700">Annuler la session</p>
+                <p className="text-[12px] font-semibold text-gray-700">Annuler la séance</p>
                 <p className="text-[11px] text-gray-600">Marquer comme annulée</p>
               </div>
               <button
@@ -327,7 +331,7 @@ function SessionPanel({
                 className={`flex-1 h-7 rounded-md text-[11px] font-medium transition-all
                   ${updateMode === "single" ? "bg-white text-gray-800 shadow-sm" : "text-gray-600 hover:text-gray-700"}`}
               >
-                Cette session
+                Cette séance
               </button>
               <button
                 onClick={() => setUpdateMode("all_following")}
@@ -537,7 +541,7 @@ function WeekGrid({
 }) {
   const today = toYMD(new Date())
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
-  const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i)
+  const { startHour, endHour, hours } = getAgendaHourRange(sessions, { defaultStartHour: 7, defaultEndHour: 22 })
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
   const hoverExitRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -558,7 +562,7 @@ function WeekGrid({
   function pos(s: Session) {
     const startMin = parseTime(s.start_time)
     return {
-      top: ((startMin - HOUR_START * 60) / 60) * SLOT_HEIGHT,
+      top: ((startMin - startHour * 60) / 60) * SLOT_HEIGHT,
       height: Math.max((s.duration / 60) * SLOT_HEIGHT, 24),
     }
   }
@@ -570,9 +574,9 @@ function WeekGrid({
         {days.map((d, i) => {
           const isToday = toYMD(d) === today
           return (
-            <div key={i} className="flex-1 min-w-0 flex flex-col items-center py-2.5 gap-0.5 border-r border-gray-100 last:border-r-0">
+            <div key={i} className="flex-1 min-w-0 flex flex-col items-center py-1 gap-0 border-r border-gray-100 last:border-r-0">
               <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">{DAYS_FR[i]}</span>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[14px] font-bold transition-colors
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-bold transition-colors
                 ${isToday ? "bg-violet-600 text-white" : "text-gray-700"}`}>
                 {d.getDate()}
               </div>
@@ -581,11 +585,11 @@ function WeekGrid({
         })}
       </div>
       <div className="flex-1 overflow-y-auto">
-        <div className="flex" style={{ minHeight: `${(HOUR_END - HOUR_START) * SLOT_HEIGHT}px` }}>
+        <div className="flex" style={{ minHeight: `${(endHour - startHour) * SLOT_HEIGHT}px` }}>
           <div className="w-16 shrink-0 border-r border-gray-100 relative">
             {hours.map(h => (
               <div key={h} className="absolute right-2 text-[10px] text-gray-600 font-medium leading-none"
-                style={{ top: (h - HOUR_START) * SLOT_HEIGHT - 6 }}>
+                style={{ top: (h - startHour) * SLOT_HEIGHT - 6 }}>
                 {String(h).padStart(2, "0")}:00
               </div>
             ))}
@@ -595,10 +599,10 @@ function WeekGrid({
             return (
               <div key={di} className="flex-1 min-w-0 relative border-r border-gray-100 last:border-r-0">
                 {hours.map(h => (
-                  <div key={h} className="absolute left-0 right-0 border-t border-gray-100" style={{ top: (h - HOUR_START) * SLOT_HEIGHT }} />
+                  <div key={h} className="absolute left-0 right-0 border-t border-gray-100" style={{ top: (h - startHour) * SLOT_HEIGHT }} />
                 ))}
                 {hours.map(h => (
-                  <div key={`h-${h}`} className="absolute left-0 right-0 border-t border-gray-50" style={{ top: (h - HOUR_START) * SLOT_HEIGHT + SLOT_HEIGHT / 2 }} />
+                  <div key={`h-${h}`} className="absolute left-0 right-0 border-t border-gray-50" style={{ top: (h - startHour) * SLOT_HEIGHT + SLOT_HEIGHT / 2 }} />
                 ))}
                 {(() => {
                   const colMap = computeColumns(daySessions)
@@ -766,8 +770,8 @@ function ListView({
   onSessionClick: (s: Session) => void
   groupColorMap: Map<string, string>
 }) {
-  const todayYMD = toYMD(new Date())
-  const upcomingSessions = sessions.filter(s => s.date >= todayYMD)
+  const now = Date.now()
+  const upcomingSessions = sessions.filter(s => sessionEndAt(s) >= now)
   const grouped: Record<string, Session[]> = {}
   for (const s of upcomingSessions) {
     if (!grouped[s.date]) grouped[s.date] = []
@@ -780,7 +784,7 @@ function ListView({
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <Calendar size={40} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-[13px] text-gray-600">Aucune session à venir</p>
+          <p className="text-[13px] text-gray-600">Aucune séance à venir</p>
         </div>
       </div>
     )
@@ -791,7 +795,7 @@ function ListView({
       {sortedDates.map(date => {
         const d = new Date(date + "T12:00:00")
         const dayLabel = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
-        const isToday = date === todayYMD
+        const isToday = date === toYMD(new Date())
         return (
           <div key={date}>
             <div className="flex items-center gap-2 mb-2">
@@ -1069,7 +1073,7 @@ export function AgendaView({ readOnly = false, instructorId, studentId }: Agenda
           return [...filtered, ...updatedSessions].sort((a, b) => a.date !== b.date ? (a.date < b.date ? -1 : 1) : (a.start_time || "").localeCompare(b.start_time || ""))
         })
       }
-      push("ok", "Session enregistrée")
+      push("ok", "Séance enregistrée")
       setSelectedSession(null)
     } catch (err: any) {
       push("err", err?.message || "Erreur lors de la sauvegarde")
@@ -1094,7 +1098,7 @@ export function AgendaView({ readOnly = false, instructorId, studentId }: Agenda
         }
         return filtered
       })
-      push("ok", "Session supprimée")
+      push("ok", "Séance supprimée")
       setSelectedSession(null)
     } catch {
       push("err", "Erreur lors de la suppression")
@@ -1163,6 +1167,14 @@ export function AgendaView({ readOnly = false, instructorId, studentId }: Agenda
   const groupColorMap = new Map(groups.map((g, idx) => [g.id, GROUP_COLORS[idx % GROUP_COLORS.length]]))
   const groupColor = (id: string) => groupColorMap.get(id) ?? "#475569"
 
+  if (loading && sessions.length === 0) {
+    return (
+      <div className="dashboard-agenda-view flex flex-1 overflow-hidden">
+        <LoadingBI fullScreen={false} />
+      </div>
+    )
+  }
+
   return (
     <div className="dashboard-agenda-view flex flex-1 overflow-hidden">
       {/* Toolbar */}
@@ -1171,28 +1183,28 @@ export function AgendaView({ readOnly = false, instructorId, studentId }: Agenda
       {/* Full layout wrapper */}
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Toolbar */}
-        <div className="flex items-center gap-3 px-6 py-3 border-b border-gray-100 bg-white shrink-0">
+        <div className="flex items-center gap-2 px-4 py-1.5 border-b border-gray-100 bg-white shrink-0">
           {view !== "list" && (
             <>
               <div className="flex items-center gap-1">
                 <button onClick={prevPeriod}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">
                   <ChevronLeft size={16} />
                 </button>
                 <button onClick={nextPeriod}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">
                   <ChevronRight size={16} />
                 </button>
               </div>
               <button onClick={goToday}
-                className="h-8 px-3 rounded-lg text-[12px] font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">
+                className="h-7 px-2.5 rounded-lg text-[11px] font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">
                 Aujourd'hui
               </button>
-              <span className="text-[14px] font-semibold text-gray-800 capitalize ml-1">{periodLabel()}</span>
+              <span className="text-[13px] font-semibold text-gray-800 capitalize ml-1">{periodLabel()}</span>
             </>
           )}
           {view === "list" && (
-            <span className="text-[14px] font-semibold text-gray-800">Toutes les sessions</span>
+            <span className="text-[13px] font-semibold text-gray-800">Toutes les séances</span>
           )}
           {loading && <Loader2 size={14} className="text-gray-400 animate-spin ml-1" />}
           <div className="ml-auto flex items-center gap-1 bg-gray-100 rounded-lg p-1">

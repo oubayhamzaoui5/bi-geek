@@ -255,18 +255,6 @@ export default function PDFViewerCanvas({ url, name, breadcrumbs, attachmentId }
   }, [loading, error, numPages, scale, chatOpen])
 
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent("pdf-ai-tutor-toggle", {
-      detail: { open: chatOpen },
-    }))
-
-    return () => {
-      window.dispatchEvent(new CustomEvent("pdf-ai-tutor-toggle", {
-        detail: { open: false },
-      }))
-    }
-  }, [chatOpen])
-
-  useEffect(() => {
     const doc = pdfRef.current
     const scrollEl = scrollRef.current
     if (!doc || !scrollEl || loading || error || numPages === 0) return

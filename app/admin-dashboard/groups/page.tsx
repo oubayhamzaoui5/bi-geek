@@ -18,7 +18,7 @@ export default function AdminGroupsPage() {
       const start = Date.now()
       try {
         await fetch("/api/admin/migrate", { cache: "no-store" }).catch(() => null)
-        const res = await fetch("/api/admin/groups")
+        const res = await fetch("/api/admin/groups", { cache: "no-store" })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error)
         setGroups(data.groups || [])
@@ -55,6 +55,7 @@ export default function AdminGroupsPage() {
         ? prev.map(g => (g.id === updated.id ? updated : g))
         : [...prev, updated]
     )
+    return updated
   }
 
   async function handleDelete(id: string) {

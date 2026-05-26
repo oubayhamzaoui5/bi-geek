@@ -14,8 +14,11 @@ export default function AdminCoursesPage() {
       const start = Date.now()
 
       try {
-        // Ensure schema migrations are applied (adds `archived` field if missing)
-        await fetch("/api/admin/migrate", { method: "POST" })
+        const migrateRes = await fetch("/api/admin/migrate", { method: "POST" })
+        if (!migrateRes.ok) {
+          const migrateData = await migrateRes.json().catch(() => ({}))
+          console.error("Migration failed:", migrateData?.error)
+        }
 
         const res = await fetch("/api/admin/courses")
         const data = await res.json()
@@ -36,108 +39,90 @@ export default function AdminCoursesPage() {
 
   // ---------------- POST / UPDATE (FormData) ----------------
   async function handleSave(course: any) {
-  const formData = new FormData()
+    const formData = new FormData()
 
-  // primitive fields
-  if (course.id) formData.append("id", course.id)
-  formData.append("title", course.title)
-  formData.append("shortDescription", course.shortDescription)
-  formData.append(
-    "longDescription",
-    course.longDescription || course.shortDescription,
-  )
-  formData.append("durationLabel", course.durationLabel)
-  formData.append("prerequis", course.prerequis)
+    if (course.id) formData.append("id", course.id)
+    formData.append("title", course.title)
+    formData.append("shortDescription", course.shortDescription)
+    formData.append("longDescription", course.longDescription || course.shortDescription)
+    formData.append("durationLabel", course.durationLabel)
+    formData.append("prerequis", course.prerequis)
+    formData.append("certificate", String(course.certificate ?? true))
+    formData.append("rating", String(course.rating ?? 4.8))
+    formData.append("reviewsCount", String(course.reviewsCount ?? 0))
 
-  formData.append("certificate", String(course.certificate ?? true))
-  formData.append("rating", String(course.rating ?? 4.8))
-  formData.append("reviewsCount", String(course.reviewsCount ?? 0))
-
-  // JSON fields
-  formData.append(
-    "certifications",
-    JSON.stringify(course.certifications ?? []),
-  )
-  formData.append(
-    "whatYouWillLearn",
-    JSON.stringify(course.whatYouWillLearn ?? []),
-  )
-  formData.append("tags", JSON.stringify(course.tags ?? []))
-  const modulesPayload = (course.modules ?? []).map((m: any) => ({
-    id: m.id,
-    title: m.title,
-    durationLabel: m.durationLabel,
-    order: m.order,
-    locked: !!m.locked,
-    lessons: (m.lessons ?? []).map((l: any) => ({
-      id: l.id,
-      title: l.title,
-      durationLabel: l.durationLabel,
-      order: l.order,
-      locked: !!l.locked,
-      attachmentsMeta: l.attachmentsMeta ?? [],
-      youtubeLinks: (l.youtubeLinks ?? []).filter((link: any) => link.url?.trim()),
-    })),
-  }))
-
-  // cover image (File)
-  if (course.coverImage instanceof File) {
-    formData.append("coverImage", course.coverImage)
-  }
-  formData.set("modules", JSON.stringify(modulesPayload))
-
-  // lesson attachments (Files) and keep-list (existing filenames to retain)
-  for (let mi = 0; mi < (course.modules ?? []).length; mi++) {
-    const module = course.modules[mi]
-    for (let li = 0; li < (module.lessons ?? []).length; li++) {
-      const lesson = module.lessons[li]
-      const attachments = Array.isArray(lesson.attachments) ? lesson.attachments : []
-      for (const f of attachments) {
-        if (f instanceof File) {
-          formData.append(`lessonAttachments-${mi}-${li}`, f)
-        } else if (typeof f === "string" && f) {
-          formData.append(`lessonAttachmentsKeep-${mi}-${li}`, f)
-        }
+    const certificationsPayload = (course.certifications ?? []).map((cert: any, index: number) => {
+      if (cert.imageFile instanceof File) {
+        formData.append(`certificationImage_${index}`, cert.imageFile)
       }
+      return {
+        id: cert.id,
+        title: cert.title,
+        issuer: cert.issuer,
+        description: cert.description,
+        image: cert.image,
+      }
+    })
+
+    formData.append("certifications", JSON.stringify(certificationsPayload))
+    formData.append("whatYouWillLearn", JSON.stringify(course.whatYouWillLearn ?? []))
+    formData.append("tags", JSON.stringify(course.tags ?? []))
+
+    const modulesPayload = (course.modules ?? []).map((m: any) => ({
+      id: m.id,
+      title: m.title,
+      durationLabel: m.durationLabel,
+      order: m.order,
+      locked: !!m.locked,
+      lessons: (m.lessons ?? []).map((l: any) => ({
+        id: l.id,
+        title: l.title,
+        durationLabel: l.durationLabel,
+        order: l.order,
+        locked: !!l.locked,
+      })),
+    }))
+
+    if (course.coverImage instanceof File) {
+      formData.append("coverImage", course.coverImage)
     }
+    formData.set("modules", JSON.stringify(modulesPayload))
+
+    const res = await fetch("/api/admin/courses", { method: "POST", body: formData })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error)
+
+    const updatedCourse = {
+      ...data.course,
+      modules: data.course.modules ?? course.modules ?? [],
+    }
+
+    setCourses(prev =>
+      prev.some(c => c.id === updatedCourse.id)
+        ? prev.map(c => (c.id === updatedCourse.id ? updatedCourse : c))
+        : [...prev, updatedCourse],
+    )
+
+    return updatedCourse
   }
 
-  const res = await fetch("/api/admin/courses", {
-    method: "POST",
-    body: formData,
-  })
-
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error)
-
-  const updatedCourse = {
-    ...data.course,
-    modules: data.course.modules ?? course.modules ?? [],
-  }
-
-  setCourses(prev =>
-    prev.some(c => c.id === updatedCourse.id)
-      ? prev.map(c => (c.id === updatedCourse.id ? updatedCourse : c))
-      : [...prev, updatedCourse],
-  )
-
-  return updatedCourse
-}
-
-
-  // ---------------- DELETE ----------------
+  // ---------------- ARCHIVE (soft) ----------------
   async function handleDelete(id: string) {
-    const res = await fetch(`/api/admin/courses/${id}`, { method: "DELETE" })
+    const res = await fetch(`/api/admin/courses/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "archive" }),
+    })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      throw new Error(data?.error || "Erreur lors de l'archivage")
-    }
+    if (!res.ok) throw new Error(data?.error || "Erreur lors de l'archivage")
     setCourses(prev => prev.filter(c => c.id !== id))
   }
 
   // ---------------- VIEW ----------------
-  function handleView(id: string) {
-    window.open(`/courses/${id}`, "_blank")
+  function handleView(course: any) {
+    const slug = course.slug
+    if (!slug) return
+    window.open(`/formation/${encodeURIComponent(slug)}`, "_blank")
   }
 
   if (loading) {
@@ -145,13 +130,11 @@ export default function AdminCoursesPage() {
   }
 
   return (
-    <>
-      <CoursesCrud
-        initialCourses={courses}
-        onSave={handleSave}
-        onDelete={handleDelete}
-        onView={handleView}
-      />
-    </>
+    <CoursesCrud
+      initialCourses={courses}
+      onSave={handleSave}
+      onDelete={handleDelete}
+      onView={handleView}
+    />
   )
 }

@@ -21,7 +21,15 @@ export function Sidebar({ variant = "student", compact = false }: { variant?: "s
   const [userName, setUserName] = useState("")
   const [userInitials, setUserInitials] = useState("U")
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
-  const [currentUserRole, setCurrentUserRole] = useState<string>("")
+  const [currentUserRole, setCurrentUserRole] = useState<string>(() => {
+    if (typeof window === "undefined") return ""
+    try {
+      const user = JSON.parse(localStorage.getItem("user") ?? "null")
+      return user?.role ?? ""
+    } catch {
+      return ""
+    }
+  })
   const railAvatarStyle = {
     width: 28,
     height: 28,
@@ -51,7 +59,7 @@ export function Sidebar({ variant = "student", compact = false }: { variant?: "s
     try {
       const raw = localStorage.getItem("user")
       const user = raw ? JSON.parse(raw) : null
-      const fallback = variant === "admin" ? "Admin" : variant === "instructor" ? "Formateur" : "Étudiant"
+      const fallback = variant === "admin" ? "Admin" : variant === "instructor" ? "Formateur" : "Apprenant"
       const name =
         user?.username?.trim() ||
         user?.email?.split("@")?.[0]?.trim() ||
@@ -82,13 +90,13 @@ export function Sidebar({ variant = "student", compact = false }: { variant?: "s
           .catch(() => {})
       }
     } catch {
-      setUserName(variant === "admin" ? "Admin" : variant === "instructor" ? "Formateur" : "Étudiant")
+      setUserName(variant === "admin" ? "Admin" : variant === "instructor" ? "Formateur" : "Apprenant")
       setUserInitials("U")
       setUserAvatar(null)
     }
   }, [variant])
 
-  const adminLinks = [
+  const adminAgentLinks = [
     { icon: Home, label: "Accueil", href: "/admin-dashboard/overview" },
     { icon: BookOpen, label: "Formations", href: "/admin-dashboard/courses" },
     { icon: Layers, label: "Bootcamps", href: "/admin-dashboard/bootcamps" },
@@ -98,6 +106,10 @@ export function Sidebar({ variant = "student", compact = false }: { variant?: "s
     { icon: ClipboardList, label: "Inscriptions", href: "/admin-dashboard/enrollments" },
     { icon: Star, label: "Vedettes", href: "/admin-dashboard/featured" },
     { icon: Settings, label: "Paramètres", href: "/admin-dashboard/settings" },
+  ]
+
+  const adminLinks = [
+    { icon: Users, label: "Utilisateurs", href: "/admin-dashboard/users" },
   ]
 
   const instructorLinks = [
@@ -114,7 +126,7 @@ export function Sidebar({ variant = "student", compact = false }: { variant?: "s
     { icon: Settings, label: "Paramètres", href: "/student-dashboard/settings" },
   ]
 
-  const primaryLinks = variant === "admin" ? adminLinks : variant === "instructor" ? instructorLinks : studentLinks
+  const primaryLinks = variant === "admin" ? (currentUserRole === "admin" ? adminLinks : adminAgentLinks) : variant === "instructor" ? instructorLinks : studentLinks
 
   const isActivePath = (href: string) => {
     if (href === "/student-dashboard/overview") {
@@ -166,11 +178,13 @@ export function Sidebar({ variant = "student", compact = false }: { variant?: "s
               <span className="font-display text-2xl font-bold text-accent tracking-tight leading-none">BI</span>
             </div>
             <span
-              className="ml-1 font-display text-2xl font-bold text-gray-900 tracking-tight leading-[1.15] pb-[2px] whitespace-nowrap overflow-hidden
+              className="ml-1 inline-flex overflow-visible
                 max-w-0 group-hover:max-w-[160px] opacity-0 group-hover:opacity-100
                 transition-all duration-200"
             >
-              geek
+              <span className="font-display text-2xl font-bold text-gray-900 tracking-tight leading-none whitespace-nowrap overflow-visible">
+                GEEK
+              </span>
             </span>
           </Link>
 
@@ -236,7 +250,7 @@ export function Sidebar({ variant = "student", compact = false }: { variant?: "s
                   opacity-0 group-hover:opacity-100 transition-all duration-200 min-w-0"
               >
                 <p className="text-[12px] font-semibold text-gray-800 truncate leading-tight">{userName}</p>
-                <p className="text-[10px] text-gray-400 capitalize leading-tight">{isInstructor ? "formateur" : isAdmin ? (currentUserRole === "admin_agent" ? "admin agent" : "admin") : "etudiant"}</p>
+                <p className="text-[10px] text-gray-400 capitalize leading-tight">{isInstructor ? "formateur" : isAdmin ? (currentUserRole === "admin_agent" ? "agent administratif" : "admin") : "apprenant"}</p>
               </div>
             </Link>
             {/* Logout */}
@@ -267,8 +281,8 @@ export function Sidebar({ variant = "student", compact = false }: { variant?: "s
                   <div className="flex items-center justify-center flex-shrink-0">
                     <span className="font-display text-2xl font-bold text-accent tracking-tight leading-none">BI</span>
                   </div>
-                  <span className="ml-1 font-display text-2xl font-bold text-gray-900 tracking-tight">
-                    geek
+                  <span className="ml-1 font-display text-2xl font-bold text-gray-900 tracking-tight leading-none">
+                    GEEK
                   </span>
                 </div>
               </div>

@@ -27,7 +27,7 @@ export async function GET(
     const pb = await getAdminPb()
 
     const session = await pb.collection("sessions").getOne(id, { expand: "group" }).catch(() => null)
-    if (!session) return NextResponse.json({ error: "Session introuvable." }, { status: 404 })
+    if (!session) return NextResponse.json({ error: "Séance introuvable." }, { status: 404 })
     if (!isStudentInGroup(session.expand?.group, studentId)) {
       return NextResponse.json({ error: "Permission refusee." }, { status: 403 })
     }
@@ -74,7 +74,7 @@ export async function POST(
 
     const pb = await getAdminPb()
     const session = await pb.collection("sessions").getOne(id, { expand: "group" }).catch(() => null)
-    if (!session) return NextResponse.json({ error: "Session introuvable." }, { status: 404 })
+    if (!session) return NextResponse.json({ error: "Séance introuvable." }, { status: 404 })
     if (!isStudentInGroup(session.expand?.group, studentId)) {
       return NextResponse.json({ error: "Permission refusee." }, { status: 403 })
     }

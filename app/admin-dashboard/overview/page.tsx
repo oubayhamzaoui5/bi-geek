@@ -91,6 +91,16 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })
 }
 
+function toYMD(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date)
+  d.setDate(d.getDate() + days)
+  return d
+}
+
 function userInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   return parts.slice(0, 2).map(part => part[0]?.toUpperCase()).join("") || "U"
@@ -131,12 +141,13 @@ function SectionCard({ title, icon: Icon, href, hrefLabel, children }: {
 }
 
 function KpiCard({ icon: Icon, label, value, href, iconBg, iconColor, badge, badgeColor, badgeBg, sublabel, dot }: {
-  icon: React.ElementType; label: string; value: number | string; href: string
+  icon: React.ElementType; label: string; value: number | string | null | undefined; href: string
   iconBg: string; iconColor: string
   badge?: string; badgeColor?: string; badgeBg?: string
   sublabel?: string; dot?: string
 }) {
   const [hover, setHover] = useState(false)
+  const displayValue = value ?? 0
   return (
     <Link href={href} style={{ textDecoration: "none" }}>
       <div
@@ -169,7 +180,7 @@ function KpiCard({ icon: Icon, label, value, href, iconBg, iconColor, badge, bad
         {/* Bottom: label then number */}
         <p style={{ fontSize: 10, fontWeight: 700, color: "#475569", margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</p>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-          <p style={{ fontSize: 26, fontWeight: 700, color: "#0f172a", margin: 0, lineHeight: 1, fontFamily: "var(--ff-display,'DM Sans')" }}>{value}</p>
+          <p style={{ fontSize: 26, fontWeight: 700, color: "#0f172a", margin: 0, lineHeight: 1, fontFamily: "var(--ff-display,'DM Sans')" }}>{displayValue}</p>
           {sublabel && <span style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>{sublabel}</span>}
         </div>
       </div>
@@ -225,8 +236,9 @@ export default function AdminOverviewPage() {
 
     async function load() {
       const start = Date.now()
-      const today = new Date().toISOString().slice(0, 10)
-      const nextWeek = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10)
+      const now = new Date()
+      const today = toYMD(now)
+      const nextWeek = toYMD(addDays(now, 14))
 
       try {
         const [usersRes, enrollmentsRes, groupsRes, sessionsRes, notificationsRes] = await Promise.all([
@@ -260,7 +272,7 @@ export default function AdminOverviewPage() {
 
         const weekAgo = Date.now() - 7 * 864e5
         const newThisWeek = allEnrollments.filter(e => new Date(e.created).getTime() >= weekAgo).length
-        const todayStr = new Date().toISOString().slice(0, 10)
+        const todayStr = toYMD(new Date())
         const todayCount = allSessions.filter(s => !s.is_cancelled && s.date === todayStr).length
 
         setRecentEnrollments(sortedEnrollments.slice(0, 10))
@@ -339,6 +351,15 @@ export default function AdminOverviewPage() {
     }
   }
 
+  const handleDismiss = async (id: string) => {
+    setNotifications(prev => prev.filter(item => item.id !== id))
+    await fetch("/api/admin/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status: "resolved" }),
+    }).catch(() => {})
+  }
+
   const hour = new Date().getHours()
   const greeting = hour < 12 ? "Bonjour" : hour < 18 ? "Bon après-midi" : "Bonsoir"
 
@@ -394,7 +415,7 @@ export default function AdminOverviewPage() {
             dot={stats.todaySessions > 0 ? "var(--accent,#6366f1)" : undefined}
           />
           <KpiCard
-            icon={Users} label="Groupes" value={stats.totalGroups}
+            icon={Users} label="Groupes actifs" value={stats.totalGroups}
             href="/admin-dashboard/groups"
             iconBg="#f8fafc" iconColor="#475569"
             badge="EN COURS" badgeBg="#e2e8f0" badgeColor="#475569"
@@ -411,7 +432,7 @@ export default function AdminOverviewPage() {
               { icon: Layers,       label: "Bootcamps",    hint: "Programmes intensifs",   href: "/admin-dashboard/bootcamps", tone: "amber"  },
               { icon: Users,        label: "Utilisateurs", hint: "Comptes et rôles",        href: "/admin-dashboard/users",     tone: "violet" },
               { icon: Users,        label: "Groupes",      hint: "Cohortes et planning",    href: "/admin-dashboard/groups",    tone: "green"  },
-              { icon: CalendarDays, label: "Agenda",       hint: "Sessions à venir",        href: "/admin-dashboard/agenda",    tone: "indigo" },
+              { icon: CalendarDays, label: "Agenda",       hint: "Séances à venir",         href: "/admin-dashboard/agenda",    tone: "indigo" },
               { icon: ClipboardList, label: "Inscription",  hint: "Sélection de la page",    href: "/admin-dashboard/enrollments", tone: "rose"   },
             ] as QuickActionItem[]).map(({ icon: Icon, label, hint, href, tone }) => {
               return (
@@ -492,14 +513,15 @@ export default function AdminOverviewPage() {
               resettingRequestId={resettingRequestId}
               resetResult={resetResult}
               onResetPassword={handleResetPassword}
+              onDismiss={handleDismiss}
             />
 
             {/* Upcoming sessions */}
-            <SectionCard title="Sessions à venir" icon={CalendarDays} href="/admin-dashboard/agenda">
+            <SectionCard title="Séances à venir" icon={CalendarDays} href="/admin-dashboard/agenda">
               {upcomingSessions.length === 0 ? (
                 <div style={{ padding: "24px 18px", textAlign: "center" }}>
                   <CalendarDays size={28} color="#e2e8f0" style={{ margin: "0 auto 8px" }} />
-                  <p style={{ fontSize: 12, color: "#475569", margin: 0 }}>Aucune session planifiée</p>
+                  <p style={{ fontSize: 12, color: "#475569", margin: 0 }}>Aucune séance planifiée</p>
                 </div>
               ) : (
                 <div style={{ padding: "8px 0" }}>
@@ -531,7 +553,7 @@ export default function AdminOverviewPage() {
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {s.title || s.groupTitle || "Session"}
+                            {s.title || s.groupTitle || "Séance"}
                           </p>
                           <p style={{ fontSize: 11, color: "#475569", margin: "1px 0 0" }}>
                             {s.start_time ? s.start_time.slice(0, 5) : "—"} · {Math.round(s.duration / 60)}h
@@ -557,11 +579,13 @@ function RealNotificationsCard({
   resettingRequestId,
   resetResult,
   onResetPassword,
+  onDismiss,
 }: {
   notifications: ResetNotification[]
   resettingRequestId: string | null
   resetResult: { requestId: string; password: string } | null
   onResetPassword: (request: ResetNotification) => void
+  onDismiss: (id: string) => void
 }) {
   return (
     <SectionCard title="Notifications" icon={Bell}>
@@ -608,22 +632,37 @@ function RealNotificationsCard({
                   {phone}
                 </p>
               </div>
-              <button
-                type="button"
-                disabled={!user || isResetting}
-                onClick={() => onResetPassword(n)}
-                style={{
-                  height: 32, padding: "0 10px", borderRadius: 8, border: "1px solid rgba(99,102,241,0.28)",
-                  background: isResetting ? "#f8fafc" : "rgba(99,102,241,0.08)",
-                  color: "var(--accent,#6366f1)", fontSize: 11, fontWeight: 800,
-                  display: "inline-flex", alignItems: "center", gap: 5,
-                  cursor: !user || isResetting ? "not-allowed" : "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <KeyRound size={12} />
-                {isResetting ? "..." : "Reset password"}
-              </button>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <button
+                  type="button"
+                  disabled={!user || isResetting}
+                  onClick={() => onResetPassword(n)}
+                  style={{
+                    height: 32, padding: "0 10px", borderRadius: 8, border: "1px solid rgba(99,102,241,0.28)",
+                    background: isResetting ? "#f8fafc" : "rgba(99,102,241,0.08)",
+                    color: "var(--accent,#6366f1)", fontSize: 11, fontWeight: 800,
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    cursor: !user || isResetting ? "not-allowed" : "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <KeyRound size={12} />
+                  {isResetting ? "..." : "Reset"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDismiss(n.id)}
+                  title="Ignorer"
+                  style={{
+                    height: 32, width: 32, borderRadius: 8, border: "1px solid #e2e8f0",
+                    background: "#f8fafc", color: "#94a3b8", fontSize: 14, fontWeight: 700,
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             </div>
           )
         })}

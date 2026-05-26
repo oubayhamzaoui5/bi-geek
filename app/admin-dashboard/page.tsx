@@ -15,13 +15,13 @@ export default function AdminPage() {
     if (!user ) {
       router.push("/login") // not logged 
     }
-    else if(user.role !== "admin"){
+    else if(user.role !== "admin" && user.role !== "admin_agent"){
             router.push("/") //or not admin
 
     }
     
      else {
-      router.push("/admin-dashboard/overview") // admin → redirect
+      router.push(user.role === "admin" ? "/admin-dashboard/users" : "/admin-dashboard/overview")
     }
   }, [router])
 

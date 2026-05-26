@@ -29,6 +29,12 @@ function formatSession(s: any): any {
   }
 }
 
+function nextDate(date: string) {
+  const d = new Date(`${date}T12:00:00`)
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
 // POST — create a new session record
 export async function POST(req: Request) {
   try {
@@ -69,7 +75,7 @@ export async function GET(req: Request) {
     const pb = await getAdminPb()
 
     const records = await pb.collection("sessions").getFullList({
-      filter: from && to ? `date >= "${from}" && date <= "${to}"` : undefined,
+      filter: from && to ? `date >= "${from}" && date < "${nextDate(to)}"` : undefined,
       sort: "date,start_time",
       expand: "group",
     })

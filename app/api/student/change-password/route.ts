@@ -26,7 +26,7 @@ function resolveAvatar(user: any, pbUrl: string) {
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}))
-    const { userId, currentPassword, newPassword, newPasswordConfirm, forceChange } = body ?? {}
+    const { userId, currentPassword, newPassword, newPasswordConfirm } = body ?? {}
 
     if (!userId || !newPassword || !newPasswordConfirm) {
       return NextResponse.json({ error: "Tous les champs sont requis." }, { status: 400 })
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
 
     const hasPassword = !!userRecord.usePassword
 
-    if (hasPassword && !forceChange) {
+    if (hasPassword) {
       // ── Scenario A: user already has a password ──
       // Verify the current password by authenticating with a fresh PB instance
       const identity = userRecord.email || userRecord.username
@@ -127,7 +127,7 @@ export async function POST(req: Request) {
     const impersonatedPb = await pb.collection("users").impersonate(userId, 60 * 60 * 24 * 7)
     const refreshedUser = impersonatedPb.authStore.record
     if (!refreshedUser) {
-      return NextResponse.json({ error: "Session introuvable apres changement du mot de passe." }, { status: 500 })
+      return NextResponse.json({ error: "Connexion introuvable après changement du mot de passe." }, { status: 500 })
     }
     const pbUrl = process.env.POCKETBASE_URL ?? process.env.NEXT_PUBLIC_PB_URL ?? "http://127.0.0.1:8090"
 

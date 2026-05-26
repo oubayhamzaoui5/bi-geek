@@ -38,7 +38,7 @@ export function FaqSection() {
           <div className="max-w-2xl">
             <SectionLabel>FAQ</SectionLabel>
             <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 md:text-4xl">
-              Questions fréquentes
+              Questions <span className="text-[#8b0f82]">fréquentes</span>
             </h2>
           </div>
           <p className="max-w-sm text-sm leading-6 text-zinc-600 md:text-right">

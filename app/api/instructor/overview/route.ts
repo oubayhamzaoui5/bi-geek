@@ -3,11 +3,57 @@ import PocketBase from "pocketbase"
 
 async function getAdminPb() {
   const pb = new PocketBase(process.env.POCKETBASE_URL)
+  pb.autoCancellation(false)
   await pb.admins.authWithPassword(
     process.env.POCKETBASE_ADMIN_EMAIL!,
     process.env.POCKETBASE_ADMIN_PASSWORD!
   )
   return pb
+}
+
+function normalizeIds(value: any): string[] {
+  if (!value) return []
+  if (Array.isArray(value)) return value.filter(Boolean).map(String)
+  return [String(value)]
+}
+
+function groupInstructorIds(group: any): string[] {
+  const ids = normalizeIds(group?.instructor)
+  return group?.programType === "bootcamp" ? ids : ids.slice(0, 1)
+}
+
+function toYMD(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+}
+
+function nextDate(date: string) {
+  const d = new Date(`${date}T12:00:00`)
+  d.setDate(d.getDate() + 1)
+  return toYMD(d)
+}
+
+async function fetchInstructorGroups(pb: PocketBase, instructorId: string) {
+  const options = { expand: "course,bootcamp" }
+  const byId = new Map<string, any>()
+  const attempts = [
+    () => pb.collection("groups").getFullList({ ...options, filter: `instructor = "${instructorId}"` }),
+    () => pb.collection("groups").getFullList({ ...options, filter: `instructor ~ "${instructorId}"` }),
+  ]
+
+  for (const attempt of attempts) {
+    try {
+      const groups = await attempt()
+      groups.forEach((g: any) => byId.set(g.id, g))
+    } catch {}
+  }
+
+  try {
+    const all = await pb.collection("groups").getFullList(options)
+    all
+      .filter((g: any) => groupInstructorIds(g).includes(instructorId))
+      .forEach((g: any) => byId.set(g.id, g))
+  } catch {}
+  return Array.from(byId.values())
 }
 
 export async function GET(req: Request) {
@@ -19,10 +65,7 @@ export async function GET(req: Request) {
     const pb = await getAdminPb()
 
     // Fetch instructor's groups
-    const groups = await pb.collection("groups").getFullList({
-      filter: `instructor = "${instructorId}"`,
-      expand: "course,bootcamp",
-    })
+    const groups = await fetchInstructorGroups(pb, instructorId)
 
     const groupIds = groups.map((g: any) => g.id)
 
@@ -35,7 +78,8 @@ export async function GET(req: Request) {
 
     // Today's date range
     const today = new Date()
-    const todayYMD = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+    const todayYMD = toYMD(today)
+    const tomorrowYMD = nextDate(todayYMD)
 
     // This week range
     const weekStart = new Date(today)
@@ -44,8 +88,8 @@ export async function GET(req: Request) {
     weekStart.setHours(0, 0, 0, 0)
     const weekEnd = new Date(weekStart)
     weekEnd.setDate(weekEnd.getDate() + 6)
-    const weekStartYMD = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}-${String(weekStart.getDate()).padStart(2, "0")}`
-    const weekEndYMD = `${weekEnd.getFullYear()}-${String(weekEnd.getMonth() + 1).padStart(2, "0")}-${String(weekEnd.getDate()).padStart(2, "0")}`
+    const weekStartYMD = toYMD(weekStart)
+    const weekEndYMD = nextDate(toYMD(weekEnd))
 
     let todaySessions = 0
     let weekSessions = 0
@@ -56,15 +100,15 @@ export async function GET(req: Request) {
 
       const [todayRes, weekRes, upcomingRes] = await Promise.allSettled([
         pb.collection("sessions").getFullList({
-          filter: `(${groupFilter}) && date = "${todayYMD}"`,
+          filter: `(${groupFilter}) && date >= "${todayYMD}" && date < "${tomorrowYMD}" && is_cancelled = false`,
           sort: "start_time",
           expand: "group",
         }),
         pb.collection("sessions").getFullList({
-          filter: `(${groupFilter}) && date >= "${weekStartYMD}" && date <= "${weekEndYMD}"`,
+          filter: `(${groupFilter}) && date >= "${weekStartYMD}" && date < "${weekEndYMD}" && is_cancelled = false`,
         }),
         pb.collection("sessions").getFullList({
-          filter: `(${groupFilter}) && date >= "${todayYMD}"`,
+          filter: `(${groupFilter}) && date >= "${todayYMD}" && is_cancelled = false`,
           sort: "date,start_time",
           expand: "group",
         }),

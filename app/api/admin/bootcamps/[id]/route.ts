@@ -26,6 +26,11 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     const { id: bootcampId } = await params
     const body = await req.json()
 
+    if (body.action === "archive") {
+      await pb.collection("bootcamps").update(bootcampId, { archived: true })
+      return NextResponse.json({ ok: true })
+    }
+
     if (body.action === "restore") {
       await pb.collection("bootcamps").update(bootcampId, { archived: false })
       return NextResponse.json({ ok: true })

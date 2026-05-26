@@ -48,7 +48,14 @@ export default function ForceChangePasswordPage() {
     if (strength < 2) { setError("Mot de passe trop faible."); return }
     setSaving(true); setError(null)
     try {
-      const res = await fetch("/api/student/change-password", {
+      const changePasswordEndpoint =
+        role === "admin" || role === "admin_agent"
+          ? "/api/admin/change-password"
+          : role === "instructor"
+            ? "/api/instructor/change-password"
+            : "/api/student/change-password"
+
+      const res = await fetch(changePasswordEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, newPassword: next, newPasswordConfirm: confirm, forceChange: true }),

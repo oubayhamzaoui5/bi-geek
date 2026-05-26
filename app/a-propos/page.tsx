@@ -105,7 +105,7 @@ export default function AboutPage() {
                 </svg>
                 Rendre l&apos;expertise tech{" "}
                 <span className="text-[#8b0f82]">accessible, concrète</span>{" "}
-                et immédiatement utile pour chaque apprenant.
+                et <span className="text-[#8b0f82]">immédiatement</span> utile pour chaque apprenant.
                 <svg aria-hidden="true" viewBox="0 0 45 36" fill="currentColor" className="ml-3 inline-block h-8 w-8 align-bottom text-[#8b0f82] md:h-10 md:w-10">
                   <path d="M13 0C6 0 0 6 0 13c0 7 5 12 12 12 1 0 2 0 3-1-1 5-5 9-10 11l3 1c8-2 14-9 14-18C22 8 18 0 13 0zm23 0c-7 0-13 6-13 13 0 7 5 12 12 12 1 0 2 0 3-1-1 5-5 9-10 11l3 1c8-2 14-9 14-18C45 8 41 0 36 0z"/>
                 </svg>

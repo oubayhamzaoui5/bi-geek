@@ -19,6 +19,12 @@ function toYMD(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
+function nextDate(date: string) {
+  const d = new Date(`${date}T12:00:00`)
+  d.setDate(d.getDate() + 1)
+  return toYMD(d)
+}
+
 // POST — generate session records for a group from its schedule+period
 // Skips dates that already have a session record for that slot.
 // Never touches past sessions that already exist.
@@ -62,7 +68,7 @@ export async function POST(req: Request) {
 
     // Fetch all existing sessions for this group in the period
     const existing = await pb.collection("sessions").getFullList({
-      filter: `group = "${groupId}" && date >= "${startDateStr}" && date <= "${endDateStr}"`,
+      filter: `group = "${groupId}" && date >= "${startDateStr}" && date < "${nextDate(endDateStr)}"`,
     })
 
     // Build a set of "date|start_time" keys for existing sessions so we never overwrite them

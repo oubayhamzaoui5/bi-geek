@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import {
   Search, Plus, Edit, Trash2, ExternalLink,
   ChevronUp, ChevronDown, Save, X,
@@ -8,7 +9,7 @@ import {
   CheckCircle, AlertCircle, Loader2,
   Layers, Clock, Award, Tag, Video, Paperclip, ChevronRight,
   Upload, FileText, Youtube, ImagePlus, Film,
-  Archive, RotateCcw
+  Archive
 } from "lucide-react"
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 
@@ -23,7 +24,16 @@ type AdminLesson = {
   attachments?: File[]; attachmentsMeta?: AttachmentMeta[]; youtubeLinks?: YoutubeLinkItem[]
 }
 type AdminModule = { id?: string; title: string; durationLabel: string; order?: number; locked?: boolean; lessons: AdminLesson[] }
-type CertificationItem = { title: string; issuer?: string; description?: string }
+type CertificationItem = {
+  id?: string
+  title: string
+  issuer?: string
+  description?: string
+  image?: string
+  imageUrl?: string | null
+  imageFile?: File | null
+  imagePreview?: string | null
+}
 type AttachmentMeta = { name: string; title?: string; description?: string; order?: number }
 type YoutubeLinkItem = { url: string; title?: string; description?: string; order?: number }
 type LessonResource = {
@@ -38,6 +48,7 @@ type LessonResource = {
 
 type AdminCourse = {
   id?: string; title: string; shortDescription: string; longDescription: string
+  slug?: string
   durationLabel: string; prerequis: "Aucun" | "Contacter l'administration"
   certificate: boolean; certifications: CertificationItem[]
   rating: number; reviewsCount: number; whatYouWillLearn: string[]
@@ -49,7 +60,7 @@ type CoursesCrudProps = {
   initialCourses?: AdminCourse[]
   onSave?: (course: AdminCourse) => Promise<AdminCourse>
   onDelete?: (id: string) => Promise<void>
-  onView?: (id: string) => void
+  onView?: (course: AdminCourse) => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -346,6 +357,7 @@ function YoutubeManager({ links, onChange }: { links: YoutubeLinkItem[]; onChang
   )
 }
 export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onView }: CoursesCrudProps) {
+  const router = useRouter()
   const [toasts, setToasts] = useState<Toast[]>([])
   const [courses, setCourses] = useState<AdminCourse[]>(initialCourses)
   const [editingCourse, setEditingCourse] = useState<AdminCourse | null>(null)
@@ -355,9 +367,6 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set())
   const [hoveredTagsCourseId, setHoveredTagsCourseId] = useState<string | null>(null)
   const [tagsTooltipPos, setTagsTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
-  const [viewMode, setViewMode] = useState<"active" | "archived">("active")
-  const [archivedCourses, setArchivedCourses] = useState<AdminCourse[]>([])
-  const [archivedLoading, setArchivedLoading] = useState(false)
   const [filterTag, setFilterTag] = useState<string>("all")
   const [filterCertificate, setFilterCertificate] = useState<"all" | "yes" | "no">("all")
   const [filterPrereq, setFilterPrereq] = useState<"all" | "none" | "contact">("all")
@@ -375,7 +384,11 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
     return () => clearInterval(iv)
   }, [])
   useEffect(() => { if (initialCourses.length) setCourses(initialCourses) }, [initialCourses])
-  useEffect(() => { return () => { if (editingCourse?.coverPreview?.startsWith("blob:")) URL.revokeObjectURL(editingCourse.coverPreview) } }, [editingCourse?.coverPreview])
+  useEffect(() => {
+    return () => {
+      if (editingCourse?.coverPreview?.startsWith("blob:")) URL.revokeObjectURL(editingCourse.coverPreview)
+    }
+  }, [editingCourse?.coverPreview])
 
   const createBlankCourse = (): AdminCourse => ({ title: "", shortDescription: "", longDescription: "", durationLabel: "", prerequis: "Aucun", certificate: true, certifications: [], rating: 4.8, reviewsCount: 0, whatYouWillLearn: [""], tags: [], modules: [], coverImage: null, coverPreview: null })
 
@@ -403,14 +416,17 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
         youtubeLinks: l.youtubeLinks ?? [],
       })),
     }))
-    setEditingCourse({ ...JSON.parse(JSON.stringify(course)), modules: normalizedModules, coverPreview: typeof course.coverImage === "string" ? `${process.env.NEXT_PUBLIC_PB_URL}/api/files/courses/${course.id}/${course.coverImage}` : null, coverImage: null })
+    const certifications = (course.certifications ?? []).map((cert) => ({
+      ...cert,
+      imageFile: null,
+      imagePreview: cert.imageUrl ?? null,
+    }))
+    setEditingCourse({ ...JSON.parse(JSON.stringify(course)), certifications, modules: normalizedModules, coverPreview: typeof course.coverImage === "string" ? `${process.env.NEXT_PUBLIC_PB_URL}/api/files/courses/${course.id}/${course.coverImage}` : null, coverImage: null })
     setIsCreating(false); setExpandedModules(new Set())
   }
   const handleNewCourse = () => { setEditingCourse(createBlankCourse()); setIsCreating(true); setExpandedModules(new Set()) }
-  const handleCancelEdit = () => { setEditingCourse(null); setIsCreating(false) }
-  const openCourseResources = (courseId: string) => {
-    window.location.assign(`/admin-dashboard/courses/${courseId}/resources`)
-  }
+
+const handleCancelEdit = () => { setEditingCourse(null); setIsCreating(false) }
 
   const handleSaveCourse = async () => {
     if (!editingCourse) return
@@ -423,6 +439,11 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
           ...saved,
           coverPreview: editingCourse.coverPreview,
           coverImage: saved.coverImage ?? editingCourse.coverImage,
+          certifications: (saved.certifications ?? []).map((cert, index) => ({
+            ...cert,
+            imageFile: null,
+            imagePreview: cert.imageUrl ?? editingCourse.certifications[index]?.imagePreview ?? null,
+          })),
         }
         setEditingCourse(merged)
         setCourses(prev =>
@@ -447,37 +468,6 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
     } catch (err: any) { showToast("error", err.message || "Erreur lors de l'archivage") }
   }
 
-  const handleRestoreCourse = async (id: string) => {
-    try {
-      const res = await fetch(`/api/admin/courses/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "restore" }) })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setArchivedCourses(prev => prev.filter(c => c.id !== id))
-      showToast("success", "Formation restaurée.")
-    } catch (err: any) { showToast("error", err.message || "Erreur lors de la restauration") }
-  }
-
-  const handlePermanentDelete = async (id: string) => {
-    if (!confirm("Supprimer définitivement cette formation ? Cette action est irréversible.")) return
-    try {
-      const res = await fetch(`/api/admin/courses/${id}?permanent=true`, { method: "DELETE" })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setArchivedCourses(prev => prev.filter(c => c.id !== id))
-      showToast("success", "Formation supprimée définitivement.")
-    } catch (err: any) { showToast("error", err.message || "Erreur lors de la suppression") }
-  }
-
-  const loadArchivedCourses = async () => {
-    setArchivedLoading(true)
-    try {
-      const res = await fetch("/api/admin/courses?archived=true")
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setArchivedCourses(data.courses)
-    } catch (err: any) { showToast("error", err.message || "Erreur lors du chargement des archives") }
-    finally { setArchivedLoading(false) }
-  }
 
   const handleAddModule = () => {
     if (!editingCourse) return
@@ -631,29 +621,26 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
     <div style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "'DM Sans','Inter',sans-serif" }}>
 
       <AdminPageHeader
-        title={viewMode === "active" ? "Formations" : "Archives"}
+        title="Formations"
         description="Gérez le catalogue de formations"
         breadcrumbs={[{ label: "Formations" }]}
         actions={
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button
-              onClick={() => {
-                if (viewMode === "active") { setViewMode("archived"); loadArchivedCourses() }
-                else setViewMode("active")
-              }}
-              style={{ padding: "9px 20px", background: viewMode === "archived" ? "rgba(99,102,241,0.08)" : "#f8fafc", color: viewMode === "archived" ? "var(--accent,#6366f1)" : "#475569", border: `1.5px solid ${viewMode === "archived" ? "var(--accent,#6366f1)" : "#e8ecf3"}`, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s" }}
+              onClick={() => router.push("/admin-dashboard/courses/archive")}
+              style={{ padding: "9px 20px", background: "#f8fafc", color: "#475569", border: "1.5px solid #e8ecf3", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(99,102,241,0.06)"; e.currentTarget.style.color = "var(--accent,#6366f1)"; e.currentTarget.style.borderColor = "rgba(99,102,241,0.3)" }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#f8fafc"; e.currentTarget.style.color = "#475569"; e.currentTarget.style.borderColor = "#e8ecf3" }}
             >
               <Archive style={{ width: 15, height: 15 }} /> Archives
             </button>
-            {viewMode === "active" && (
-              <button onClick={handleNewCourse}
-                style={{ padding: "9px 20px", background: "var(--accent,#6366f1)", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "opacity 0.15s" }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = "0.88")}
-                onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
-              >
-                <Plus style={{ width: 15, height: 15 }} /> Nouvelle formation
-              </button>
-            )}
+            <button onClick={handleNewCourse}
+              style={{ padding: "9px 20px", background: "var(--accent,#6366f1)", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "opacity 0.15s" }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = "0.88")}
+              onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+            >
+              <Plus style={{ width: 15, height: 15 }} /> Nouvelle formation
+            </button>
           </div>
         }
       />
@@ -702,24 +689,16 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
 
       {/* ── Table ── */}
       {(() => {
-        const displayCourses = viewMode === "active" ? filteredCourses : archivedCourses.filter(c => c.title.toLowerCase().includes(searchTerm.toLowerCase()))
+        const displayCourses = filteredCourses
         const isEmpty = displayCourses.length === 0
 
         return (
           <div style={{ padding: "0px 0px" }}>
-            {archivedLoading ? (
-              <div style={{ background: "#fff", padding: "64px 24px", textAlign: "center" }}>
-                <Loader2 style={{ width: 32, height: 32, color: "#475569", margin: "0 auto", animation: "spin 1s linear infinite" }} />
-              </div>
-            ) : isEmpty ? (
+            {isEmpty ? (
               <div style={{ background: "#fff", padding: "64px 24px", textAlign: "center" }}>
                 <BookOpen style={{ width: 40, height: 40, color: "#e2e8f0", margin: "0 auto 12px" }} />
-                <p style={{ fontSize: 15, fontWeight: 600, color: "#475569", margin: "0 0 4px" }}>
-                  {viewMode === "archived" ? "Aucune formation archivée" : "Aucune formation trouvée"}
-                </p>
-                <p style={{ fontSize: 13, color: "#475569", margin: 0 }}>
-                  {viewMode === "active" ? "Créez votre première formation avec le bouton ci-dessus." : "Les formations archivées apparaîtront ici."}
-                </p>
+                <p style={{ fontSize: 15, fontWeight: 600, color: "#475569", margin: "0 0 4px" }}>Aucune formation trouvée</p>
+                <p style={{ fontSize: 13, color: "#475569", margin: 0 }}>Créez votre première formation avec le bouton ci-dessus.</p>
               </div>
             ) : (
               <div style={{ background: "#fff", overflow: "hidden" }}>
@@ -730,7 +709,7 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                 </div>
                 {displayCourses.map((course, idx) => (
                   <div key={course.id}
-                    style={{ display: "grid", gridTemplateColumns: "1fr 180px 190px", padding: "32px 36px", borderBottom: idx < displayCourses.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", transition: "background 0.15s", opacity: viewMode === "archived" ? 0.85 : 1 }}
+                    style={{ display: "grid", gridTemplateColumns: "1fr 180px 190px", padding: "32px 36px", borderBottom: idx < displayCourses.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", transition: "background 0.15s" }}
                     onMouseEnter={e => (e.currentTarget.style.background = "#fafbfd")}
                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                   >
@@ -739,19 +718,19 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 20 }}>
                         {course.coverPreview || (course.coverImage && typeof course.coverImage === "string") ? (
                           <img src={course.coverPreview || `${process.env.NEXT_PUBLIC_PB_URL}/api/files/courses/${course.id}/${course.coverImage}`}
-                            onClick={() => viewMode === "active" && handleSelectCourse(course)}
-                            style={{ width: 320, height: 180, borderRadius: 4, objectFit: "cover", flexShrink: 0, border: "1px solid #f1f5f9", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", cursor: viewMode === "active" ? "pointer" : "default" }} alt="" />
+                            onClick={() => handleSelectCourse(course)}
+                            style={{ width: 320, height: 180, borderRadius: 4, objectFit: "cover", flexShrink: 0, border: "1px solid #f1f5f9", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", cursor: "pointer" }} alt="" />
                         ) : (
-                          <div onClick={() => viewMode === "active" && handleSelectCourse(course)} style={{ width: 320, height: 180, borderRadius: 4, background: "rgba(99,102,241,0.08)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: viewMode === "active" ? "pointer" : "default" }}>
+                          <div onClick={() => handleSelectCourse(course)} style={{ width: 320, height: 180, borderRadius: 4, background: "rgba(99,102,241,0.08)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}>
                             <BookOpen style={{ width: 30, height: 30, color: "var(--accent,#6366f1)" }} />
                           </div>
                         )}
                         <div style={{ minWidth: 0 }}>
                           <p
-                            onClick={() => viewMode === "active" && handleSelectCourse(course)}
-                            onMouseEnter={e => viewMode === "active" && (e.currentTarget.style.color = "var(--accent,#6366f1)")}
+                            onClick={() => handleSelectCourse(course)}
+                            onMouseEnter={e => (e.currentTarget.style.color = "var(--accent,#6366f1)")}
                             onMouseLeave={e => (e.currentTarget.style.color = "#0f172a")}
-                            style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", margin: "0 0 6px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", cursor: viewMode === "active" ? "pointer" : "default", transition: "color 0.15s" }}
+                            style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", margin: "0 0 6px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", cursor: "pointer", transition: "color 0.15s" }}
                           >{course.title || "Sans titre"}</p>
                           <p style={{ fontSize: 14, color: "#475569", margin: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical" }}>{course.longDescription}</p>
                         </div>
@@ -772,20 +751,9 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                     </div>
                     {/* Actions */}
                     <div style={{ display: "flex", gap: 8 }}>
-                      {viewMode === "active" ? (
-                        <>
-                          {onView && <IconBtn onClick={e => { e.stopPropagation(); course.id && onView(course.id) }} color="#475569" title="Voir"><ExternalLink style={{ width: 22, height: 22 }} /></IconBtn>}
-                          <IconBtn onClick={e => { e.stopPropagation(); course.id && openCourseResources(course.id) }} color="#0f766e" hoverBg="rgba(15,118,110,0.08)" title="Ressources"><Film style={{ width: 22, height: 22 }} /></IconBtn>
-                          <IconBtn onClick={e => { e.stopPropagation(); handleSelectCourse(course) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)" title="Modifier"><Edit style={{ width: 22, height: 22 }} /></IconBtn>
-                          <IconBtn onClick={e => { e.stopPropagation(); course.id && handleDeleteCourse(course.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Archiver"><Archive style={{ width: 22, height: 22 }} /></IconBtn>
-                        </>
-                      ) : (
-                        <>
-                          <IconBtn onClick={e => { e.stopPropagation(); course.id && handleRestoreCourse(course.id) }} color="#22c55e" hoverBg="rgba(34,197,94,0.08)" title="Restaurer"><RotateCcw style={{ width: 22, height: 22 }} /></IconBtn>
-                          <IconBtn onClick={e => { e.stopPropagation(); handleSelectCourse(course) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)" title="Modifier"><Edit style={{ width: 22, height: 22 }} /></IconBtn>
-                          <IconBtn onClick={e => { e.stopPropagation(); course.id && handlePermanentDelete(course.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Supprimer définitivement"><Trash2 style={{ width: 22, height: 22 }} /></IconBtn>
-                        </>
-                      )}
+                      {onView && <IconBtn onClick={e => { e.stopPropagation(); onView(course) }} color="#475569" title="Voir"><ExternalLink style={{ width: 22, height: 22 }} /></IconBtn>}
+                      <IconBtn onClick={e => { e.stopPropagation(); handleSelectCourse(course) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)" title="Modifier"><Edit style={{ width: 22, height: 22 }} /></IconBtn>
+                      <IconBtn onClick={e => { e.stopPropagation(); course.id && handleDeleteCourse(course.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Archiver"><Archive style={{ width: 22, height: 22 }} /></IconBtn>
                     </div>
                   </div>
                 ))}
@@ -964,6 +932,52 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                               <span style={{ fontSize: 10, fontWeight: 800, color: "#475569", letterSpacing: "0.08em", textTransform: "uppercase" }}>Certification {index + 1}</span>
                               <IconBtn onClick={() => setEditingCourse({ ...editingCourse, certifications: editingCourse.certifications.filter((_, i) => i !== index) })} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)"><Trash2 style={{ width: 13, height: 13 }} /></IconBtn>
                             </div>
+                            <div
+                              onClick={() => document.getElementById(`certificationImageInput-${index}`)?.click()}
+                              style={{ position: "relative", width: "100%", paddingTop: "56.25%", marginBottom: 14, borderRadius: 12, border: "2px dashed #dde3f0", background: cert.imagePreview || cert.imageUrl ? "#fff" : "linear-gradient(135deg,#f8fafc,#eef2ff)", cursor: "pointer", overflow: "hidden", transition: "border-color 0.15s, background 0.15s" }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--accent,#6366f1)" }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "#dde3f0" }}
+                            >
+                              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                {cert.imagePreview || cert.imageUrl ? (
+                                  <>
+                                    <img src={cert.imagePreview || cert.imageUrl || ""} alt={cert.title || "Certification"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, background: "rgba(15,23,42,0.48)", color: "#fff", opacity: 0, transition: "opacity 0.2s" }}
+                                      onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.opacity = "1"}
+                                      onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.opacity = "0"}
+                                    >
+                                      <ImagePlus style={{ width: 24, height: 24 }} />
+                                      <span style={{ fontSize: 13, fontWeight: 700 }}>Changer l'image</span>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div style={{ textAlign: "center" }}>
+                                    <div style={{ width: 46, height: 46, borderRadius: 14, background: "rgba(99,102,241,0.12)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" }}>
+                                      <ImagePlus style={{ width: 22, height: 22, color: "var(--accent,#6366f1)" }} />
+                                    </div>
+                                    <p style={{ fontSize: 13, fontWeight: 700, color: "#475569", margin: 0 }}>Ajouter l'image du certificat</p>
+                                    <p style={{ fontSize: 11, color: "#64748b", margin: "4px 0 0" }}>Format recommandÃ© : 16:9</p>
+                                  </div>
+                                )}
+                              </div>
+                              <input
+                                id={`certificationImageInput-${index}`}
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
+                                onClick={e => e.stopPropagation()}
+                                onChange={e => {
+                                  const file = e.target.files?.[0]
+                                  if (!file) return
+                                  const c = [...editingCourse.certifications]
+                                  c[index] = { ...c[index], imageFile: file, imagePreview: URL.createObjectURL(file) }
+                                  setEditingCourse({ ...editingCourse, certifications: c })
+                                }}
+                              />
+                              <div style={{ position: "absolute", top: 10, right: 10, background: "rgba(15,23,42,0.62)", color: "#fff", fontSize: 9, fontWeight: 800, letterSpacing: "0.08em", padding: "3px 8px", borderRadius: 7 }}>
+                                16 : 9
+                              </div>
+                            </div>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                               <div>
                                 <FieldLabel>Nom du certificat</FieldLabel>
@@ -991,22 +1005,6 @@ export default function CoursesCrud({ initialCourses = [], onSave, onDelete, onV
                     )}
                   </div>
                 </FormCard>
-
-                {editingCourse.id && (
-                  <FormCard title="Ressources du cours" icon={<Film style={{ width: 16, height: 16 }} />}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: 16, borderRadius: 12, border: "1px solid #e8ecf3", background: "#fff" }}>
-                      <div>
-                        <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Modules, lecons, PDFs et videos Drive</p>
-                        <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>Gerez les ressources depuis une page dediee, avec la meme logique que les ressources de groupe.</p>
-                      </div>
-                      <button onClick={() => editingCourse.id && openCourseResources(editingCourse.id)}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
-                      >
-                        <Film style={{ width: 14, height: 14 }} /> Ouvrir les ressources
-                      </button>
-                    </div>
-                  </FormCard>
-                )}
 
                 {/* ── Modules ── */}
                 {editingCourse && false && (

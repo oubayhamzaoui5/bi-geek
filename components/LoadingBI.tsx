@@ -1,14 +1,28 @@
 "use client"
 
+import { usePathname } from "next/navigation"
+
 type LoadingBIProps = {
   fullScreen?: boolean
 }
 
 export default function LoadingBI({ fullScreen = true }: LoadingBIProps) {
+  const pathname = usePathname()
+  const isDashboardRoute =
+    pathname?.startsWith("/admin-dashboard") ||
+    pathname?.startsWith("/student-dashboard") ||
+    pathname?.startsWith("/instructor-dashboard")
+  const shouldCoverViewport = fullScreen || isDashboardRoute
+
   return (
     <div style={{
-      width: "100%", height: fullScreen ? "100vh" : "100%",
-      background: "#fafafa",
+      position: shouldCoverViewport ? "fixed" : "relative",
+      inset: shouldCoverViewport ? 0 : undefined,
+      zIndex: shouldCoverViewport ? 9999 : undefined,
+      width: shouldCoverViewport ? "100vw" : "100%",
+      height: shouldCoverViewport ? "100dvh" : "100%",
+      minHeight: shouldCoverViewport ? "100dvh" : undefined,
+      background: "var(--background, #fafafa)",
       display: "flex",
       alignItems: "center", justifyContent: "center",
     }}>
@@ -43,15 +57,16 @@ export default function LoadingBI({ fullScreen = true }: LoadingBIProps) {
         <div style={{
           position: "absolute",
           width: 148, height: 148,
-          background: "oklch(0.80 0.18 308 / 0.5)",
+          background: "color-mix(in oklch, var(--accent) 45%, white)",
+          opacity: 0.55,
           animation: "_blob_back 6s ease-in-out infinite, _breathe 6s ease-in-out infinite",
         }} />
 
         {/* main blob */}
         <div style={{
           width: 124, height: 124,
-          background: "oklch(0.65 0.32 308)",
-          boxShadow: "0 20px 60px oklch(0.65 0.32 308 / 0.35)",
+          background: "var(--accent)",
+          boxShadow: "0 20px 60px color-mix(in oklch, var(--accent) 35%, transparent)",
           animation: "_blob 4s ease-in-out infinite, _breathe 4s ease-in-out infinite",
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>

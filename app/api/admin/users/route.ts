@@ -17,10 +17,77 @@ function resolveAvatar(user: any): string | null {
   return `${PB_URL}/api/files/${user.collectionId}/${user.id}/${user.avatar}`;
 }
 
+function canAssignRole(callerRole: string, role: string) {
+  if (callerRole === "admin") return role !== "admin";
+  if (callerRole === "admin_agent") return !ADMIN_ROLES.includes(role);
+  return false;
+}
+
+function canManageTarget(callerRole: string, targetRole: string) {
+  if (callerRole === "admin") return targetRole !== "admin";
+  if (callerRole === "admin_agent") return !ADMIN_ROLES.includes(targetRole);
+  return false;
+}
+
+function usernameBase(name: unknown, surname: unknown, email: unknown) {
+  const fullName = [name, surname]
+    .filter((part) => typeof part === "string" && part.trim())
+    .join("_");
+  let base = fullName
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  if (!base && typeof email === "string" && email.includes("@")) {
+    base = email
+      .split("@")[0]
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  }
+
+  return base || `user_${Date.now()}`;
+}
+
+async function generateUniqueUsername(pb: any, data: any, currentId?: string) {
+  const base = usernameBase(data.name, data.surname, data.email);
+  const users = await pb.collection("users").getFullList({ fields: "id,username" });
+  const existing = new Set(
+    users
+      .filter((user: any) => user.id !== currentId)
+      .map((user: any) => String(user.username || "").toLowerCase())
+      .filter(Boolean)
+  );
+
+  if (!existing.has(base)) return base;
+
+  let suffix = 2;
+  let candidate = `${base}_${suffix}`;
+  while (existing.has(candidate)) {
+    suffix += 1;
+    candidate = `${base}_${suffix}`;
+  }
+  return candidate;
+}
+
 export async function GET(req: Request) {
   try {
     await requireUser(req, ADMIN_ROLES);
     const pb = await getAdminPB();
+    const { searchParams } = new URL(req.url);
+    if (searchParams.get("usernamePreview") === "1") {
+      const username = await generateUniqueUsername(pb, {
+        name: searchParams.get("name") ?? "",
+        surname: searchParams.get("surname") ?? "",
+        email: searchParams.get("email") ?? "",
+      }, searchParams.get("currentId") ?? undefined);
+      return NextResponse.json({ username });
+    }
+
     const users = await pb.collection("users").getFullList({ sort: "-created" });
     return NextResponse.json(users.map(u => ({ ...u, avatar: resolveAvatar(u) })));
   } catch (err: any) {
@@ -36,23 +103,23 @@ export async function POST(req: Request) {
     const caller = await requireUser(req, ADMIN_ROLES);
     const pb = await getAdminPB();
 
-    const callerRole = caller.role;
-    if (callerRole === "admin_agent" && ADMIN_ROLES.includes(data.role)) {
-      return NextResponse.json({ error: "Permission refusée : un admin agent ne peut pas créer des comptes admin." }, { status: 403 });
+    const role = data.role ?? "student";
+    if (!canAssignRole(caller.role, role)) {
+      return NextResponse.json({ error: "Permission refusée : vous ne pouvez pas créer ce type de compte." }, { status: 403 });
     }
 
     const pwd = data.password || data.plainPassword;
     if (!pwd) throw new Error("Mot de passe requis.");
+    const username = await generateUniqueUsername(pb, data);
 
     const user = await pb.collection("users").create({
-      username: data.username,
+      username,
       name: data.name ?? "",
       surname: data.surname ?? "",
       email: data.email,
       emailVisibility: true,
       phone: data.phone ?? "",
-      role: data.role ?? "student",
-      tags: data.tags ?? [],
+      role,
       usePassword: false,
       plainPassword: pwd,
       password: pwd,
@@ -63,7 +130,7 @@ export async function POST(req: Request) {
       try {
         await sendWelcomeEmail({
           to: data.email,
-          username: data.username,
+          username,
           password: pwd,
           name: data.name,
         });
@@ -89,30 +156,28 @@ export async function PATCH(req: Request) {
     const caller = await requireUser(req, ADMIN_ROLES);
     const pb = await getAdminPB();
 
-    const callerRole = caller.role;
-    if (callerRole === "admin_agent") {
-      const target = await pb.collection("users").getOne(data.id);
-      if (ADMIN_ROLES.includes(target.role) || ADMIN_ROLES.includes(data.role)) {
-        return NextResponse.json({ error: "Permission refusée : un admin agent ne peut pas modifier des comptes admin." }, { status: 403 });
-      }
+    const target = await pb.collection("users").getOne(data.id);
+    if (!canManageTarget(caller.role, target.role) || !canAssignRole(caller.role, data.role)) {
+      return NextResponse.json({ error: "Permission refusée : vous ne pouvez pas modifier ce type de compte." }, { status: 403 });
     }
 
+    const username = await generateUniqueUsername(pb, data, data.id);
     const payload: Record<string, unknown> = {
-      username: data.username,
+      username,
       name: data.name ?? "",
       surname: data.surname ?? "",
       email: data.email,
       emailVisibility: true,
       phone: data.phone ?? "",
       role: data.role,
-      tags: data.tags ?? [],
     };
 
     if (typeof data.usePassword === "boolean") {
       payload.usePassword = data.usePassword;
     }
 
-    if (typeof data.password === "string" && data.password) {
+    const changedPassword = typeof data.password === "string" && data.password;
+    if (changedPassword) {
       payload.password = data.password;
       payload.passwordConfirm = data.password;
       payload.plainPassword = data.plainPassword || data.password;
@@ -139,12 +204,9 @@ export async function DELETE(req: Request) {
     const caller = await requireUser(req, ADMIN_ROLES);
     const pb = await getAdminPB();
 
-    const callerRole = caller.role;
-    if (callerRole === "admin_agent") {
-      const target = await pb.collection("users").getOne(id);
-      if (ADMIN_ROLES.includes(target.role)) {
-        return NextResponse.json({ error: "Permission refusée : un admin agent ne peut pas supprimer des comptes admin." }, { status: 403 });
-      }
+    const target = await pb.collection("users").getOne(id);
+    if (!canManageTarget(caller.role, target.role)) {
+      return NextResponse.json({ error: "Permission refusée : vous ne pouvez pas supprimer ce type de compte." }, { status: 403 });
     }
 
     await pb.collection("users").delete(id);

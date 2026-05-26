@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
+import LoadingBI from "@/components/LoadingBI"
 
 type Ctx = { loading: boolean; setPageLoading: (v: boolean) => void }
 
@@ -21,6 +22,7 @@ export function DashboardLoadingProvider({ children }: { children: React.ReactNo
   return (
     <Ctx.Provider value={{ loading: pageLoading || routeLoading, setPageLoading }}>
       {children}
+      {(pageLoading || routeLoading) && <LoadingBI />}
     </Ctx.Provider>
   )
 }

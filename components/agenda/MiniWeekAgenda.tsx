@@ -5,6 +5,7 @@ import {
   CalendarDays, ChevronLeft, ChevronRight, ArrowRight, Loader2,
 } from "lucide-react"
 import Link from "next/link"
+import { getAgendaHourRange } from "./timeRange"
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -13,8 +14,6 @@ const MONTHS_FR = [
   "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ]
-const HOUR_START = 7
-const HOUR_END = 21
 const SLOT_H = 44
 
 const GROUP_COLORS = [
@@ -182,7 +181,7 @@ export function MiniWeekAgenda({ instructorId, studentId, agendaHref, title = "A
 
   const today = toYMD(new Date())
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
-  const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i)
+  const { startHour, endHour, hours } = getAgendaHourRange(sessions, { defaultStartHour: 7, defaultEndHour: 21 })
   const weekEnd = addDays(weekStart, 6)
   const isThisWeek = toYMD(getWeekStart(new Date())) === toYMD(weekStart)
 
@@ -253,11 +252,11 @@ export function MiniWeekAgenda({ instructorId, studentId, agendaHref, title = "A
 
       {/* Time grid */}
       <div>
-        <div style={{ display: "flex", minHeight: `${(HOUR_END - HOUR_START) * SLOT_H}px` }}>
+        <div style={{ display: "flex", minHeight: `${(endHour - startHour) * SLOT_H}px` }}>
           {/* Hour gutter */}
           <div style={{ width: 38, flexShrink: 0, borderRight: "1px solid #f1f5f9", position: "relative" }}>
             {hours.map(h => (
-              <div key={h} style={{ position: "absolute", right: 6, top: (h - HOUR_START) * SLOT_H - 5, fontSize: 9, color: "#cbd5e1", fontWeight: 600, lineHeight: 1 }}>
+              <div key={h} style={{ position: "absolute", right: 6, top: (h - startHour) * SLOT_H - 5, fontSize: 9, color: "#cbd5e1", fontWeight: 600, lineHeight: 1 }}>
                 {String(h).padStart(2, "0")}h
               </div>
             ))}
@@ -278,18 +277,18 @@ export function MiniWeekAgenda({ instructorId, studentId, agendaHref, title = "A
               <div key={di} style={{ flex: 1, position: "relative", borderRight: di < 6 ? "1px solid #f1f5f9" : undefined }}>
                 {/* Hour lines */}
                 {hours.map(h => (
-                  <div key={h} style={{ position: "absolute", left: 0, right: 0, top: (h - HOUR_START) * SLOT_H, borderTop: "1px solid #f8fafc" }} />
+                  <div key={h} style={{ position: "absolute", left: 0, right: 0, top: (h - startHour) * SLOT_H, borderTop: "1px solid #f8fafc" }} />
                 ))}
                 {/* Half-hour lines */}
                 {hours.map(h => (
-                  <div key={`hh-${h}`} style={{ position: "absolute", left: 0, right: 0, top: (h - HOUR_START) * SLOT_H + SLOT_H / 2, borderTop: "1px solid #fafafa" }} />
+                  <div key={`hh-${h}`} style={{ position: "absolute", left: 0, right: 0, top: (h - startHour) * SLOT_H + SLOT_H / 2, borderTop: "1px solid #fafafa" }} />
                 ))}
 
                 {/* Sessions */}
                 {daySessions.map((s, si) => {
                   const sessionKey = s.id ?? `__v${si}`
                   const startMin = parseTime(s.start_time)
-                  const top = ((startMin - HOUR_START * 60) / 60) * SLOT_H
+                  const top = ((startMin - startHour * 60) / 60) * SLOT_H
                   const height = Math.max((s.duration / 60) * SLOT_H, 22)
                   const { col, totalCols } = colMap.get(sessionKey) ?? { col: 0, totalCols: 1 }
                   const isHovered = hoveredKey === sessionKey

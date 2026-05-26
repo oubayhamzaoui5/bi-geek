@@ -35,7 +35,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ]
 
   const courseUrls: MetadataRoute.Sitemap = courses.map((course) => ({
-    url: absoluteUrl(`/course/${course.slug || course.id}`),
+    url: absoluteUrl(`/formation/${course.slug || course.id}`),
     lastModified: now,
     changeFrequency: "weekly",
     priority: 0.8,

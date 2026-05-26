@@ -19,7 +19,7 @@ export async function GET(
     const pb = await getAdminPb()
 
     const session = await pb.collection("sessions").getOne(id).catch(() => null)
-    if (!session) return NextResponse.json({ error: "Session introuvable." }, { status: 404 })
+    if (!session) return NextResponse.json({ error: "Séance introuvable." }, { status: 404 })
 
     // Get all students in the group
     const group = await pb.collection("groups").getOne(session.group, {

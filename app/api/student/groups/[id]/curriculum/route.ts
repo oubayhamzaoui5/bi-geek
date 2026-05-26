@@ -58,32 +58,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const modules = await safeGetList(pb, "group_modules", `group_id = "${groupId}"`, "order")
     const resourceMode = resolveGroupResourceMode(group, modules)
     if (resourceMode === "default" && group.course) {
+      const source = await readDefaultCourseResources(pb, group.course)
       return NextResponse.json({
-        ...(await readDefaultCourseResources(pb, group.course)),
+        ok: true,
+        modules: source.modules,
+        moduleVideos: source.moduleVideos || [],
+        moduleAttachments: source.moduleAttachments || [],
         groupId,
         resourceMode: "default",
         sourceCourseId: group.course,
       })
     }
 
-    const lessons = await safeGetList(pb, "group_lessons", `group_id = "${groupId}"`, "order")
-
-    let videos: any[] = []
-    let lessonAttachments: any[] = []
-    let videoAttachments: any[] = []
     let moduleVideos: any[] = []
     let moduleAttachments: any[] = []
-
-    if (lessons.length > 0) {
-      const lessonFilter = lessons.map((l: any) => `lesson_id = "${l.id}"`).join(" || ")
-      videos = await safeGetList(pb, "lesson_videos", lessonFilter, "order")
-      lessonAttachments = await safeGetList(pb, "lesson_attachments", lessonFilter, "created")
-    }
-
-    if (videos.length > 0) {
-      const videoFilter = videos.map((v: any) => `video_id = "${v.id}"`).join(" || ")
-      videoAttachments = await safeGetList(pb, "video_attachments", videoFilter, "created")
-    }
 
     if (modules.length > 0) {
       const modFilter = modules.map((m: any) => `module_id = "${m.id}"`).join(" || ")
@@ -95,35 +83,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       ok: true,
       resourceMode: "custom",
       modules: modules.map((m: any) => ({ id: m.id, title: m.title || "", order: m.order ?? 0, description: m.description || "" })),
-      lessons: lessons.map((l: any) => ({
-        id: l.id,
-        slug: l.slug || l.id,
-        moduleId: l.module_id || "",
-        title: l.title || "",
-        order: l.order ?? 0,
-        description: l.description || "",
-        content: l.content || "",
-      })),
-      videos: videos.map((v: any) => ({
-        id: v.id,
-        lessonId: v.lesson_id || "",
-        title: v.title || "",
-        order: v.order ?? 0,
-        driveUrl: v.drive_url || "",
-        description: v.description || "",
-      })),
-      lessonAttachments: lessonAttachments.map((a: any) => ({
-        id: a.id,
-        lessonId: a.lesson_id || "",
-        name: a.name || a.file || "",
-        url: a.file ? attachmentUrl("lesson_attachments", a.id, a.file) : null,
-      })),
-      videoAttachments: videoAttachments.map((a: any) => ({
-        id: a.id,
-        videoId: a.video_id || "",
-        name: a.name || a.file || "",
-        url: a.file ? attachmentUrl("video_attachments", a.id, a.file) : null,
-      })),
       moduleVideos: moduleVideos.map((v: any) => ({
         id: v.id,
         moduleId: v.module_id || "",

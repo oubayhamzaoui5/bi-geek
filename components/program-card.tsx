@@ -28,7 +28,7 @@ interface ProgramCardProps {
 
 export function ProgramCard({ program, variant, hrefOverride, href: hrefProp }: ProgramCardProps) {
   const safeTags   = Array.isArray(program.tags) ? program.tags : []
-  const [slug, setSlug] = useState<string>(program.slug ?? program.id)
+  const [slug, setSlug] = useState<string>(program.slug || "")
 
   const resolvedVariant = variant ?? program.type ?? "course"
   const isBootcamp = resolvedVariant === "bootcamp"
@@ -37,11 +37,11 @@ export function ProgramCard({ program, variant, hrefOverride, href: hrefProp }: 
     if (program.slug) return
     fetch(`/api/slug/${resolvedVariant}/${program.id}`)
       .then((r) => r.json())
-      .then((d) => setSlug(d.slug ?? program.id))
-      .catch(() => setSlug(program.id))
+      .then((d) => setSlug(d.slug || ""))
+      .catch(() => setSlug(""))
   }, [program.id, program.slug, resolvedVariant])
 
-  const href = hrefProp ?? hrefOverride ?? (isBootcamp ? `/bootcamp/${slug}` : `/course/${slug}`)
+  const href = hrefProp ?? hrefOverride ?? (isBootcamp ? `/bootcamp/${slug || program.id}` : slug ? `/formation/${slug}` : "/formations")
 
   return (
     <Link

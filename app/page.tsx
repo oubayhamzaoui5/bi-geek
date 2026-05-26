@@ -215,7 +215,7 @@ function SectionHeader({
   description,
 }: {
   eyebrow: string
-  title: string
+  title: React.ReactNode
   description?: string
 }) {
   return (
@@ -348,10 +348,10 @@ function DataAnalyticsBootcampAd() {
           <Link href="/bootcamp/bootcamp-data-analytics" className="group relative block aspect-[16/10] overflow-hidden md:aspect-auto">
             <div className="absolute inset-0 bg-[#8b0f82]/10 opacity-0 transition group-hover:opacity-100" />
             <Image
-              src="/bootcamp-data-analytics-ad.webp"
+              src="/bootcamp-data-analytics-new.webp"
               alt="Bootcamp Data Analytics BI Geek"
-              width={1586}
-              height={992}
+              width={1672}
+              height={941}
               className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
               sizes="(min-width: 768px) 50vw, 100vw"
             />
@@ -406,7 +406,7 @@ function ProgramGrid() {
       <div className="mb-10 flex flex-col gap-5 md:mb-14 md:flex-row md:items-end md:justify-between">
         <div className="max-w-2xl">
           <SectionLabel>Programmes populaires</SectionLabel>
-          <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 md:text-4xl">Nos formations et bootcamps phares</h2>
+          <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 md:text-4xl">Nos <span className="text-[#8b0f82]">formations</span></h2>
           <Link
             href="/formations"
             className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[#8b0f82] transition hover:text-[#710c6a]"
@@ -430,7 +430,7 @@ function ProgramGrid() {
             <div>
               <div className="grid gap-5 md:grid-cols-3">
                 {programs.map((p) => (
-                  <ProgramCard key={`${p.type ?? "course"}-${p.id}`} program={p} href={`/${p.type === "bootcamp" ? "bootcamp" : "course"}/${p.slug ?? p.id}`} />
+                  <ProgramCard key={`${p.type ?? "course"}-${p.id}`} program={p} />
                 ))}
               </div>
             </div>
@@ -640,7 +640,7 @@ export default function Home() {
           <div className="flex flex-col justify-center">
             <SectionLabel>Qui sommes-nous</SectionLabel>
             <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 md:text-5xl">
-              Nous accélérons les carrières tech.
+              Nous accélérons les <span className="text-[#8b0f82]">carrières tech.</span>
             </h2>
             <p className="mt-6 text-base leading-7 text-zinc-600">
               Chez <strong className="font-semibold text-zinc-950">BI GEEK</strong>, nous formons des profils
@@ -673,7 +673,7 @@ export default function Home() {
               <div>
                 <SectionLabel>BI Geek Pour Entreprises</SectionLabel>
                 <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 md:text-4xl">
-                  Investissez dans l'excellence de vos équipes.
+                  Investissez dans l'excellence de<br /><span className="text-[#8b0f82]">vos équipes.</span>
                 </h2>
                 <p className="mt-5 max-w-xl text-base leading-7 text-zinc-600">
                   Nous concevons et délivrons des programmes de formation tech sur mesure pour les entreprises qui
@@ -745,7 +745,7 @@ export default function Home() {
               <div>
                 <SectionLabel>Certifications</SectionLabel>
                 <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight text-zinc-950 md:text-4xl">
-                  Passez des certifications officielles<br className="hidden md:block" /> reconnues par l&apos;industrie.
+                  Passez des certifications<br />officielles reconnues<br /><span className="text-[#8b0f82]">à l&apos;échelle internationale.</span>
                 </h2>
               </div>
               <p className="max-w-sm text-sm leading-6 text-zinc-500">
@@ -812,7 +812,7 @@ export default function Home() {
             <div>
               <SectionHeader
                 eyebrow="Pourquoi BI Geek"
-                title="Ce qui nous différencie"
+                title={<>Ce qui nous <span className="text-[#8b0f82]">différencie</span></>}
                 description="Une formation pensée pour votre carrière, pas pour la salle de classe."
               />
             </div>
@@ -835,7 +835,7 @@ export default function Home() {
 
         <section className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-24">
           <div>
-            <SectionHeader eyebrow="Domaines" title="Explorez nos domaines d'expertise" />
+            <SectionHeader eyebrow="Domaines" title={<>Explorez nos domaines d&apos;<span className="text-[#8b0f82]">expertise</span></>} />
           </div>
           <div className="grid gap-5 md:grid-cols-3">
             {categories.map(({ icon: Icon, title, description, image }, i) => (

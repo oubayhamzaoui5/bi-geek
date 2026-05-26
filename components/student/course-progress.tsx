@@ -103,14 +103,14 @@ export function CourseProgress({
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">Bi Geek Team</p>
-            <p className="text-xs text-muted-foreground">Instructeur principal</p>
+            <p className="text-xs text-muted-foreground">Formateur principal</p>
           </div>
         </div>
       </div>
 
       {nextSession && (
         <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-4">
-          <h3 className="text-sm font-semibold text-foreground">Prochaine session</h3>
+          <h3 className="text-sm font-semibold text-foreground">Prochaine séance</h3>
           <div className="flex flex-col gap-1 text-xs text-muted-foreground">
             <span className="font-medium text-foreground">{nextSession.title}</span>
             <span>

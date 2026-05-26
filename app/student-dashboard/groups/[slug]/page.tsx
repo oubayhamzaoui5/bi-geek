@@ -1,23 +1,23 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
-import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useCallback, useEffect, useState } from "react"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { AnimatePresence, motion } from "framer-motion"
 import {
   ChevronRight, BookOpen, Layers, Users, GraduationCap, Video,
-  FileText, AlertCircle, LayoutList, Clock, Calendar,
-  ExternalLink, Play,
-  ChevronDown, Paperclip, ClipboardList, ClipboardCheck, Upload, X, Check, Loader2, MessageSquare,
+  FileText, AlertCircle, LayoutList,
+  ExternalLink,
+  ChevronDown, Paperclip, BrainCircuit, ClipboardCheck,
 } from "lucide-react"
 import GroupKpiCard from "@/components/groups/GroupKpiCard"
 import LoadingBI from "@/components/LoadingBI"
-import { STATUS_META, fmtDate, initials, avatarColor, type GroupStatus } from "@/components/groups/groupUtils"
+import { STATUS_META, initials, avatarColor, type GroupStatus } from "@/components/groups/groupUtils"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type Tab = "overview" | "etudiants" | "seances"
-const TAB_ORDER: Tab[] = ["overview", "etudiants", "seances"]
+type Tab = "overview"
+const TAB_ORDER: Tab[] = ["overview"]
 
 function parseTab(value: string | null): Tab | null {
   if (!value) return null
@@ -41,35 +41,24 @@ type Group = {
   studentIds: string[]
   students: { id: string; name: string; surname: string; username: string; email: string; avatar: string | null }[]
   instructor: { id: string; name: string; surname: string; avatar?: string | null } | null
+  instructors?: { id: string; name: string; surname: string; avatar?: string | null }[]
   program: Program | null
-  nextSession?: { id: string; title: string | null; date: string; start_time: string; mode: string; joinUrl: string | null } | null
-  nextSessions?: { id: string; title: string | null; date: string; start_time: string; mode: string; joinUrl: string | null }[] | null
-  pastSessions?: { id: string; title: string | null; date: string; start_time: string; mode: string; joinUrl: string | null; recordingUrl: string | null; googleEventId: string | null }[] | null
 }
 
 type Module      = { id: string; title: string; order: number; description: string }
-type Lesson      = { id: string; moduleId: string; title: string; order: number; description: string; content: string }
-type LessonVideo = { id: string; lessonId: string; title: string; driveUrl: string; description: string }
-type Attachment  = { id: string; lessonId?: string; videoId?: string; name: string; url: string | null }
 type ModuleVideo = { id: string; moduleId: string; title: string; driveUrl: string; description: string; order: number }
 type ModuleAttachment = { id: string; moduleId: string; name: string; url: string | null; order?: number }
 
-type HomeworkAttachment = { id: string; name: string; url: string | null }
-type SubmissionFile     = { id: string; name: string; url: string | null }
-type HomeworkSubmission = { id: string; submittedAt: string; files: SubmissionFile[] }
-type HomeworkItem = {
-  id: string
-  moduleId: string
-  title: string
-  text: string
-  deadline: string | null
-  attachments: HomeworkAttachment[]
-  submission: HomeworkSubmission | null
-}
+type QuizItem     = { id: string; moduleId: string; title: string; deadline: string | null; questionsCount: number }
+type ExerciseItem = { id: string; moduleId: string; title: string; description: string; deadline: string | null; attachmentsCount: number }
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 function isPdf(name: string) { return name.split(".").pop()?.toLowerCase() === "pdf" }
+
+function fmtDeadline(d: string) {
+  return new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })
+}
 
 const moduleExpandVariants = {
   open: {
@@ -91,43 +80,24 @@ const moduleExpandVariants = {
 export default function StudentGroupDetailPage() {
   const { slug: groupId } = useParams<{ slug: string }>()
   const router = useRouter()
-  const pathname = usePathname()
   const searchParams = useSearchParams()
 
   const [group,              setGroup]              = useState<Group | null>(null)
-  const [todaySession,       setTodaySession]       = useState<{ id: string; title: string | null; date: string; start_time: string; mode: string; joinUrl: string | null } | null>(null)
   const [modules,            setModules]            = useState<Module[]>([])
-  const [lessons,            setLessons]            = useState<Lesson[]>([])
-  const [lessonVideos,       setLessonVideos]       = useState<LessonVideo[]>([])
-  const [lessonAttachments,  setLessonAttachments]  = useState<Attachment[]>([])
   const [moduleVideos,       setModuleVideos]       = useState<ModuleVideo[]>([])
   const [moduleAttachments,  setModuleAttachments]  = useState<ModuleAttachment[]>([])
-  const [homework,           setHomework]           = useState<HomeworkItem[]>([])
-  const [loading,            setLoading]            = useState(true)
-  const [activeTab,          setActiveTab]          = useState<Tab>("overview")
-  const [expandedModules,    setExpandedModules]    = useState<Set<string>>(new Set())
-  const [expandedHomeworkId, setExpandedHomeworkId] = useState<string | null>(null)
-  const [submittingHwId,     setSubmittingHwId]     = useState<string | null>(null)
-  const [pendingFiles,       setPendingFiles]       = useState<File[]>([])
-  const [toRemoveFileIds,    setToRemoveFileIds]    = useState<string[]>([])
-  const [loadError,          setLoadError]          = useState("")
-  const hwSubmitRef = useRef<HTMLInputElement>(null)
+  const [quizzes,   setQuizzes]   = useState<QuizItem[]>([])
+  const [exercises, setExercises] = useState<ExerciseItem[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [activeTab, setActiveTab] = useState<Tab>("overview")
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set())
+  const [formateurIndex, setFormateurIndex] = useState(0)
+  const [loadError, setLoadError] = useState("")
 
   useEffect(() => {
     const tabFromQuery = parseTab(searchParams.get("view")) ?? "overview"
     setActiveTab(prev => (prev === tabFromQuery ? prev : tabFromQuery))
   }, [searchParams])
-
-  const setActiveTabWithRoute = useCallback((tab: Tab) => {
-    if (tab === activeTab) return
-    setActiveTab(tab)
-
-    const params = new URLSearchParams(searchParams.toString())
-    if (tab === "overview") params.delete("view")
-    else params.set("view", tab)
-    const query = params.toString()
-    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false })
-  }, [activeTab, pathname, router, searchParams])
 
   function getStudentId() {
     try {
@@ -144,27 +114,25 @@ export default function StudentGroupDetailPage() {
       setLoading(true)
       setLoadError("")
       try {
-        const studentId = getStudentId()
-        const hwUrl = `/api/student/groups/${groupId}/homework${studentId ? `?studentId=${encodeURIComponent(studentId)}` : ""}`
-        const [gRes, cRes, hwRes] = await Promise.all([
+        const [gRes, cRes, qRes, exRes] = await Promise.all([
           fetch(`/api/student/groups/${groupId}`),
           fetch(`/api/student/groups/${groupId}/curriculum`),
-          fetch(hwUrl),
+          fetch(`/api/student/groups/${groupId}/quiz`),
+          fetch(`/api/student/groups/${groupId}/exercice`),
         ])
-        if (gRes.status === 401 || cRes.status === 401 || hwRes.status === 401) {
+        if (gRes.status === 401 || cRes.status === 401) {
           localStorage.removeItem("user")
           router.replace(`/login?next=/student-dashboard/groups/${groupId}`)
           return
         }
-        if (gRes.status === 403 || cRes.status === 403 || hwRes.status === 403) {
+        if (gRes.status === 403 || cRes.status === 403) {
           setLoadError("Acces refuse. Reconnectez-vous puis reessayez.")
           return
         }
         if (gRes.ok) {
           const d = await gRes.json()
           if (d.ok) {
-            setGroup({ ...d.group, nextSession: d.nextSession, nextSessions: d.nextSessions, pastSessions: d.pastSessions })
-            setTodaySession(d.todaySession || null)
+            setGroup(d.group)
           }
         } else {
           const d = await gRes.json().catch(() => ({}))
@@ -174,17 +142,18 @@ export default function StudentGroupDetailPage() {
           const d = await cRes.json()
           if (d.ok) {
             setModules(d.modules || [])
-            setLessons(d.lessons || [])
-            setLessonVideos(d.videos || [])
-            setLessonAttachments(d.lessonAttachments || [])
             setModuleVideos(d.moduleVideos || [])
             setModuleAttachments(d.moduleAttachments || [])
             if ((d.modules || []).length > 0) setExpandedModules(new Set([(d.modules[0] as Module).id]))
           }
         }
-        if (hwRes.ok) {
-          const d = await hwRes.json()
-          if (d.ok) setHomework(d.homework || [])
+        if (qRes.ok) {
+          const d = await qRes.json()
+          if (d.ok) setQuizzes(d.quizzes || [])
+        }
+        if (exRes.ok) {
+          const d = await exRes.json()
+          if (d.ok) setExercises(d.exercises || [])
         }
       } catch {
         setLoadError("Erreur lors du chargement du groupe.")
@@ -194,34 +163,6 @@ export default function StudentGroupDetailPage() {
     load()
   }, [groupId])
 
-  async function submitHomework(hw: HomeworkItem) {
-    const studentId = getStudentId()
-    if (!studentId) return
-    setSubmittingHwId(hw.id)
-    try {
-      const fd = new FormData()
-      fd.append("studentId", studentId)
-      for (const f of pendingFiles) fd.append("files", f)
-
-      let url = `/api/student/groups/${groupId}/homework/${hw.id}/submit`
-      let method = "POST"
-      if (hw.submission) {
-        method = "PATCH"
-        if (toRemoveFileIds.length > 0) fd.append("deleteFileIds", JSON.stringify(toRemoveFileIds))
-      }
-
-      const res = await fetch(url, { method, body: fd })
-      const d = await res.json()
-      if (!res.ok) throw new Error(d.error || "Erreur")
-      setHomework(p => p.map(h => h.id === hw.id ? { ...h, submission: d.submission } : h))
-      setPendingFiles([])
-      setToRemoveFileIds([])
-    } catch (err: any) {
-      alert(err.message)
-    } finally {
-      setSubmittingHwId(null)
-    }
-  }
 
   if (loading) return <LoadingBI />
 
@@ -239,26 +180,18 @@ export default function StudentGroupDetailPage() {
 
   const sm = STATUS_META[group.status]
   const isBootcamp = group.programType === "bootcamp"
-  const nextSess = group.nextSession
-  const nextSessions = (group.nextSessions && group.nextSessions.length > 0)
-    ? group.nextSessions
-    : (nextSess ? [nextSess] : [])
-  const relevantSess = nextSess ?? todaySession
-  const showBanner = !!relevantSess && !!relevantSess.joinUrl
-  const hasLiveNext = showBanner
+  const formateurs = (group.instructors && group.instructors.length > 0) ? group.instructors : (group.instructor ? [group.instructor] : [])
+  const currentFormateur = formateurs[formateurIndex % Math.max(formateurs.length, 1)]
   const sortedModules = [...modules].sort((a, b) => a.order - b.order)
 
-  // Build the unified item list per module (same structure as instructor)
+  // Build the unified item list per module
   function buildModuleItems(moduleId: string) {
-    const mLessons = lessons.filter(l => l.moduleId === moduleId).sort((a, b) => a.order - b.order)
-    const mVideos  = moduleVideos.filter(v => v.moduleId === moduleId).sort((a, b) => a.order - b.order)
-    const mAtts    = moduleAttachments.filter(a => a.moduleId === moduleId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    const mVideos = moduleVideos.filter(v => v.moduleId === moduleId).sort((a, b) => a.order - b.order)
+    const mAtts = moduleAttachments.filter(a => a.moduleId === moduleId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     type Item =
-      | { itype: "lesson"; id: string; order: number; key: string }
       | { itype: "module_video"; id: string; order: number; key: string }
       | { itype: "module_attachment"; id: string; order: number; key: string }
     const items: Item[] = [
-      ...mLessons.map(l => ({ itype: "lesson" as const, id: l.id, order: l.order, key: `lesson:${l.id}` })),
       ...mVideos.map(v => ({ itype: "module_video" as const, id: v.id, order: v.order, key: `mvideo:${v.id}` })),
       ...mAtts.map(a => ({ itype: "module_attachment" as const, id: a.id, order: a.order ?? 0, key: `matt:${a.id}` })),
     ]
@@ -298,25 +231,6 @@ export default function StudentGroupDetailPage() {
             <h1 style={{ fontSize: 20, fontWeight: 700, color: "#111827", margin: 0, fontFamily: "var(--ff-display,'Syne',sans-serif)" }}>{group.title}</h1>
             <p style={{ fontSize: 13, color: "#6b7280", margin: "1px 0 0" }}>{group.program?.title || (isBootcamp ? "Bootcamp" : "Formation")}</p>
           </div>
-
-          <nav style={{ display: "flex", gap: 2 }}>
-            {([
-              { id: "overview",  label: "Vue d'ensemble", icon: LayoutList },
-              { id: "etudiants", label: "Étudiants",       icon: Users,     count: group.students.length },
-              { id: "seances",   label: "Séances",         icon: Calendar,  count: group.pastSessions?.length || 0 },
-            ] as { id: Tab; label: string; icon: React.ElementType; count?: number }[]).map(({ id, label, icon: Icon, count }) => {
-              const isActive = activeTab === id
-              return (
-                <button key={id} onClick={() => setActiveTabWithRoute(id)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px 10px", border: "none", background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: isActive ? 700 : 500, color: isActive ? "color-mix(in oklch, var(--accent) 85%, black)" : "#6b7280", borderBottom: isActive ? "2.5px solid var(--accent)" : "2.5px solid transparent", marginBottom: -1, transition: "all 0.15s" }}>
-                  <Icon size={13} />
-                  {label}
-                  {count !== undefined && count > 0 && (
-                    <span style={{ fontSize: 10, fontWeight: 700, minWidth: 18, height: 18, borderRadius: 99, display: "inline-flex", alignItems: "center", justifyContent: "center", background: isActive ? "color-mix(in oklch, var(--accent) 12%, transparent)" : "#f3f4f6", color: isActive ? "color-mix(in oklch, var(--accent) 85%, black)" : "#6b7280", padding: "0 4px" }}>{count}</span>
-                  )}
-                </button>
-              )
-            })}
-          </nav>
         </div>
       </header>
 
@@ -335,54 +249,12 @@ export default function StudentGroupDetailPage() {
           {/* Stats row */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
             {[
-              { icon: Users,      value: group.students.length,       label: "Étudiants", iconColor: "var(--accent)", iconBg: "color-mix(in oklch, var(--accent) 8%, transparent)" },
+              { icon: Users,      value: group.students.length,       label: "Apprenants", iconColor: "var(--accent)", iconBg: "color-mix(in oklch, var(--accent) 8%, transparent)" },
               { icon: LayoutList, value: modules.length,              label: "Modules",   iconColor: "var(--accent)", iconBg: "color-mix(in oklch, var(--accent) 8%, transparent)" },
-              { icon: FileText,   value: lessons.length,              label: "Leçons",    iconColor: "#10b981", iconBg: "rgba(16,185,129,0.08)" },
-              { icon: Video,      value: lessonVideos.length + moduleVideos.length, label: "Vidéos", iconColor: "#f59e0b", iconBg: "rgba(245,158,11,0.08)" },
+              { icon: Video,      value: moduleVideos.length,          label: "Vidéos",   iconColor: "#f59e0b", iconBg: "rgba(245,158,11,0.08)" },
+              { icon: FileText,   value: moduleAttachments.length,     label: "Fichiers", iconColor: "#10b981", iconBg: "rgba(16,185,129,0.08)" },
             ].map(card => <GroupKpiCard key={card.label} {...card} />)}
           </div>
-
-          {/* Live session banner */}
-          {hasLiveNext && relevantSess?.joinUrl && (
-            <div style={{ background: "linear-gradient(135deg,color-mix(in oklch, var(--accent) 85%, black) 0%,#7c3aed 100%)", borderRadius: 16, padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 8px 24px color-mix(in oklch, var(--accent) 25%, transparent)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 14, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <Video size={22} color="#fff" />
-                </div>
-                <div>
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.18)", padding: "2px 10px", borderRadius: 99, marginBottom: 6 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", display: "inline-block" }} />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", letterSpacing: "0.06em" }}>PROCHAINE SÉANCE</span>
-                  </div>
-                  <h3 style={{ fontSize: 17, fontWeight: 700, color: "#fff", margin: "0 0 4px", fontFamily: "var(--ff-display,'Syne',sans-serif)" }}>{relevantSess!.title || "Séance de formation"}</h3>
-                  <p style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
-                    <Clock size={12} /> {fmtDate(relevantSess!.date)} à {relevantSess!.start_time || "—"}
-                  </p>
-                </div>
-              </div>
-              {relevantSess!.joinUrl && (
-                <button onClick={() => window.open(relevantSess!.joinUrl!, "_blank")} style={{ background: "#fff", color: "color-mix(in oklch, var(--accent) 85%, black)", border: "none", padding: "11px 20px", borderRadius: 11, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
-                  <ExternalLink size={14} /> Rejoindre
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Non-live next session */}
-          {nextSess && nextSess.joinUrl && !hasLiveNext && (
-            <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf3", padding: "16px 20px", display: "flex", alignItems: "center", gap: 14, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: "#f4f6fb", border: "1px solid #e8ecf3", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Calendar size={18} color="var(--accent)" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)", margin: "0 0 3px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Prochaine séance</p>
-                <p style={{ fontSize: 14, fontWeight: 700, color: "#111827", margin: 0 }}>{nextSess.title || "Séance"}</p>
-                <p style={{ fontSize: 12, color: "#6b7280", margin: "2px 0 0", display: "flex", alignItems: "center", gap: 5 }}>
-                  <Clock size={11} /> {fmtDate(nextSess.date)} à {nextSess.start_time || "—"}
-                </p>
-              </div>
-            </div>
-          )}
 
           {/* 2-col: program info + sidebar */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16, alignItems: "start" }}>
@@ -413,110 +285,49 @@ export default function StudentGroupDetailPage() {
               </div>
             )}
 
-            {/* Right: instructor + sessions sidebar */}
+            {/* Right: instructor sidebar */}
             <div style={{ display: "flex", flexDirection: "column", gap: 12, position: "sticky", top: 104, alignSelf: "start" }}>
-              {group.instructor && (
+              {currentFormateur && (
                 <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf3", padding: "16px 18px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Formateur</p>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", margin: 0, textTransform: "uppercase", letterSpacing: "0.06em" }}>Formateur</p>
+                    {formateurs.length > 1 && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <button type="button" aria-label="Formateur précédent" onClick={() => setFormateurIndex(i => (i - 1 + formateurs.length) % formateurs.length)} style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid color-mix(in oklch, var(--accent) 20%, #e2e8f0)", background: "color-mix(in oklch, var(--accent) 5%, white)", color: "color-mix(in oklch, var(--accent) 82%, black)", cursor: "pointer", fontSize: 16, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, transition: "all 0.15s" }} onMouseEnter={e => { e.currentTarget.style.background = "var(--accent)"; e.currentTarget.style.color = "#fff" }} onMouseLeave={e => { e.currentTarget.style.background = "color-mix(in oklch, var(--accent) 5%, white)"; e.currentTarget.style.color = "color-mix(in oklch, var(--accent) 82%, black)" }}>‹</button>
+                        <button type="button" aria-label="Formateur suivant" onClick={() => setFormateurIndex(i => (i + 1) % formateurs.length)} style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid color-mix(in oklch, var(--accent) 20%, #e2e8f0)", background: "color-mix(in oklch, var(--accent) 5%, white)", color: "color-mix(in oklch, var(--accent) 82%, black)", cursor: "pointer", fontSize: 16, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, transition: "all 0.15s" }} onMouseEnter={e => { e.currentTarget.style.background = "var(--accent)"; e.currentTarget.style.color = "#fff" }} onMouseLeave={e => { e.currentTarget.style.background = "color-mix(in oklch, var(--accent) 5%, white)"; e.currentTarget.style.color = "color-mix(in oklch, var(--accent) 82%, black)" }}>›</button>
+                      </div>
+                    )}
+                  </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                    {group.instructor.avatar ? (
+                    {currentFormateur.avatar ? (
                       <img
-                        src={group.instructor.avatar}
+                        src={currentFormateur.avatar}
                         alt=""
                         style={{ width: 40, height: 40, minWidth: 40, minHeight: 40, borderRadius: "50%", objectFit: "cover", display: "block", flexShrink: 0, border: "2px solid color-mix(in oklch, var(--accent) 20%, transparent)" }}
                       />
                     ) : (
                       <div style={{ width: 40, height: 40, minWidth: 40, minHeight: 40, borderRadius: "50%", background: "color-mix(in oklch, var(--accent) 10%, transparent)", border: "2px solid color-mix(in oklch, var(--accent) 20%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 14, fontWeight: 800, color: "color-mix(in oklch, var(--accent) 85%, black)" }}>
-                        {initials(group.instructor.name, group.instructor.surname)}
+                        {initials(currentFormateur.name, currentFormateur.surname)}
                       </div>
                     )}
                     <div>
-                      <p style={{ fontSize: 14, fontWeight: 700, color: "#111827", margin: 0 }}>{[group.instructor.name, group.instructor.surname].filter(Boolean).join(" ")}</p>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: "#111827", margin: 0 }}>{[currentFormateur.name, currentFormateur.surname].filter(Boolean).join(" ")}</p>
                       <p style={{ fontSize: 12, color: "#6b7280", margin: "1px 0 0", display: "flex", alignItems: "center", gap: 4 }}>
                         <GraduationCap size={11} /> Formateur
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => window.dispatchEvent(new CustomEvent("open-message-group", { detail: { groupId } }))}
-                    style={{
-                      width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-                      padding: "9px 14px", borderRadius: 10,
-                      background: "color-mix(in oklch, var(--accent) 7%, transparent)",
-                      border: "1.5px solid color-mix(in oklch, var(--accent) 20%, transparent)",
-                      color: "color-mix(in oklch, var(--accent) 85%, black)",
-                      fontSize: 13, fontWeight: 700, cursor: "pointer",
-                      transition: "all 0.15s",
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLButtonElement).style.background = "color-mix(in oklch, var(--accent) 12%, transparent)"
-                      ;(e.currentTarget as HTMLButtonElement).style.borderColor = "color-mix(in oklch, var(--accent) 35%, transparent)"
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLButtonElement).style.background = "color-mix(in oklch, var(--accent) 7%, transparent)"
-                      ;(e.currentTarget as HTMLButtonElement).style.borderColor = "color-mix(in oklch, var(--accent) 20%, transparent)"
-                    }}
-                  >
-                    <MessageSquare size={14} />
-                    Envoyer un message
-                  </button>
+                  {formateurs.length > 1 && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5, margin: "-2px 0 12px" }}>
+                      {formateurs.map((f, idx) => (
+                        <button key={f.id} type="button" aria-label={`Formateur ${idx + 1}`} onClick={() => setFormateurIndex(idx)} style={{ width: idx === formateurIndex % formateurs.length ? 18 : 6, height: 6, borderRadius: 99, border: "none", background: idx === formateurIndex % formateurs.length ? "var(--accent)" : "#cbd5e1", cursor: "pointer", padding: 0, transition: "all 0.15s" }} />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Upcoming sessions */}
-              <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #f1f5f9", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.03)" }}>
-                <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 9, background: "linear-gradient(180deg,#fafbfd 0%,#fff 100%)" }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: "color-mix(in oklch, var(--accent) 10%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent)" }}>
-                    <Calendar size={13} strokeWidth={2} />
-                  </div>
-                  <h2 style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", margin: 0 }}>Séances à venir</h2>
-                </div>
-                {nextSessions.length === 0 ? (
-                  <div style={{ padding: "22px 18px", textAlign: "center" }}>
-                    <Calendar size={24} color="#e2e8f0" style={{ margin: "0 auto 8px" }} />
-                    <p style={{ fontSize: 12, color: "#475569", margin: 0 }}>Aucune séance planifiée</p>
-                  </div>
-                ) : (
-                  <div style={{ padding: "8px 0" }}>
-                    {nextSessions.slice(0, 3).map((session, idx) => {
-                      const sessionDate = new Date(session.date + "T00:00:00")
-                      const isToday = sessionDate.toDateString() === new Date().toDateString()
-                      return (
-                        <div key={session.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 18px", borderBottom: idx < Math.min(nextSessions.length, 3) - 1 ? "1px solid #f8fafc" : "none" }}>
-                          <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: isToday ? "color-mix(in oklch, var(--accent) 10%, transparent)" : "#f8fafc", border: `1.5px solid ${isToday ? "color-mix(in oklch, var(--accent) 20%, transparent)" : "#f1f5f9"}` }}>
-                            <span style={{ fontSize: 13, fontWeight: 800, color: isToday ? "var(--accent)" : "#0f172a", lineHeight: 1 }}>{sessionDate.getDate()}</span>
-                            <span style={{ fontSize: 9, fontWeight: 600, color: "#475569", lineHeight: 1, marginTop: 1 }}>{sessionDate.toLocaleDateString("fr-FR", { month: "short" }).toUpperCase()}</span>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.title || "Séance"}</p>
-                            <p style={{ fontSize: 11, color: "#475569", margin: "1px 0 0" }}>{session.start_time ? session.start_time.slice(0, 5) : "—"} · {fmtDate(session.date)}</p>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
 
-              {/* Quick links */}
-              <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf3", padding: "14px 16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-                <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", margin: "0 0 10px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Accès rapide</p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {([
-                    { label: "Étudiants",  tab: "etudiants" as Tab, icon: Users  },
-                    { label: "Historique", tab: "seances" as Tab,   icon: Clock  },
-                  ]).map(({ label, tab, icon: Icon }) => (
-                    <button key={tab} onClick={() => setActiveTabWithRoute(tab)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", borderRadius: 9, border: "1px solid #f3f4f6", background: "#fafafa", cursor: "pointer", textAlign: "left", transition: "all 0.15s" }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "color-mix(in oklch, var(--accent) 6%, white)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "color-mix(in oklch, var(--accent) 20%, transparent)" }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#fafafa"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#f3f4f6" }}
-                    >
-                      <Icon size={13} color="var(--accent)" />
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{label}</span>
-                      <ChevronRight size={12} style={{ color: "#d1d5db", marginLeft: "auto" }} />
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
           {/* ── Programme — same card design as instructor, read-only ── */}
@@ -526,7 +337,7 @@ export default function StudentGroupDetailPage() {
               <span style={{ fontSize: 20, fontWeight: 800, color: "#111827", letterSpacing: "-0.025em" }}>Programme</span>
               <span style={{ fontSize: 13, color: "#6b7280", fontWeight: 500 }}>{modules.length} module{modules.length !== 1 ? "s" : ""}</span>
               <span style={{ color: "#d1d5db", fontSize: 13 }}>·</span>
-              <span style={{ fontSize: 13, color: "#6b7280", fontWeight: 500 }}>{lessons.length} leçon{lessons.length !== 1 ? "s" : ""}</span>
+              <span style={{ fontSize: 13, color: "#6b7280", fontWeight: 500 }}>{moduleVideos.length + moduleAttachments.length} ressource{moduleVideos.length + moduleAttachments.length !== 1 ? "s" : ""}</span>
             </div>
 
             {modules.length === 0 ? (
@@ -540,7 +351,7 @@ export default function StudentGroupDetailPage() {
                   const isExpanded = expandedModules.has(mod.id)
                   const etapeNum = String(modIdx + 1).padStart(2, "0")
                   const allItems = buildModuleItems(mod.id)
-                  const modLessonsCount = lessons.filter(l => l.moduleId === mod.id).length
+                  const modResourcesCount = moduleVideos.filter(v => v.moduleId === mod.id).length + moduleAttachments.filter(a => a.moduleId === mod.id).length
                   return (
                     <div key={mod.id} style={{ background: "#fff", borderRadius: 16, border: "1px solid #e8ecf3", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", overflow: "hidden" }}>
                       {/* Module header — same style as instructor */}
@@ -556,7 +367,7 @@ export default function StudentGroupDetailPage() {
                           <div style={{ fontSize: 18, fontWeight: 800, color: "#111827", letterSpacing: "-0.02em", lineHeight: 1.25 }}>{mod.title}</div>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
                             <BookOpen size={12} color="#9ca3af" />
-                            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 500 }}>{modLessonsCount} leçon{modLessonsCount !== 1 ? "s" : ""}</span>
+                            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 500 }}>{modResourcesCount} ressource{modResourcesCount !== 1 ? "s" : ""}</span>
                             {mod.description && (
                               <>
                                 <span style={{ color: "#e2e8f0", fontSize: 12 }}>·</span>
@@ -585,34 +396,6 @@ export default function StudentGroupDetailPage() {
                               display: "flex", alignItems: "center", gap: 14, padding: "11px 20px",
                               borderBottom: itemIdx < allItems.length - 1 ? "1px solid #f8f9fb" : "none",
                               transition: "background 0.12s",
-                            }
-                            if (item.itype === "lesson") {
-                              const lesson = lessons.find(l => l.id === item.id)!
-                              return (
-                                <div key={item.key} style={{ ...baseRow, cursor: "pointer" }}
-                                  onClick={() => router.push(`/student-dashboard/groups/${groupId}/lessons/${lesson.id}`)}
-                                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = "rgba(99,102,241,0.05)"}
-                                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
-                                >
-                                  <div style={{ width: 34, height: 34, borderRadius: 9, background: "#6366f1", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 2px 8px rgba(99,102,241,0.35)" }}>
-                                    <BookOpen size={16} strokeWidth={2.5} color="#fff" />
-                                  </div>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: 10, fontWeight: 700, color: "#6366f1", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 1 }}>Leçon</div>
-                                    <span style={{ fontSize: 14, fontWeight: 500, color: "#1f2937", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lesson.title}</span>
-                                  </div>
-                                  {(() => {
-                                    const vids = lessonVideos.filter(v => v.lessonId === lesson.id)
-                                    const atts = lessonAttachments.filter(a => a.lessonId === lesson.id)
-                                    return (
-                                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                        {vids.length > 0 && <span style={{ fontSize: 11, color: "#9ca3af", display: "flex", alignItems: "center", gap: 3 }}><Video size={11} /> {vids.length}</span>}
-                                        {atts.length > 0 && <span style={{ fontSize: 11, color: "#9ca3af", display: "flex", alignItems: "center", gap: 3 }}><Paperclip size={11} /> {atts.length}</span>}
-                                      </div>
-                                    )
-                                  })()}
-                                </div>
-                              )
                             }
                             if (item.itype === "module_video") {
                               const vid = moduleVideos.find(v => v.id === item.id)!
@@ -674,170 +457,63 @@ export default function StudentGroupDetailPage() {
                           })}
                         </div>
                       )}
-                      {allItems.length === 0 && homework.filter(h => h.moduleId === mod.id).length === 0 && (
+                      {allItems.length === 0 && quizzes.filter(q => q.moduleId === mod.id).length === 0 && exercises.filter(ex => ex.moduleId === mod.id).length === 0 && (
                         <div style={{ padding: "20px 18px", textAlign: "center" }}>
                           <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>Aucun contenu pour ce module</p>
                         </div>
                       )}
 
-                      {/* ── Homework items ── */}
-                      {homework.filter(h => h.moduleId === mod.id).map(hw => {
-                        const isExpHw    = expandedHomeworkId === hw.id
-                        const deadlinePassed = hw.deadline ? new Date(hw.deadline) < new Date() : false
-                        const hasSubmission  = !!hw.submission
-                        const isSubmitting   = submittingHwId === hw.id
-                        const canModify      = !deadlinePassed
-
-                        return (
-                          <div key={hw.id} style={{ borderTop: "1px solid #f0f1f5" }}>
-                            {/* Row */}
-                            <div
-                              style={{ display: "flex", alignItems: "center", gap: 14, padding: "11px 20px", cursor: "pointer", transition: "background 0.12s" }}
-                              onClick={() => {
-                                setExpandedHomeworkId(isExpHw ? null : hw.id)
-                                setPendingFiles([])
-                                setToRemoveFileIds([])
-                              }}
-                              onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = "#fff8f0"}
-                              onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
-                            >
-                              <div style={{ width: 34, height: 34, borderRadius: 9, background: hasSubmission ? "#10b981" : "#8b5cf6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: hasSubmission ? "0 2px 8px rgba(16,185,129,0.35)" : "0 2px 8px rgba(139,92,246,0.35)" }}>
-                                {hasSubmission ? <ClipboardCheck size={16} strokeWidth={2.5} color="#fff" /> : <ClipboardList size={16} strokeWidth={2.5} color="#fff" />}
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: hasSubmission ? "#059669" : "#7c3aed", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 1 }}>{hasSubmission ? "Exercice · Rendu" : "Exercice"}</div>
-                                <span style={{ fontSize: 14, fontWeight: 600, color: "#1f2937", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hw.title}</span>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
-                                  {hw.deadline && (
-                                    <span style={{ fontSize: 11, color: deadlinePassed ? "#ef4444" : "#f59e0b", display: "flex", alignItems: "center", gap: 3 }}>
-                                      <Clock size={10} />
-                                      {new Date(hw.deadline).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
-                                      {deadlinePassed ? " — Expiré" : ""}
-                                    </span>
-                                  )}
-                                  {hasSubmission && (
-                                    <span style={{ fontSize: 11, color: "#10b981", fontWeight: 600 }}>Rendu</span>
-                                  )}
-                                </div>
-                              </div>
-                              <ChevronDown size={14} style={{ color: "#9ca3af", transition: "transform 0.2s", transform: isExpHw ? "rotate(0deg)" : "rotate(-90deg)", flexShrink: 0 }} />
+                      {/* ── Quiz items ── */}
+                      {quizzes.filter(q => q.moduleId === mod.id).map(quiz => (
+                        <div key={quiz.id} style={{ borderTop: "1px solid #f0f1f5" }}>
+                          <div
+                            style={{ display: "flex", alignItems: "center", gap: 14, padding: "11px 20px", cursor: "pointer", transition: "background 0.12s" }}
+                            onClick={() => router.push(`/student-dashboard/groups/${groupId}/quiz/${quiz.id}`)}
+                            onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = "#f0f9ff"}
+                            onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
+                          >
+                            <div style={{ width: 34, height: 34, borderRadius: 9, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 2px 8px color-mix(in oklch, var(--accent) 28%, transparent)" }}>
+                              <BrainCircuit size={16} strokeWidth={2.5} color="#fff" />
                             </div>
-
-                            {/* Expanded detail + submission */}
-                            {isExpHw && (
-                              <div style={{ padding: "0 20px 16px 68px", display: "flex", flexDirection: "column", gap: 12, background: "#fffbf5", borderTop: "1px solid #fef3c7" }}>
-                                {hw.text && (
-                                  <p style={{ fontSize: 13, color: "#374151", margin: 0, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>{hw.text}</p>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 1 }}>Quiz</div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                                <span style={{ fontSize: 14, fontWeight: 600, color: "#1f2937", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{quiz.title}</span>
+                                {quiz.deadline && (
+                                  <span style={{ fontSize: 11, color: "#dc2626", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>Deadline: {fmtDeadline(quiz.deadline)}</span>
                                 )}
-
-                                {/* Deadline pill */}
-                                {hw.deadline && (
-                                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 99, background: deadlinePassed ? "rgba(239,68,68,0.08)" : "rgba(245,158,11,0.1)", border: `1px solid ${deadlinePassed ? "rgba(239,68,68,0.2)" : "rgba(245,158,11,0.3)"}`, width: "fit-content" }}>
-                                    <Clock size={11} color={deadlinePassed ? "#ef4444" : "#f59e0b"} />
-                                    <span style={{ fontSize: 12, fontWeight: 600, color: deadlinePassed ? "#ef4444" : "#92400e" }}>
-                                      Deadline : {new Date(hw.deadline).toLocaleString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                                      {deadlinePassed ? " (expiré)" : ""}
-                                    </span>
-                                  </div>
-                                )}
-
-                                {/* Instructor attachments */}
-                                {hw.attachments.length > 0 && (
-                                  <div>
-                                    <p style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Fichiers du formateur</p>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                      {hw.attachments.map(att => (
-                                        <a key={att.id} href={att.url || "#"} target="_blank" rel="noopener noreferrer"
-                                          style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#fff", borderRadius: 8, border: "1px solid #f3f4f6", textDecoration: "none", transition: "background 0.12s" }}
-                                          onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
-                                          onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
-                                        >
-                                          <Paperclip size={12} color="#9ca3af" />
-                                          <span style={{ flex: 1, fontSize: 12, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{att.name}</span>
-                                          <ExternalLink size={11} color="#9ca3af" />
-                                        </a>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Submission section */}
-                                <div>
-                                  <p style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                                    {hasSubmission ? "Votre rendu" : "Rendre le devoir"}
-                                  </p>
-
-                                  {/* Submitted files */}
-                                  {hasSubmission && hw.submission!.files.length > 0 && (
-                                    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
-                                      {hw.submission!.files
-                                        .filter(f => !toRemoveFileIds.includes(f.id))
-                                        .map(f => (
-                                          <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#f0fdf4", borderRadius: 8, border: "1px solid #bbf7d0" }}>
-                                            <Check size={12} color="#10b981" />
-                                            {f.url ? (
-                                              <a href={f.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, fontSize: 12, color: "#065f46", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</a>
-                                            ) : (
-                                              <span style={{ flex: 1, fontSize: 12, color: "#065f46", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
-                                            )}
-                                            {canModify && (
-                                              <button onClick={() => setToRemoveFileIds(p => [...p, f.id])}
-                                                style={{ padding: "2px 4px", background: "transparent", border: "none", borderRadius: 4, cursor: "pointer", color: "#86efac", transition: "color 0.12s" }}
-                                                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"}
-                                                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = "#86efac"}
-                                              ><X size={11} /></button>
-                                            )}
-                                          </div>
-                                        ))}
-                                    </div>
-                                  )}
-
-                                  {/* Pending new files */}
-                                  {pendingFiles.length > 0 && expandedHomeworkId === hw.id && (
-                                    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
-                                      {pendingFiles.map((f, i) => (
-                                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#fefce8", borderRadius: 8, border: "1px solid #fde68a" }}>
-                                          <Upload size={12} color="#f59e0b" />
-                                          <span style={{ flex: 1, fontSize: 12, color: "#92400e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
-                                          <button onClick={() => setPendingFiles(p => p.filter((_, j) => j !== i))}
-                                            style={{ padding: "2px 4px", background: "transparent", border: "none", borderRadius: 4, cursor: "pointer", color: "#fbbf24", transition: "color 0.12s" }}
-                                            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"}
-                                            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = "#fbbf24"}
-                                          ><X size={11} /></button>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {canModify ? (
-                                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                                      <button onClick={() => hwSubmitRef.current?.click()}
-                                        style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 14px", background: "#fff", border: "1.5px dashed #fbbf24", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#92400e", cursor: "pointer", transition: "all 0.15s" }}
-                                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#fffbeb"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#f59e0b" }}
-                                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#fbbf24" }}
-                                      ><Upload size={12} /> Ajouter des fichiers</button>
-                                      {(pendingFiles.length > 0 || toRemoveFileIds.length > 0) && (
-                                        <button onClick={() => submitHomework(hw)} disabled={isSubmitting}
-                                          style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 14px", background: "#10b981", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#fff", cursor: isSubmitting ? "not-allowed" : "pointer", opacity: isSubmitting ? 0.7 : 1 }}
-                                        >{isSubmitting ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} {hasSubmission ? "Mettre à jour" : "Soumettre"}</button>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
-                                      <Clock size={12} color="#ef4444" />
-                                      <span style={{ fontSize: 12, color: "#ef4444", fontWeight: 600 }}>La deadline est passée — plus de modifications possibles</span>
-                                    </div>
-                                  )}
-
-                                  {!hasSubmission && !canModify && (
-                                    <p style={{ fontSize: 12, color: "#9ca3af", margin: "6px 0 0" }}>Vous n'avez pas rendu ce devoir.</p>
-                                  )}
-                                </div>
                               </div>
-                            )}
+                            </div>
+                            <ChevronRight size={14} style={{ color: "#d1d5db", flexShrink: 0 }} />
                           </div>
-                        )
-                      })}
+                        </div>
+                      ))}
+
+                      {/* ── Exercise items ── */}
+                      {exercises.filter(ex => ex.moduleId === mod.id).map(ex => (
+                        <div key={ex.id} style={{ borderTop: "1px solid #f0f1f5" }}>
+                          <div
+                            style={{ display: "flex", alignItems: "center", gap: 14, padding: "11px 20px", cursor: "pointer", transition: "background 0.12s" }}
+                            onClick={() => router.push(`/student-dashboard/groups/${groupId}/exercice/${ex.id}`)}
+                            onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = "#ecfeff"}
+                            onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
+                          >
+                            <div style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg,#06b6d4,#0891b2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 2px 8px rgba(6,182,212,0.28)" }}>
+                              <ClipboardCheck size={16} strokeWidth={2.5} color="#fff" />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: "#0e7490", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 1 }}>Travail pratique</div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                                <span style={{ fontSize: 14, fontWeight: 600, color: "#1f2937", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{ex.title}</span>
+                                {ex.deadline && (
+                                  <span style={{ fontSize: 11, color: "#dc2626", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>Deadline: {fmtDeadline(ex.deadline)}</span>
+                                )}
+                              </div>
+                            </div>
+                            <ChevronRight size={14} style={{ color: "#d1d5db", flexShrink: 0 }} />
+                          </div>
+                        </div>
+                      ))}
                     </motion.div>
                     </div>
                   )
@@ -846,199 +522,18 @@ export default function StudentGroupDetailPage() {
             )}
           </div>
 
-          {/* Homework with no matching module (safety net) */}
-          {(() => {
-            const moduleIds = new Set(sortedModules.map(m => m.id))
-            const orphans = homework.filter(h => !moduleIds.has(h.moduleId))
-            if (orphans.length === 0) return null
-            return (
-              <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #fde68a", overflow: "hidden", marginTop: 4 }}>
-                <div style={{ padding: "14px 20px", borderBottom: "1px solid #fef3c7", display: "flex", alignItems: "center", gap: 8, background: "#fffbeb" }}>
-                  <ClipboardList size={14} color="#f59e0b" />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#92400e" }}>Devoirs</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#f59e0b", background: "#fef3c7", borderRadius: 99, padding: "2px 8px" }}>{orphans.length}</span>
-                </div>
-                {orphans.map(hw => {
-                  const isExpHw = expandedHomeworkId === hw.id
-                  const deadlinePassed = hw.deadline ? new Date(hw.deadline) < new Date() : false
-                  const hasSubmission = !!hw.submission
-                  const isSubmitting = submittingHwId === hw.id
-                  const canModify = !deadlinePassed
-                  return (
-                    <div key={hw.id} style={{ borderTop: "1px solid #fef3c7" }}>
-                      <div
-                        style={{ display: "flex", alignItems: "center", gap: 14, padding: "11px 20px", cursor: "pointer", transition: "background 0.12s" }}
-                        onClick={() => { setExpandedHomeworkId(isExpHw ? null : hw.id); setPendingFiles([]); setToRemoveFileIds([]) }}
-                        onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = "#fffbeb"}
-                        onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
-                      >
-                        <div style={{ width: 34, height: 34, borderRadius: 9, background: hasSubmission ? "#10b981" : "#f59e0b", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          {hasSubmission ? <ClipboardCheck size={16} strokeWidth={2.5} color="#fff" /> : <ClipboardList size={16} strokeWidth={2.5} color="#fff" />}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#1f2937", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hw.title}</span>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
-                            {hw.deadline && (
-                              <span style={{ fontSize: 11, color: deadlinePassed ? "#ef4444" : "#f59e0b", display: "flex", alignItems: "center", gap: 3 }}>
-                                <Clock size={10} /> {new Date(hw.deadline).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
-                                {deadlinePassed ? " — Expiré" : ""}
-                              </span>
-                            )}
-                            {hasSubmission && <span style={{ fontSize: 11, color: "#10b981", fontWeight: 600 }}>Rendu</span>}
-                          </div>
-                        </div>
-                        <ChevronDown size={14} style={{ color: "#9ca3af", transition: "transform 0.2s", transform: isExpHw ? "rotate(0deg)" : "rotate(-90deg)", flexShrink: 0 }} />
-                      </div>
-                      {isExpHw && (
-                        <div style={{ padding: "0 20px 16px 68px", display: "flex", flexDirection: "column", gap: 12, background: "#fffbf5", borderTop: "1px solid #fef3c7" }}>
-                          {hw.text && <p style={{ fontSize: 13, color: "#374151", margin: 0, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>{hw.text}</p>}
-                          {canModify ? (
-                            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                              <button onClick={() => hwSubmitRef.current?.click()}
-                                style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 14px", background: "#fff", border: "1.5px dashed #fbbf24", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#92400e", cursor: "pointer" }}
-                              ><Upload size={12} /> Ajouter des fichiers</button>
-                              {(pendingFiles.length > 0 || toRemoveFileIds.length > 0) && (
-                                <button onClick={() => submitHomework(hw)} disabled={isSubmitting}
-                                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 14px", background: "#10b981", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#fff", cursor: isSubmitting ? "not-allowed" : "pointer" }}
-                                >{isSubmitting ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} {hasSubmission ? "Mettre à jour" : "Soumettre"}</button>
-                              )}
-                            </div>
-                          ) : (
-                            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
-                              <Clock size={12} color="#ef4444" />
-                              <span style={{ fontSize: 12, color: "#ef4444", fontWeight: 600 }}>Délai expiré</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })()}
           </div>
         </div>
       )}
 
       {/* ─── TAB: ÉTUDIANTS ──────────────────────────────────────────────────── */}
-      {activeTab === "etudiants" && (
-        <div style={{ padding: "24px 28px 64px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: "#111827", margin: 0 }}>Étudiants inscrits</h2>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "color-mix(in oklch, var(--accent) 85%, black)", background: "color-mix(in oklch, var(--accent) 8%, transparent)", padding: "2px 10px", borderRadius: 99, border: "1px solid color-mix(in oklch, var(--accent) 18%, transparent)" }}>{group.students.length}</span>
-          </div>
-          {group.students.length === 0 ? (
-            <div style={{ background: "#fff", borderRadius: 16, border: "1px dashed #e2e8f0", padding: "56px 24px", textAlign: "center" }}>
-              <Users size={36} style={{ color: "#e2e8f0", margin: "0 auto 12px" }} />
-              <p style={{ fontSize: 14, color: "#9ca3af", margin: 0 }}>Aucun étudiant inscrit dans ce groupe</p>
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
-              {group.students.map(s => (
-                <div key={s.id}
-                  style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf3", padding: "16px 18px", display: "flex", alignItems: "center", gap: 13, boxShadow: "0 1px 3px rgba(0,0,0,0.04)", transition: "all 0.15s" }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 6px 20px rgba(0,0,0,0.08)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)" }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)" }}
-                >
-                  {s.avatar ? (
-                    <img src={s.avatar} alt="" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                  ) : (
-                    <div style={{ width: 44, height: 44, borderRadius: "50%", background: avatarColor(s.id), display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 15, fontWeight: 800, color: "#fff" }}>
-                      {initials(s.name, s.surname)}
-                    </div>
-                  )}
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: "#111827", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {[s.name, s.surname].filter(Boolean).join(" ") || s.username || "—"}
-                    </p>
-                    <p style={{ fontSize: 12, color: "#6b7280", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.email}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* ─── TAB: SÉANCES ────────────────────────────────────────────────────── */}
-      {activeTab === "seances" && (
-        <div style={{ padding: "24px 28px 64px" }}>
-          {nextSess && nextSess.joinUrl && (
-            <div style={{ marginBottom: 28 }}>
-              <h2 style={{ fontSize: 14, fontWeight: 700, color: "#6b7280", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Prochaine séance</h2>
-              <div style={{ background: "#fff", borderRadius: 14, border: "1.5px solid color-mix(in oklch, var(--accent) 20%, white)", padding: "18px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 4px 16px color-mix(in oklch, var(--accent) 7%, transparent)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: "color-mix(in oklch, var(--accent) 8%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Calendar size={20} color="var(--accent)" />
-                  </div>
-                  <div>
-                    <p style={{ fontSize: 16, fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>{nextSess.title || "Séance de formation"}</p>
-                    <p style={{ fontSize: 13, color: "#6b7280", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
-                      <Clock size={12} /> {fmtDate(nextSess.date)} à {nextSess.start_time || "—"}
-                    </p>
-                  </div>
-                </div>
-                {hasLiveNext && nextSess.joinUrl && (
-                  <button onClick={() => window.open(nextSess.joinUrl!, "_blank")} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 18px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                    <ExternalLink size={13} /> Rejoindre
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
 
-          {group.pastSessions && group.pastSessions.length > 0 && (
-            <div>
-              <h2 style={{ fontSize: 14, fontWeight: 700, color: "#6b7280", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Historique ({group.pastSessions.length})</h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {group.pastSessions.map(s => (
-                  <div key={s.id} style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8ecf3", padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 10, background: "#f4f6fb", border: "1px solid #e8ecf3", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Video size={15} color="#6b7280" />
-                      </div>
-                      <div>
-                        <p style={{ fontSize: 14, fontWeight: 700, color: "#111827", margin: "0 0 3px" }}>{s.title || "Séance"}</p>
-                        <p style={{ fontSize: 12, color: "#6b7280", margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
-                          <Clock size={10} /> {fmtDate(s.date)} à {s.start_time || "—"}
-                        </p>
-                      </div>
-                    </div>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: 9, fontSize: 12, fontWeight: 700 }}>
-                      Terminée
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!nextSess && (!group.pastSessions || group.pastSessions.length === 0) && (
-            <div style={{ background: "#fff", borderRadius: 16, border: "1px dashed #e2e8f0", padding: "56px 24px", textAlign: "center" }}>
-              <Calendar size={36} style={{ color: "#e2e8f0", margin: "0 auto 12px" }} />
-              <p style={{ fontSize: 14, color: "#9ca3af", margin: 0 }}>Aucune séance planifiée pour ce groupe</p>
-            </div>
-          )}
-        </div>
-      )}
         </motion.div>
       </AnimatePresence>
 
-      {/* Hidden file input for homework submissions */}
-      <input
-        ref={hwSubmitRef}
-        type="file"
-        multiple
-        style={{ display: "none" }}
-        onChange={e => {
-          const files = Array.from(e.target.files || [])
-          setPendingFiles(p => [...p, ...files])
-          e.target.value = ""
-        }}
-      />
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+<style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

@@ -89,7 +89,7 @@ export default function LoginPage() {
       if (!res.ok) { setLoginErr(data?.error ?? "Identifiants invalides."); return }
       const authUser = data?.user
       if (!authUser?.id) {
-        setLoginErr("Session invalide. RÃ©essayez.")
+        setLoginErr("Connexion invalide. Réessayez.")
         return
       }
       localStorage.setItem("user", JSON.stringify(authUser))
@@ -230,7 +230,7 @@ export default function LoginPage() {
                 className="text-4xl font-bold leading-tight mb-2"
                 style={{ fontFamily: "var(--ff-display)", color: "var(--foreground)" }}
               >
-                {step === "username" ? "Bon retour !" : `Bonjour, ${username} 👋`}
+                {step === "username" ? "Bon retour !" : `Bonjour, ${username}`}
               </h1>
               <p className="text-base mb-8" style={{ color: "var(--muted-foreground)" }}>
                 {step === "username"

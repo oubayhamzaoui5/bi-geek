@@ -27,12 +27,11 @@ export type AdminUser = {
   usePassword?: boolean
   password?: string
   plainPassword?: string | null
-  tags?: string[]
 }
 
 type UsersCrudProps = {
   initialUsers?: AdminUser[]
-  onSave?: (user: AdminUser, avatarFile?: File) => Promise<void>
+  onSave?: (user: AdminUser, avatarFile?: File) => Promise<AdminUser | void>
   onDelete?: (id: string) => Promise<void>
   onView?: (id: string) => void
   currentUserRole?: string
@@ -140,7 +139,14 @@ function FormCard({ title, icon, children, action }: { title: string; icon?: Rea
 const ADMIN_ROLES = ["admin", "admin_agent"]
 
 export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView, currentUserRole }: UsersCrudProps) {
+  const isAdmin = currentUserRole === "admin"
   const isAdminAgent = currentUserRole === "admin_agent"
+  const canAssignRole = (role: AdminUser["role"]) => {
+    if (isAdmin) return role !== "admin"
+    if (isAdminAgent) return !ADMIN_ROLES.includes(role)
+    return false
+  }
+  const canManageUser = (user: AdminUser) => canAssignRole(user.role)
 
   // ── State ──
   const [users, setUsers] = useState<AdminUser[]>(initialUsers)
@@ -155,7 +161,9 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
   const [generatedPassword, setGeneratedPassword] = useState("")
   const [passwordCopied, setPasswordCopied] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
-  const [tagInput, setTagInput] = useState("")
+  const [usernamePreview, setUsernamePreview] = useState("")
+  const [usernamePreviewLoading, setUsernamePreviewLoading] = useState(false)
+  const [newUserAvatarColor, setNewUserAvatarColor] = useState<{ from: string; to: string } | null>(null)
 
   const showToast = (type: ToastType, message: string, duration = 4500) => {
     const id = `toast_${Date.now()}_${Math.random()}`
@@ -208,6 +216,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
       setIsCreating(true)
       setAvatarFile(null)
       setAvatarPreview(null)
+      setNewUserAvatarColor(AVATAR_PALETTES[Math.floor(Math.random() * AVATAR_PALETTES.length)])
       setGeneratedPassword("")
       setPasswordCopied(false)
       setError(null)
@@ -225,7 +234,9 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
   }, [avatarFile])
 
   // ── Filters ──
-  const filteredUsers = users.filter(user => {
+  const visibleUsers = users.filter(canManageUser)
+
+  const filteredUsers = visibleUsers.filter(user => {
     const q = searchTerm.toLowerCase()
     const matchSearch = !q ||
       user.username.toLowerCase().includes(q) ||
@@ -238,36 +249,43 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
   })
 
   const stats = {
-    total: users.length,
-    admin: users.filter(u => u.role === "admin").length,
-    admin_agent: users.filter(u => u.role === "admin_agent").length,
-    instructor: users.filter(u => u.role === "instructor").length,
-    student: users.filter(u => u.role === "student").length,
+    total: visibleUsers.length,
+    admin: visibleUsers.filter(u => u.role === "admin").length,
+    admin_agent: visibleUsers.filter(u => u.role === "admin_agent").length,
+    instructor: visibleUsers.filter(u => u.role === "instructor").length,
+    student: visibleUsers.filter(u => u.role === "student").length,
   }
 
   // ── Handlers ──
   const createBlankUser = (): AdminUser => ({
     avatar: null, name: "", surname: "", username: "",
     email: "", phone: "", role: "student", verified: true,
-    usePassword: false, plainPassword: null, tags: [],
+    usePassword: false, plainPassword: null,
   })
 
   const handleSelectUser = (user: AdminUser) => {
+    if (!canManageUser(user)) {
+      setError("Permission refusée : ce compte ne peut pas être modifié.")
+      return
+    }
     setEditingUser(normalizeUser(user)); setAvatarFile(null)
     setAvatarPreview(user.avatar || null); setGeneratedPassword("")
+    setNewUserAvatarColor(null)
     setPasswordCopied(false); setIsCreating(false); setError(null)
   }
 
   const handleNewUser = () => {
     setEditingUser(createBlankUser()); setAvatarFile(null)
     setAvatarPreview(null); setGeneratedPassword("")
-    setPasswordCopied(false); setIsCreating(true); setError(null); setTagInput("")
+    setNewUserAvatarColor(AVATAR_PALETTES[Math.floor(Math.random() * AVATAR_PALETTES.length)])
+    setPasswordCopied(false); setIsCreating(true); setError(null)
   }
 
   const handleCancelEdit = () => {
     setEditingUser(null); setAvatarFile(null)
     setAvatarPreview(null); setGeneratedPassword("")
-    setPasswordCopied(false); setIsCreating(false); setError(null); setTagInput("")
+    setNewUserAvatarColor(null)
+    setPasswordCopied(false); setIsCreating(false); setError(null)
   }
 
   const generatePassword = (length = 12) => {
@@ -291,6 +309,50 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
     return cand
   }
 
+  useEffect(() => {
+    if (!editingUser) {
+      setUsernamePreview("")
+      setUsernamePreviewLoading(false)
+      return
+    }
+
+    if (!isCreating) {
+      setUsernamePreview(editingUser.username || "")
+      setUsernamePreviewLoading(false)
+      return
+    }
+
+    const hasIdentity = !!(editingUser.name?.trim() || editingUser.surname?.trim() || editingUser.email?.trim())
+    setUsernamePreview("")
+    setUsernamePreviewLoading(hasIdentity)
+    if (!hasIdentity) return
+
+    const controller = new AbortController()
+    const timer = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          usernamePreview: "1",
+          name: editingUser.name || "",
+          surname: editingUser.surname || "",
+          email: editingUser.email || "",
+        })
+        if (editingUser.id) params.set("currentId", editingUser.id)
+        const res = await fetch(`/api/admin/users?${params.toString()}`, { signal: controller.signal })
+        const data = await res.json().catch(() => ({}))
+        if (res.ok && data?.username) setUsernamePreview(data.username)
+      } catch (err: any) {
+        if (err?.name !== "AbortError") setUsernamePreview("")
+      } finally {
+        if (!controller.signal.aborted) setUsernamePreviewLoading(false)
+      }
+    }, 250)
+
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [editingUser?.id, editingUser?.name, editingUser?.surname, editingUser?.email, editingUser?.username, isCreating])
+
   const handleCopyPassword = async () => {
     const pwd = isCreating
       ? (editingUser?.usePassword ? (editingUser?.plainPassword ?? "") : generatedPassword)
@@ -309,27 +371,28 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
 
   const handleSaveUser = async () => {
     if (!editingUser) return
-    if (isAdminAgent && ADMIN_ROLES.includes(editingUser.role ?? "")) return setError("Permission refusée : un admin agent ne peut pas créer ou modifier des comptes admin.")
+    if (!canAssignRole(editingUser.role)) return setError("Permission refusée : vous ne pouvez pas créer ou modifier ce type de compte.")
     if (!editingUser.name?.trim() || !editingUser.surname?.trim()) return setError("Le prénom et le nom sont obligatoires")
     if (!editingUser.email.trim()) return setError("L'email est obligatoire")
     if (!editingUser.phone.trim()) return setError("Le téléphone est obligatoire")
     if (isCreating && !editingUser.usePassword && !generatedPassword) return setError("Le mot de passe est obligatoire")
     setLoading(true); setError(null)
     try {
-      const username = generateUniqueUsername(editingUser.name || "", editingUser.surname || "", editingUser.email || "", editingUser.id)
+      const username = usernamePreview || generateUniqueUsername(editingUser.name || "", editingUser.surname || "", editingUser.email || "", editingUser.id)
       const finalPwd = editingUser.usePassword ? (editingUser.plainPassword || "") : (generatedPassword || "")
       const userToSave = {
         ...editingUser, username,
         ...(isCreating ? { password: finalPwd, plainPassword: finalPwd }
           : editingUser.usePassword && finalPwd ? { password: finalPwd, plainPassword: finalPwd } : {})
       }
-      if (onSave) await onSave(userToSave, avatarFile || undefined)
+      const savedUser = onSave ? await onSave(userToSave, avatarFile || undefined) : undefined
+      const savedUsername = savedUser?.username || username
       if (editingUser.id) {
-        const updated = avatarPreview ? { ...editingUser, avatar: avatarPreview, username } : { ...editingUser, username }
+        const updated = avatarPreview ? { ...editingUser, avatar: avatarPreview, username: savedUsername } : { ...editingUser, username: savedUsername }
         setUsers(prev => prev.map(u => u.id === editingUser.id ? updated : u))
         showToast("success", "Utilisateur mis à jour avec succès !")
       } else {
-        const newUser = { ...editingUser, username, id: `user_${Date.now()}`, avatar: avatarPreview }
+        const newUser = savedUser || { ...editingUser, username: savedUsername, id: `user_${Date.now()}`, avatar: avatarPreview }
         setUsers(prev => [...prev, newUser])
         showToast("success", "Utilisateur créé avec succès !")
       }
@@ -361,6 +424,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
   const handleDeleteUser = async (id: string) => {
     const user = users.find(u => u.id === id)
     if (!user) return
+    if (!canManageUser(user)) return setError("Permission refusée : ce compte ne peut pas être supprimé.")
     if (!confirm(`Supprimer l'utilisateur ${getDisplayName(user)} ? Cette action est irréversible.`)) return
     try {
       if (onDelete) await onDelete(id)
@@ -410,11 +474,11 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
         {/* Role filter pills */}
         <div className="dashboard-role-filter-pills" style={{ display: "flex", gap: 6 }}>
           {([
-            { value: "student",     label: "Étudiants",     count: stats.student },
-            { value: "instructor",  label: "Instructeurs",  count: stats.instructor },
+            { value: "student",     label: "Apprenants",    count: stats.student },
+            { value: "instructor",  label: "Formateurs",    count: stats.instructor },
+            { value: "admin_agent", label: "Agents administratifs",  count: stats.admin_agent },
             { value: "admin",       label: "Admins",        count: stats.admin },
-            { value: "admin_agent", label: "Admin Agents",  count: stats.admin_agent },
-          ] as { value: AdminUser["role"]; label: string; count: number }[]).map(({ value, label, count }) => {
+          ] as { value: AdminUser["role"]; label: string; count: number }[]).filter(({ value }) => canAssignRole(value)).map(({ value, label, count }) => {
             const active = filterRole === value
             return (
               <button key={value} onClick={() => setFilterRole(value)}
@@ -455,7 +519,8 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
               const displayName = getDisplayName(user)
               return (
                 <div key={user.id}
-                  style={{ display: "grid", gridTemplateColumns: "1fr 200px 100px", padding: "20px 36px", borderBottom: idx < filteredUsers.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", transition: "background 0.15s" }}
+                  onClick={() => canManageUser(user) && handleSelectUser(user)}
+                  style={{ display: "grid", gridTemplateColumns: "1fr 200px 100px", padding: "20px 36px", borderBottom: idx < filteredUsers.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", transition: "background 0.15s", cursor: canManageUser(user) ? "pointer" : "default" }}
                   onMouseEnter={e => (e.currentTarget.style.background = "#fafbfd")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
@@ -489,10 +554,12 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
                   </div>
                   {/* Actions */}
                   <div style={{ display: "flex", gap: 2 }}>
-                    <IconBtn onClick={e => { e.stopPropagation(); handleSelectUser(user) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)" title="Modifier">
-                      <Edit style={{ width: 16, height: 16 }} />
-                    </IconBtn>
-                    {!(isAdminAgent && ADMIN_ROLES.includes(user.role)) && (
+                    {canManageUser(user) && (
+                      <IconBtn onClick={e => { e.stopPropagation(); handleSelectUser(user) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)" title="Modifier">
+                        <Edit style={{ width: 16, height: 16 }} />
+                      </IconBtn>
+                    )}
+                    {canManageUser(user) && (
                       <IconBtn onClick={e => { e.stopPropagation(); user.id && handleDeleteUser(user.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Supprimer">
                         <Trash2 style={{ width: 16, height: 16 }} />
                       </IconBtn>
@@ -566,7 +633,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
                           style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", border: "3px solid #fff", boxShadow: "0 4px 14px rgba(15,23,42,0.12)" }} />
                       ) : (() => {
                           const dn = [editingUser.name, editingUser.surname].filter(Boolean).join(" ") || editingUser.username || "U"
-                          const { from, to } = avatarColor(dn)
+                          const { from, to } = isCreating && newUserAvatarColor ? newUserAvatarColor : avatarColor(dn)
                           return (
                             <div style={{ width: 80, height: 80, borderRadius: "50%", background: `linear-gradient(135deg,${from},${to})`, display: "flex", alignItems: "center", justifyContent: "center", border: "3px solid #fff", boxShadow: "0 4px 14px rgba(15,23,42,0.12)" }}>
                               <span style={{ fontSize: 28, fontWeight: 700, color: "#fff" }}>{dn[0]?.toUpperCase()}</span>
@@ -622,19 +689,19 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
                       <SelectField
                         value={editingUser.role}
                         onChange={v => setEditingUser({ ...editingUser, role: v as AdminUser["role"] })}
-                        disabled={isAdminAgent && ADMIN_ROLES.includes(editingUser.role ?? "")}
+                        disabled={!canAssignRole(editingUser.role)}
                       >
-                        <option value="student">Étudiant</option>
-                        <option value="instructor">Instructeur</option>
-                        {!isAdminAgent && <option value="admin">Administrateur</option>}
-                        {!isAdminAgent && <option value="admin_agent">Admin Agent</option>}
+                        <option value="student">Apprenant</option>
+                        <option value="instructor">Formateur</option>
+                        {!isAdminAgent && editingUser.role === "admin" && <option value="admin">Administrateur</option>}
+                        {!isAdminAgent && <option value="admin_agent">Agent administratif</option>}
                         {isAdminAgent && ADMIN_ROLES.includes(editingUser.role ?? "") && (
-                          <option value={editingUser.role}>{editingUser.role === "admin" ? "Administrateur" : "Admin Agent"}</option>
+                          <option value={editingUser.role}>{editingUser.role === "admin" ? "Administrateur" : "Agent administratif"}</option>
                         )}
                       </SelectField>
-                      {isAdminAgent && ADMIN_ROLES.includes(editingUser.role ?? "") && (
+                      {!canAssignRole(editingUser.role) && (
                         <p style={{ fontSize: 11, color: "#f43f5e", margin: "5px 0 0" }}>
-                          Vous ne pouvez pas modifier le rôle d'un compte admin.
+                          Vous ne pouvez pas modifier ce type de compte.
                         </p>
                       )}
                     </div>
@@ -650,11 +717,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
                       <FieldLabel>Nom d'utilisateur</FieldLabel>
                       <input
                         readOnly
-                        value={
-                          isCreating
-                            ? generateUniqueUsername(editingUser.name || "", editingUser.surname || "", editingUser.email || "")
-                            : (editingUser.username || "")
-                        }
+                        value={isCreating ? (usernamePreviewLoading ? "Verification..." : usernamePreview) : (editingUser.username || "")}
                         style={{
                           width: "100%", padding: "10px 14px",
                           background: "#f1f5f9", border: "1.5px solid #e2e8f0", borderRadius: 10,
@@ -731,69 +794,6 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
                     )}
                   </div>
                 </FormCard>
-
-                {/* Tags — instructors only */}
-                {editingUser.role === "instructor" && (
-                  <FormCard title="Spécialités & Tags" icon={<span style={{ fontSize: 13 }}>🏷</span>}>
-                    {/* Chip list */}
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 12, minHeight: 32 }}>
-                      {(editingUser.tags ?? []).map((tag, i) => (
-                        <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 99, background: "linear-gradient(135deg,rgba(99,102,241,0.1),rgba(129,140,248,0.06))", border: "1px solid rgba(99,102,241,0.2)", fontSize: 12, fontWeight: 600, color: "#4f46e5" }}>
-                          {tag}
-                          <button type="button" onClick={() => setEditingUser({ ...editingUser, tags: (editingUser.tags ?? []).filter((_, j) => j !== i) })}
-                            style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#a5b4fc", display: "flex", lineHeight: 1 }}>
-                            <X style={{ width: 11, height: 11 }} />
-                          </button>
-                        </span>
-                      ))}
-                      {(editingUser.tags ?? []).length === 0 && (
-                        <span style={{ fontSize: 12, color: "#cbd5e1" }}>Aucun tag pour l'instant</span>
-                      )}
-                    </div>
-                    {/* Input */}
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <input
-                        value={tagInput}
-                        onChange={e => setTagInput(e.target.value)}
-                        onKeyDown={e => {
-                          if ((e.key === "Enter" || e.key === ",") && tagInput.trim()) {
-                            e.preventDefault()
-                            const tag = tagInput.trim().replace(/,$/, "")
-                            if (tag && !(editingUser.tags ?? []).includes(tag)) {
-                              setEditingUser({ ...editingUser, tags: [...(editingUser.tags ?? []), tag] })
-                            }
-                            setTagInput("")
-                          }
-                        }}
-                        placeholder="Ajouter un tag (Entrée pour confirmer)"
-                        style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13, color: "#0f172a", outline: "none", background: "#fff", transition: "border-color 0.15s" }}
-                        onFocus={e => (e.target.style.borderColor = "var(--accent,#6366f1)")}
-                        onBlur={e => {
-                          e.target.style.borderColor = "#e2e8f0"
-                          if (tagInput.trim()) {
-                            const tag = tagInput.trim()
-                            if (!(editingUser.tags ?? []).includes(tag)) {
-                              setEditingUser({ ...editingUser, tags: [...(editingUser.tags ?? []), tag] })
-                            }
-                            setTagInput("")
-                          }
-                        }}
-                      />
-                      <button type="button"
-                        onClick={() => {
-                          const tag = tagInput.trim()
-                          if (tag && !(editingUser.tags ?? []).includes(tag)) {
-                            setEditingUser({ ...editingUser, tags: [...(editingUser.tags ?? []), tag] })
-                          }
-                          setTagInput("")
-                        }}
-                        style={{ padding: "10px 16px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,var(--accent,#6366f1),#818cf8)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-                        + Ajouter
-                      </button>
-                    </div>
-                    <p style={{ fontSize: 11, color: "#475569", margin: "8px 0 0" }}>Appuyez sur Entrée ou virgule pour ajouter. Ex: Power BI, DAX, SQL…</p>
-                  </FormCard>
-                )}
 
               </div>
             </div>

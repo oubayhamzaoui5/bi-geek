@@ -8,6 +8,8 @@ import {
   Plus, Check, Loader2, MapPin, Monitor, HelpCircle, XCircle, RefreshCw,
 } from "lucide-react"
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
+import LoadingBI from "@/components/LoadingBI"
+import { getAgendaHourRange } from "@/components/agenda/timeRange"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -48,9 +50,7 @@ const DAYS_FULL_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi
 const MONTHS_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
 
-const HOUR_START = 7
-const HOUR_END = 22
-const SLOT_HEIGHT = 64 // px per hour
+const SLOT_HEIGHT = 44 // px per hour
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -87,6 +87,10 @@ function formatTime(minutes: number): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+}
+
+function sessionEndAt(session: { date: string; start_time: string; duration: number }): number {
+  return new Date(`${session.date}T${session.start_time || "09:00"}:00`).getTime() + Math.max(session.duration, 1) * 60_000
 }
 
 function formatDuration(minutes: number): string {
@@ -163,9 +167,14 @@ function SessionPanel({
   const [deleting, setDeleting] = useState(false)
   const [updateMode, setUpdateMode] = useState<"single" | "all_following">("single")
   const [activeTab, setActiveTab] = useState<"details" | "presences">("details")
-  const isPast = session.date < toYMD(new Date())
+  const isPast = sessionEndAt(session) < Date.now()
 
   const group = groups.find(g => g.id === draft.group)
+  const endTime = formatTime(parseTime(draft.start_time) + Math.max(draft.duration, 15))
+  const setEndTime = (time: string) => {
+    const duration = Math.max(parseTime(time) - parseTime(draft.start_time), 15)
+    setDraft(d => ({ ...d, duration }))
+  }
   const dateFmt = (() => {
     const d = new Date(draft.date + "T12:00:00")
     return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
@@ -206,13 +215,13 @@ function SessionPanel({
             </div>
             <div>
               <p className="text-[13px] font-semibold text-gray-900">
-                {draft.title || group?.title || "Session"}
+                {draft.title || group?.title || "Séance"}
               </p>
               <p className="text-[11px] text-gray-600 capitalize">{dateFmt}</p>
             </div>
           </div>
           <button onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-600
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-600 cursor-pointer
               hover:bg-gray-100 hover:text-gray-600 transition-colors">
             <X size={16} />
           </button>
@@ -244,7 +253,7 @@ function SessionPanel({
         {activeTab === "presences" && !session.id && (
           <div className="flex-1 flex items-center justify-center px-6 py-10 text-center">
             <p className="text-[12px] text-gray-500">
-              Enregistrez d&apos;abord la session pour voir les présences.
+              Enregistrez d&apos;abord la séance pour voir les présences.
             </p>
           </div>
         )}
@@ -257,7 +266,7 @@ function SessionPanel({
           {isPast && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-100">
               <AlertCircle size={14} className="text-amber-500 shrink-0" />
-              <span className="text-[12px] text-amber-700 font-medium">Session passée – non modifiable</span>
+              <span className="text-[12px] text-amber-700 font-medium">Séance passée – non modifiable</span>
             </div>
           )}
 
@@ -265,7 +274,7 @@ function SessionPanel({
           {draft.is_cancelled && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-100">
               <AlertCircle size={14} className="text-red-500 shrink-0" />
-              <span className="text-[12px] text-red-600 font-medium">Session annulée</span>
+              <span className="text-[12px] text-red-600 font-medium">Séance annulée</span>
             </div>
           )}
 
@@ -275,14 +284,30 @@ function SessionPanel({
             <span className="font-medium text-gray-700">{group?.title || draft.group}</span>
           </div>
 
-          {/* Time / Duration */}
+          {/* Date */}
+          <div>
+            <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+              Date de la séance
+            </label>
+            <input
+              type="date"
+              value={draft.date}
+              onChange={e => setDraft(d => ({ ...d, date: e.target.value }))}
+              className="w-full h-9 px-3 rounded-lg border border-gray-200 text-[13px]
+                text-gray-800 focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400/20"
+            />
+          </div>
+
+          {/* Time */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">
-                Heure de début
+                Heure de départ
               </label>
               <input
                 type="time"
+                lang="fr-FR"
+                step={900}
                 value={draft.start_time}
                 onChange={e => setDraft(d => ({ ...d, start_time: e.target.value }))}
                 className="w-full h-9 px-3 rounded-lg border border-gray-200 text-[13px]
@@ -291,25 +316,27 @@ function SessionPanel({
             </div>
             <div>
               <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">
-                Durée (min)
+                Heure de fin
               </label>
               <input
-                type="number"
-                min={15}
-                max={480}
-                step={15}
-                value={draft.duration}
-                onChange={e => setDraft(d => ({ ...d, duration: parseInt(e.target.value) || 120 }))}
+                type="time"
+                lang="fr-FR"
+                step={900}
+                value={endTime}
+                onChange={e => setEndTime(e.target.value)}
                 className="w-full h-9 px-3 rounded-lg border border-gray-200 text-[13px]
                   text-gray-800 focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400/20"
               />
             </div>
           </div>
+          <p className="text-[11px] text-gray-500 font-medium -mt-3">
+            Durée calculée : {formatDuration(draft.duration)}
+          </p>
 
           {/* Cancel toggle */}
           <div className="flex items-center justify-between py-3 px-3 rounded-lg bg-gray-50 border border-gray-100">
             <div>
-              <p className="text-[12px] font-semibold text-gray-700">Annuler la session</p>
+              <p className="text-[12px] font-semibold text-gray-700">Annuler la séance</p>
               <p className="text-[11px] text-gray-600">Marquer comme annulée</p>
             </div>
             <button
@@ -338,7 +365,7 @@ function SessionPanel({
                     ? "bg-white text-gray-800 shadow-sm"
                     : "text-gray-600 hover:text-gray-600"}`}
               >
-                Cette session
+                Cette séance
               </button>
               <button
                 onClick={() => setUpdateMode("all_following")}
@@ -446,7 +473,7 @@ function PresenceTab({ sessionId }: { sessionId: string }) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center py-10 px-6">
         <Users size={28} className="text-gray-200 mb-2" />
-        <p className="text-[12px] text-gray-500 font-medium">Aucun étudiant dans ce groupe</p>
+        <p className="text-[12px] text-gray-500 font-medium">Aucun apprenant dans ce groupe</p>
       </div>
     )
   }
@@ -716,7 +743,7 @@ function GroupScheduleModal({
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Clock size={28} className="text-gray-200 mb-2" />
                 <p className="text-[12px] text-gray-600">Aucune séance définie</p>
-                <p className="text-[11px] text-gray-600 mt-0.5">Ajoutez une séance pour générer les sessions automatiquement</p>
+                <p className="text-[11px] text-gray-600 mt-0.5">Ajoutez une séance pour générer les séances automatiquement</p>
               </div>
             )}
 
@@ -766,6 +793,85 @@ function GroupScheduleModal({
 
 // ── Week Grid View ─────────────────────────────────────────────────────────────
 
+function ExtraSessionModal({
+  session,
+  group,
+  onClose,
+  onSave,
+}: {
+  session: Session
+  group: Group | undefined
+  onClose: () => void
+  onSave: (s: Session) => Promise<void>
+}) {
+  const [draft, setDraft] = useState<Session>({ ...session })
+  const [saving, setSaving] = useState(false)
+  const endTime = formatTime(parseTime(draft.start_time) + Math.max(draft.duration, 15))
+  const setEndTime = (time: string) => {
+    const duration = Math.max(parseTime(time) - parseTime(draft.start_time), 15)
+    setDraft(d => ({ ...d, duration }))
+  }
+
+  async function save() {
+    setSaving(true)
+    try { await onSave(draft) } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-lg mx-4 animate-in zoom-in-95 duration-150 flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="text-[14px] font-bold text-gray-900">Séance ponctuelle</h2>
+            <p className="text-[12px] text-gray-600 mt-0.5">{group?.title || draft.groupTitle || "Groupe"}</p>
+          </div>
+          <button onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="px-6 py-4 space-y-4">
+          <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-4 space-y-3">
+            <p className="text-[11px] font-bold text-violet-500 uppercase tracking-wider">Détails de la séance</p>
+            <div>
+              <label className="block text-[9px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">Date de la séance</label>
+              <input type="date" value={draft.date} onChange={e => setDraft(d => ({ ...d, date: e.target.value }))}
+                className="w-full h-9 px-3 rounded-lg border border-gray-200 text-[12px] focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400/20 bg-white" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[9px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">Heure de départ</label>
+                <input type="time" lang="fr-FR" step={900} value={draft.start_time} onChange={e => setDraft(d => ({ ...d, start_time: e.target.value }))}
+                  className="w-full h-9 px-3 rounded-lg border border-gray-200 text-[12px] focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400/20 bg-white" />
+              </div>
+              <div>
+                <label className="block text-[9px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">Heure de fin</label>
+                <input type="time" lang="fr-FR" step={900} value={endTime} onChange={e => setEndTime(e.target.value)}
+                  className="w-full h-9 px-3 rounded-lg border border-gray-200 text-[12px] focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400/20 bg-white" />
+              </div>
+            </div>
+            <p className="text-[11px] text-gray-500 font-medium">Durée calculée : {formatDuration(draft.duration)}</p>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2 shrink-0">
+          <button onClick={onClose}
+            className="h-9 px-4 rounded-lg border border-gray-200 text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+            Annuler
+          </button>
+          <button onClick={save} disabled={saving}
+            className="flex items-center gap-1.5 h-9 px-4 rounded-lg text-[12px] font-semibold text-white bg-violet-600 hover:bg-violet-700 transition-colors disabled:opacity-50 cursor-pointer">
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function WeekGrid({
   weekStart,
   sessions,
@@ -779,7 +885,7 @@ function WeekGrid({
 }) {
   const today = toYMD(new Date())
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
-  const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i)
+  const { startHour, endHour, hours } = getAgendaHourRange(sessions, { defaultStartHour: 7, defaultEndHour: 22 })
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
   const hoverExitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -816,7 +922,7 @@ function WeekGrid({
 
   function positionForSession(s: Session) {
     const startMin = parseTime(s.start_time)
-    const top = ((startMin - HOUR_START * 60) / 60) * SLOT_HEIGHT
+    const top = ((startMin - startHour * 60) / 60) * SLOT_HEIGHT
     const height = Math.max((s.duration / 60) * SLOT_HEIGHT, 24)
     return { top, height }
   }
@@ -833,13 +939,13 @@ function WeekGrid({
           return (
             <div
               key={i}
-              className="flex-1 min-w-0 flex flex-col items-center py-2.5 gap-0.5 border-r border-gray-100 last:border-r-0"
+              className="flex-1 min-w-0 flex flex-col items-center py-1 gap-0 border-r border-gray-100 last:border-r-0"
             >
               <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
                 {DAYS_FR[i]}
               </span>
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-[14px] font-bold transition-colors
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-bold transition-colors
                   ${isToday ? "bg-violet-600 text-white" : "text-gray-700"}`}
               >
                 {d.getDate()}
@@ -851,14 +957,14 @@ function WeekGrid({
 
       {/* Scrollable grid */}
       <div className="flex-1 overflow-y-auto">
-        <div className="flex" style={{ minHeight: `${(HOUR_END - HOUR_START) * SLOT_HEIGHT}px` }}>
+        <div className="flex" style={{ minHeight: `${(endHour - startHour) * SLOT_HEIGHT}px` }}>
           {/* Hour labels */}
           <div className="w-16 shrink-0 border-r border-gray-100 relative">
             {hours.map(h => (
               <div
                 key={h}
                 className="absolute right-2 text-[10px] text-gray-600 font-medium leading-none"
-                style={{ top: (h - HOUR_START) * SLOT_HEIGHT - 6 }}
+                style={{ top: (h - startHour) * SLOT_HEIGHT - 6 }}
               >
                 {String(h).padStart(2, "0")}:00
               </div>
@@ -878,7 +984,7 @@ function WeekGrid({
                   <div
                     key={h}
                     className="absolute left-0 right-0 border-t border-gray-100"
-                    style={{ top: (h - HOUR_START) * SLOT_HEIGHT }}
+                    style={{ top: (h - startHour) * SLOT_HEIGHT }}
                   />
                 ))}
 
@@ -887,7 +993,7 @@ function WeekGrid({
                   <div
                     key={`h-${h}`}
                     className="absolute left-0 right-0 border-t border-gray-50"
-                    style={{ top: (h - HOUR_START) * SLOT_HEIGHT + SLOT_HEIGHT / 2 }}
+                    style={{ top: (h - startHour) * SLOT_HEIGHT + SLOT_HEIGHT / 2 }}
                   />
                 ))}
 
@@ -1128,8 +1234,8 @@ function ListView({
   onSessionClick: (s: Session) => void
   groupColorMap: Map<string, string>
 }) {
-  const todayYMD = toYMD(new Date())
-  const upcomingSessions = sessions.filter(s => s.date >= todayYMD)
+  const now = Date.now()
+  const upcomingSessions = sessions.filter(s => sessionEndAt(s) >= now)
   const grouped: Record<string, Session[]> = {}
   for (const s of upcomingSessions) {
     if (!grouped[s.date]) grouped[s.date] = []
@@ -1143,7 +1249,7 @@ function ListView({
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <Calendar size={40} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-[13px] text-gray-600">Aucune session à venir</p>
+          <p className="text-[13px] text-gray-600">Aucune séance à venir</p>
         </div>
       </div>
     )
@@ -1250,8 +1356,10 @@ export default function AgendaPage() {
 
   const [sessions, setSessions] = useState<Session[]>([])
   const [groups, setGroups] = useState<Group[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [hasLoadedSessions, setHasLoadedSessions] = useState(false)
   const [selectedSession, setSelectedSession] = useState<Session | null>(null)
+  const [extraSession, setExtraSession] = useState<Session | null>(null)
   const [scheduleGroup, setScheduleGroup] = useState<Group | null>(null)
   const [focusedGroupId, setFocusedGroupId] = useState<string | null>(null)
   const [calendarGroupFilterId, setCalendarGroupFilterId] = useState<string | null>(null)
@@ -1324,11 +1432,13 @@ export default function AgendaPage() {
       .then(r => r.json())
       .then(d => {
         setSessions(d.sessions || [])
+        setHasLoadedSessions(true)
         setLoading(false)
       })
       .catch((err) => {
         if (err.name !== "AbortError") {
           console.error(err)
+          setHasLoadedSessions(true)
           setLoading(false)
         }
       })
@@ -1461,7 +1571,7 @@ export default function AgendaPage() {
         })
       }
 
-      push("ok", "Session enregistrée")
+      push("ok", "Séance enregistrée")
       setSelectedSession(null)
     } catch (err: any) {
       push("err", err?.message || "Erreur lors de la sauvegarde")
@@ -1503,11 +1613,32 @@ export default function AgendaPage() {
         return filtered
       })
 
-      push("ok", "Session supprimée")
+      push("ok", "Séance supprimée")
       setSelectedSession(null)
     } catch {
       push("err", "Erreur lors de la suppression")
     }
+  }
+
+  function handleAddExtraSession(group: Group) {
+    const today = toYMD(new Date())
+    const firstSlot = group.schedules[0]
+    setView("week")
+    setWeekStart(getWeekStart(new Date()))
+    setExtraSession({
+      id: null,
+      group: group.id,
+      groupTitle: group.title,
+      date: today,
+      start_time: firstSlot?.start_time || "09:00",
+      duration: firstSlot?.duration || 120,
+      mode: "live_presentiel",
+      title: null,
+      notes: "",
+      is_cancelled: false,
+      instructor: null,
+      virtual: false,
+    })
   }
 
   async function handleSaveGroupSchedule(draft: Group) {
@@ -1603,29 +1734,44 @@ export default function AgendaPage() {
 
   const groupColor = (id: string) => groupColorMap.get(id) ?? "#475569"
 
+  if (loading && !hasLoadedSessions) {
+    return (
+      <div className="admin-agenda-page h-screen flex flex-col overflow-hidden bg-[#fafafa]">
+        <AdminPageHeader
+          title="Agenda"
+          description="Planning des sÃ©ances par groupe"
+          breadcrumbs={[{ label: "Agenda" }]}
+        />
+        <div className="flex-1 min-h-0">
+          <LoadingBI fullScreen={false} />
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-[#fafafa]">
+    <div className="admin-agenda-page h-screen flex flex-col overflow-hidden bg-[#fafafa]">
       <AdminPageHeader
         title="Agenda"
-        description="Planning des sessions par groupe"
+        description="Planning des séances par groupe"
         breadcrumbs={[{ label: "Agenda" }]}
       />
 
       {/* Toolbar */}
-      <div className="flex items-center gap-3 px-6 py-3 border-b border-gray-100 bg-white shrink-0">
+      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-gray-100 bg-white shrink-0">
         {/* Nav — hidden in list view */}
         {view !== "list" && (
           <>
             <div className="flex items-center gap-1">
               <button
                 onClick={prevPeriod}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 onClick={nextPeriod}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
               >
                 <ChevronRight size={16} />
               </button>
@@ -1633,19 +1779,19 @@ export default function AgendaPage() {
 
             <button
               onClick={goToday}
-              className="h-8 px-3 rounded-lg text-[12px] font-medium text-gray-600
+              className="h-7 px-2.5 rounded-lg text-[11px] font-medium text-gray-600
                 border border-gray-200 hover:bg-gray-50 transition-colors"
             >
               Aujourd'hui
             </button>
 
-            <span className="text-[14px] font-semibold text-gray-800 capitalize ml-1">
+            <span className="text-[13px] font-semibold text-gray-800 capitalize ml-1">
               {periodLabel()}
             </span>
           </>
         )}
         {view === "list" && (
-          <span className="text-[14px] font-semibold text-gray-800">Toutes les sessions</span>
+          <span className="text-[14px] font-semibold text-gray-800">Toutes les séances</span>
         )}
 
         {loading && <Loader2 size={14} className="text-gray-600 animate-spin ml-1" />}
@@ -1712,14 +1858,22 @@ export default function AgendaPage() {
                       {g.title}
                     </span>
                   </button>
-                  <button
-                    onClick={() => setScheduleGroup(g)}
-                    className="w-5 h-5 flex items-center justify-center rounded text-gray-400
-                      opacity-0 group-hover/item:opacity-100 hover:text-gray-600 hover:bg-gray-100 transition-all"
-                    title="Modifier le planning"
-                  >
-                    <Clock size={11} />
-                  </button>
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => setScheduleGroup(g)}
+                      className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all cursor-pointer"
+                      title="Séances hebdomadaires"
+                    >
+                      <Calendar size={11} />
+                    </button>
+                    <button
+                      onClick={() => handleAddExtraSession(g)}
+                      className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all cursor-pointer"
+                      title="Ajouter une séance ponctuelle"
+                    >
+                      <Plus size={11} />
+                    </button>
+                  </div>
                   {hasSchedule ? (
                     <span className="text-[9px] font-bold text-gray-400 shrink-0"
                       title={`${g.schedules.length} séance${g.schedules.length > 1 ? "s" : ""}/semaine`}>
@@ -1793,6 +1947,19 @@ export default function AgendaPage() {
         />
       )}
 
+      {/* Extra session modal */}
+      {extraSession && (
+        <ExtraSessionModal
+          session={extraSession}
+          group={groups.find(g => g.id === extraSession.group)}
+          onClose={() => setExtraSession(null)}
+          onSave={async (draft) => {
+            await handleSaveSession(draft)
+            setExtraSession(null)
+          }}
+        />
+      )}
+
       {/* Group schedule modal */}
       {scheduleGroup && (
         <GroupScheduleModal
@@ -1816,6 +1983,9 @@ export default function AgendaPage() {
           </div>
         ))}
       </div>
+      <style>{`
+        .admin-agenda-page > div:first-child{padding-top:10px!important;padding-bottom:10px!important}
+      `}</style>
     </div>
   )
 }

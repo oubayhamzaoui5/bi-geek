@@ -29,6 +29,12 @@ function formatSession(s: any): any {
   }
 }
 
+function sessionEndMs(session: any) {
+  const date = session.date?.slice(0, 10) || "1970-01-01"
+  const time = session.start_time || "00:00"
+  return new Date(`${date}T${time}:00`).getTime() + Math.max(session.duration || 120, 1) * 60_000
+}
+
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -37,11 +43,9 @@ export async function DELETE(
     const pb = await getAdminPb()
     const { id } = await params
 
-    // Guard: refuse to delete completed (past) sessions
+    // Guard: refuse to delete sessions after their end time
     const existing = await pb.collection("sessions").getOne(id)
-    const today = new Date()
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
-    if (existing.date.slice(0, 10) < todayStr) {
+    if (sessionEndMs(existing) < Date.now()) {
       return NextResponse.json({ error: "Les sessions passées ne peuvent pas être supprimées." }, { status: 403 })
     }
 
@@ -84,11 +88,9 @@ export async function PATCH(
     if (fields.instructor !== undefined) data.instructor = fields.instructor
 
     if (updateMode === "single") {
-      // Guard: refuse to modify completed (past) sessions
+      // Guard: refuse to modify sessions after their end time
       const existing = await pb.collection("sessions").getOne(id)
-      const today = new Date()
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
-      if (existing.date.slice(0, 10) < todayStr) {
+      if (sessionEndMs(existing) < Date.now()) {
         return NextResponse.json({ error: "Les sessions passées ne peuvent pas être modifiées." }, { status: 403 })
       }
       const record = await pb.collection("sessions").update(id, data)
@@ -114,17 +116,14 @@ export async function PATCH(
       const dateStr = current.date.slice(0, 10)
       const startTime = current.start_time || ""
 
-      // Today in YYYY-MM-DD — never touch past (completed) sessions
-      const today = new Date()
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
-
-      // All sessions of the same group + same slot, from this date onwards, not in the past
-      const effectiveFrom = dateStr > todayStr ? dateStr : todayStr
+      // All sessions of the same group + same slot, from this date onwards.
+      // Past sessions are skipped after fetch by derived end time.
       const filter = startTime
-        ? `group = "${current.group}" && start_time = "${startTime}" && date >= "${effectiveFrom}"`
-        : `group = "${current.group}" && date >= "${effectiveFrom}"`
+        ? `group = "${current.group}" && start_time = "${startTime}" && date >= "${dateStr}"`
+        : `group = "${current.group}" && date >= "${dateStr}"`
 
-      const following = await pb.collection("sessions").getFullList({ filter, sort: "date" })
+      const following = (await pb.collection("sessions").getFullList({ filter, sort: "date" }))
+        .filter((s: any) => sessionEndMs(s) >= Date.now())
 
       const updated = await Promise.all(
         following.map(s => pb.collection("sessions").update(s.id, data))

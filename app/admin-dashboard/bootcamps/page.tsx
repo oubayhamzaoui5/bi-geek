@@ -85,15 +85,23 @@ export default function AdminBootcampsPage() {
     )
   }
 
-  // DELETE
+  // ARCHIVE (soft)
   async function handleDelete(id: string) {
-    await fetch(`/api/admin/bootcamps/${id}`, { method: "DELETE" })
+    const res = await fetch(`/api/admin/bootcamps/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "archive" }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data?.error || "Erreur lors de l'archivage")
     setBootcamps(prev => prev.filter(b => b.id !== id))
   }
 
   // VIEW
-  function handleView(id: string) {
-    window.open(`/bootcamps/${id}`, "_blank")
+  function handleView(bootcamp: any) {
+    const slug = bootcamp.slug || bootcamp.id
+    if (!slug) return
+    window.open(`/bootcamp/${encodeURIComponent(slug)}`, "_blank")
   }
 
   if (loading) {

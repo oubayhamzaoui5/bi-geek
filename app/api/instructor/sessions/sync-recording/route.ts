@@ -11,6 +11,16 @@ async function getAdminPb() {
   return pb
 }
 
+function normalizeIds(value: any): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  return value ? [String(value)] : []
+}
+
+function groupInstructorIds(group: any): string[] {
+  const ids = normalizeIds(group?.instructor)
+  return group?.programType === "bootcamp" ? ids : ids.slice(0, 1)
+}
+
 export async function POST(req: Request) {
   try {
     const { sessionId, instructorId } = await req.json()
@@ -21,7 +31,7 @@ export async function POST(req: Request) {
     const pb = await getAdminPb()
     const session = await pb.collection("sessions").getOne(sessionId, { expand: "group" })
     
-    if (session.expand?.group?.instructor !== instructorId) {
+    if (!groupInstructorIds(session.expand?.group).includes(instructorId)) {
       return NextResponse.json({ error: "Unauthorized access to this group" }, { status: 403 })
     }
 

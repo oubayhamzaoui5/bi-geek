@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import {
   Users, CalendarDays, Clock, ExternalLink,
   TrendingUp,
-  GraduationCap, Star, BookOpen, Video,
+  GraduationCap, Star, BookOpen, Video, Settings,
 } from "lucide-react"
 import { MiniWeekAgenda } from "@/components/agenda/MiniWeekAgenda"
 import { KpiCard, QuickBtn, SectionCard } from "@/components/dashboard/OverviewShared"
@@ -22,9 +22,21 @@ type Stats = {
   weekSessions: number
 }
 
+const EMPTY_STATS: Stats = {
+  totalGroups: 0,
+  activeGroups: 0,
+  totalStudents: 0,
+  todaySessions: 0,
+  weekSessions: 0,
+}
+
+function toCount(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0
+}
+
 /* ─── Page ─────────────────────────────────────────────────────────────────── */
 export default function InstructorOverviewPage() {
-  const [stats, setStats] = useState<Stats | null>(null)
+  const [stats, setStats] = useState<Stats>(EMPTY_STATS)
   const [upcomingSessions, setUpcomingSessions] = useState<OverviewSession[]>([])
   const [programs, setPrograms] = useState<StudentProgram[]>([])
   const [instructorId, setInstructorId] = useState<string>("")
@@ -47,9 +59,17 @@ export default function InstructorOverviewPage() {
       .then(r => r.json())
       .then(d => {
         if (d.ok) {
-          setStats(d.stats)
+          setStats({
+            totalGroups: toCount(d.stats?.totalGroups),
+            activeGroups: toCount(d.stats?.activeGroups),
+            totalStudents: toCount(d.stats?.totalStudents),
+            todaySessions: toCount(d.stats?.todaySessions),
+            weekSessions: toCount(d.stats?.weekSessions),
+          })
           setUpcomingSessions(d.upcomingSessions || [])
           setPrograms(d.programs || [])
+        } else {
+          setStats(EMPTY_STATS)
         }
       })
       .catch(console.error)
@@ -78,20 +98,20 @@ export default function InstructorOverviewPage() {
   const kpiCards = [
     {
       icon: Users,
-      label: "Mes formations",
-      value: stats?.totalGroups ?? 0,
+      label: "Formations actives",
+      value: stats.activeGroups,
       href: "/instructor-dashboard/groups",
       iconBg: "rgba(99,102,241,0.08)",
       iconColor: "#6366f1",
-      badge: "ACTIFS",
+      badge: "TOTAL",
       badgeBg: "#e2e8f0",
       badgeColor: "#475569",
-      sublabel: `${stats?.activeGroups ?? 0}`,
+      sublabel: `sur ${stats.totalGroups}`,
     },
     {
       icon: GraduationCap,
-      label: "Mes étudiants",
-      value: stats?.totalStudents ?? 0,
+      label: "Mes apprenants",
+      value: stats.totalStudents,
       href: "/instructor-dashboard/groups",
       iconBg: "rgba(14,165,233,0.08)",
       iconColor: "#0ea5e9",
@@ -99,18 +119,18 @@ export default function InstructorOverviewPage() {
     },
     {
       icon: CalendarDays,
-      label: "Sessions aujourd'hui",
-      value: stats?.todaySessions ?? 0,
+      label: "Séances aujourd'hui",
+      value: stats.todaySessions,
       href: "/instructor-dashboard/agenda",
       iconBg: "rgba(22,163,74,0.08)",
       iconColor: "#16a34a",
-      sublabel: stats?.todaySessions ? "planifiées" : "aucune",
-      dot: (stats?.todaySessions ?? 0) > 0 ? "#16a34a" : undefined,
+      sublabel: stats.todaySessions ? "planifiées" : "aucune",
+      dot: stats.todaySessions > 0 ? "#16a34a" : undefined,
     },
     {
       icon: TrendingUp,
-      label: "Sessions cette semaine",
-      value: stats?.weekSessions ?? 0,
+      label: "Séances cette semaine",
+      value: stats.weekSessions,
       href: "/instructor-dashboard/agenda",
       iconBg: "rgba(245,158,11,0.08)",
       iconColor: "#f59e0b",
@@ -120,8 +140,8 @@ export default function InstructorOverviewPage() {
 
   const quickActions = [
     { icon: Users,         label: "Mes formations",   hint: "Cohortes et planning",    href: "/instructor-dashboard/groups",   tone: "blue" },
-    { icon: GraduationCap, label: "Mes étudiants", hint: "Suivi des apprenants",    href: "/instructor-dashboard/students", tone: "violet" },
-    { icon: CalendarDays,  label: "Agenda",        hint: "Sessions à venir",         href: "/instructor-dashboard/agenda",   tone: "green" },
+    { icon: CalendarDays,  label: "Agenda",        hint: "Séances à venir",          href: "/instructor-dashboard/agenda",   tone: "green" },
+    { icon: Settings,      label: "Parametres",    hint: "Profil et securite",        href: "/instructor-dashboard/settings", tone: "violet" },
   ] as const
 
   return (

@@ -15,25 +15,25 @@ export async function POST() {
     const pb = await getAdminPb()
 
     const collection = await pb.collections.getOne("bootcamps")
-    const schema: any[] = collection.schema ?? []
-
+    const useNewApi = Array.isArray((collection as any).fields)
+    const fields: any[] = (collection as any).fields ?? (collection as any).schema ?? []
     const migrations: string[] = []
 
-    // Add `archived` bool field if missing
-    if (!schema.find((f: any) => f.name === "archived")) {
-      schema.push({ name: "archived", type: "bool", required: false, options: {} })
-      migrations.push("archived")
+    const ensureField = async (field: Record<string, unknown>, opts: Record<string, unknown> = {}) => {
+      if (fields.find((f: any) => f.name === field.name)) return
+      const newField = useNewApi ? { ...field, ...opts } : { ...field, options: opts }
+      fields.push(newField)
+      try {
+        await pb.collections.update("bootcamps", useNewApi ? { fields } : { schema: fields })
+        migrations.push(String(field.name))
+      } catch (err: any) {
+        const msg: string = err?.data?.message ?? err?.message ?? ""
+        if (!msg.includes("duplicate column name")) throw err
+      }
     }
 
-    // Add `tags` json field if missing
-    if (!schema.find((f: any) => f.name === "tags")) {
-      schema.push({ name: "tags", type: "json", required: false, options: {} })
-      migrations.push("tags")
-    }
-
-    if (migrations.length > 0) {
-      await pb.collections.update("bootcamps", { schema })
-    }
+    await ensureField({ name: "archived", type: "bool", required: false })
+    await ensureField({ name: "tags", type: "json", required: false })
 
     return NextResponse.json({ ok: true, applied: migrations })
   } catch (err: any) {

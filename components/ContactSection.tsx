@@ -75,7 +75,7 @@ export function ContactSection() {
         <div className="max-w-2xl">
           <SectionLabel>Contactez-nous</SectionLabel>
           <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 md:text-4xl">
-            Une question sur nos formations ?
+            Une question sur <span className="text-[#8b0f82]">nos formations ?</span>
           </h2>
         </div>
         <p className="max-w-sm text-sm leading-6 text-zinc-600 md:text-right">

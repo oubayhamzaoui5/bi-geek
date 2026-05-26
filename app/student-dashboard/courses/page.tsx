@@ -93,7 +93,7 @@ export default function CoursesPage() {
 
             <CourseSection
               title="Prochaines Formations"
-              subtitle="Inscrivez-vous avant le début des sessions"
+              subtitle="Inscrivez-vous avant le début des séances"
               courses={byStatus("upcoming")}
             />
 

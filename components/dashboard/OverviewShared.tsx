@@ -9,7 +9,7 @@ type Tone = "blue" | "amber" | "violet" | "green" | "indigo" | "rose"
 type KpiCardProps = {
   icon: React.ElementType
   label: string
-  value: number | string
+  value: number | string | null | undefined
   href: string
   iconBg: string
   iconColor: string
@@ -42,6 +42,7 @@ const QUICK_BTN_STYLES: Record<
 
 export function KpiCard({ icon: Icon, label, value, href, iconBg, iconColor, badge, badgeColor, badgeBg, sublabel, dot }: KpiCardProps) {
   const [hover, setHover] = useState(false)
+  const displayValue = value ?? 0
   return (
     <Link href={href} style={{ textDecoration: "none" }}>
       <div
@@ -72,7 +73,7 @@ export function KpiCard({ icon: Icon, label, value, href, iconBg, iconColor, bad
         </div>
         <p style={{ fontSize: 10, fontWeight: 700, color: "#475569", margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</p>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-          <p style={{ fontSize: 26, fontWeight: 700, color: "#0f172a", margin: 0, lineHeight: 1, fontFamily: "var(--ff-display,'DM Sans')" }}>{value}</p>
+          <p style={{ fontSize: 26, fontWeight: 700, color: "#0f172a", margin: 0, lineHeight: 1, fontFamily: "var(--ff-display,'DM Sans')" }}>{displayValue}</p>
           {sublabel && <span style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>{sublabel}</span>}
         </div>
       </div>
@@ -160,4 +161,3 @@ export function SectionCard({
     </div>
   )
 }
-

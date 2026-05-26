@@ -16,15 +16,41 @@ async function getAdminPb() {
   return pb
 }
 
+async function ensureArchivedField(pb: PocketBase) {
+  const col = await pb.collections.getOne("courses")
+  const fields: any[] = (col as any).fields ?? (col as any).schema ?? []
+  if (!fields.find((f: any) => f.name === "archived")) {
+    fields.push({ name: "archived", type: "bool", required: false })
+    const useNewApi = Array.isArray((col as any).fields)
+    try {
+      await pb.collections.update("courses", useNewApi ? { fields } : { schema: fields })
+    } catch (err: any) {
+      const msg: string = err?.data?.message ?? err?.message ?? ""
+      if (!msg.includes("duplicate column name")) throw err
+    }
+  }
+}
+
 type RouteParams = {
   params: Promise<{ id: string }>
 }
 
+// PATCH — archive or restore (never permanent delete)
 export async function PATCH(req: Request, { params }: RouteParams) {
   try {
     const pb = await getAdminPb()
     const { id: courseId } = await params
     const body = await req.json()
+
+    if (body.action === "archive") {
+      try { await ensureArchivedField(pb) } catch (e) { console.error("PATCH archive: ensureField failed:", e) }
+      const updated = await pb.collection("courses").update(courseId, { archived: true })
+      if (!updated.archived) {
+        console.error("PATCH archive: PocketBase did not persist archived=true for", courseId)
+        return NextResponse.json({ error: "Champ archived non persisté par PocketBase" }, { status: 500 })
+      }
+      return NextResponse.json({ ok: true })
+    }
 
     if (body.action === "restore") {
       await pb.collection("courses").update(courseId, { archived: false })
@@ -38,20 +64,12 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   }
 }
 
+// DELETE — permanent only (cascade modules + lessons)
 export async function DELETE(req: Request, { params }: RouteParams) {
   try {
     const pb = await getAdminPb()
     const { id: courseId } = await params
-    const { searchParams } = new URL(req.url)
-    const permanent = searchParams.get("permanent") === "true"
 
-    if (!permanent) {
-      // Soft delete — archive
-      await pb.collection("courses").update(courseId, { archived: true })
-      return NextResponse.json({ ok: true })
-    }
-
-    // Permanent delete — cascade lessons and modules
     const modules = await pb.collection("course_modules").getFullList({
       filter: `course="${courseId}"`,
     })

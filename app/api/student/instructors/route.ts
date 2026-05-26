@@ -17,6 +17,16 @@ function resolveAvatar(user: any) {
   return `${pbUrl}/api/files/${user.collectionId}/${user.id}/${user.avatar}`
 }
 
+function normalizeIds(value: any): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  return value ? [String(value)] : []
+}
+
+function groupInstructorIds(group: any): string[] {
+  const ids = normalizeIds(group?.instructor)
+  return group?.programType === "bootcamp" ? ids : ids.slice(0, 1)
+}
+
 // GET /api/student/instructors?studentId=xxx
 // Returns all instructors whose groups this student belongs to
 export async function GET(req: Request) {
@@ -30,10 +40,10 @@ export async function GET(req: Request) {
     // Find all groups containing this student
     const groups = await pb.collection("groups").getFullList({
       filter: `students ~ "${studentId}"`,
-      fields: "id,title,instructor",
+      fields: "id,title,instructor,programType",
     }).catch(async () => {
       // Fallback: fetch all and filter in memory
-      const all = await pb.collection("groups").getFullList({ fields: "id,title,instructor,students" })
+      const all = await pb.collection("groups").getFullList({ fields: "id,title,instructor,programType,students" })
       return all.filter((g: any) => {
         if (!g.students) return false
         if (Array.isArray(g.students)) return g.students.includes(studentId)
@@ -41,7 +51,7 @@ export async function GET(req: Request) {
       })
     })
 
-    const instructorIds = [...new Set(groups.map((g: any) => g.instructor).filter(Boolean))] as string[]
+    const instructorIds = [...new Set(groups.flatMap((g: any) => groupInstructorIds(g)).filter(Boolean))] as string[]
 
     if (instructorIds.length === 0) {
       return NextResponse.json({ ok: true, instructors: [] })
@@ -63,7 +73,7 @@ export async function GET(req: Request) {
           username: u.username || "",
           avatar: resolveAvatar(u),
           groups: groups
-            .filter((g: any) => g.instructor === u.id)
+            .filter((g: any) => groupInstructorIds(g).includes(u.id))
             .map((g: any) => ({ groupId: g.id, groupTitle: g.title })),
         }
       })

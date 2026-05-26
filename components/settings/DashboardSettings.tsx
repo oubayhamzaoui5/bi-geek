@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from "react"
 import {
-  UserRound, KeyRound, Camera, Save, User, Loader2,
+  UserRound, KeyRound, Camera, Save, Loader2,
   Eye, EyeOff, ShieldCheck,
 } from "lucide-react"
 import { SectionCard } from "@/components/dashboard/OverviewShared"
@@ -214,11 +214,13 @@ function ProfileSection({ profileApiPath, onLoaded }: { profileApiPath: string; 
   const [data, setData] = useState<ProfileForm>({ username: "", name: "", surname: "", email: "", phone: "" })
   const [phoneLocal, setPhoneLocal] = useState("")
   const [avatar, setAvatar] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState<"ok" | "err" | null>(null)
   const [errorMsg, setErrorMsg] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
+  const displayName = [data.name, data.surname].filter(Boolean).join(" ") || data.username || data.email?.split("@")[0] || "U"
 
   useEffect(() => {
     const id = getUserId()
@@ -255,6 +257,23 @@ function ProfileSection({ profileApiPath, onLoaded }: { profileApiPath: string; 
         const raw = localStorage.getItem("user")
         if (raw) localStorage.setItem("user", JSON.stringify({ ...JSON.parse(raw), email: data.email }))
       } catch {}
+
+      if (avatarFile) {
+        const fd = new FormData()
+        fd.append("id", userId)
+        fd.append("avatar", avatarFile)
+        const avatarRes = await fetch(`${profileApiPath}/avatar`, { method: "POST", body: fd })
+        const avatarJson = await avatarRes.json()
+        if (avatarRes.ok && avatarJson.avatar) {
+          setAvatar(avatarJson.avatar)
+          try {
+            const raw = localStorage.getItem("user")
+            if (raw) localStorage.setItem("user", JSON.stringify({ ...JSON.parse(raw), avatar: avatarJson.avatar }))
+          } catch {}
+        }
+        setAvatarFile(null)
+      }
+
       setSaved("ok")
     } catch (err: any) {
       setErrorMsg(err?.message ?? "Erreur serveur.")
@@ -292,8 +311,9 @@ function ProfileSection({ profileApiPath, onLoaded }: { profileApiPath: string; 
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                 <div style={{ position: "relative", flexShrink: 0 }}>
                   <div style={{
-                    width: 60, height: 60, borderRadius: 12, overflow: "hidden",
-                    border: "1.5px solid #f1f5f9", background: "#f8fafc",
+                    width: 60, height: 60, borderRadius: "50%", overflow: "hidden",
+                    border: "2px solid #f1f5f9", background: "#f8fafc",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
                   }}>
                     {avatar ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -301,10 +321,12 @@ function ProfileSection({ profileApiPath, onLoaded }: { profileApiPath: string; 
                     ) : (
                       <div style={{
                         width: "100%", height: "100%",
-                        background: "linear-gradient(135deg, rgba(99,102,241,0.75) 0%, rgba(139,92,246,0.75) 100%)",
+                        background: "var(--accent,#6366f1)",
                         display: "flex", alignItems: "center", justifyContent: "center",
                       }}>
-                        <User size={22} color="#fff" strokeWidth={1.8} />
+                        <span style={{ fontSize: 22, fontWeight: 700, color: "#fff" }}>
+                          {displayName[0]?.toUpperCase()}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -323,7 +345,7 @@ function ProfileSection({ profileApiPath, onLoaded }: { profileApiPath: string; 
                     <Camera size={11} color="#fff" />
                   </button>
                   <input ref={inputRef} type="file" accept="image/*" style={{ display: "none" }}
-                    onChange={e => { const f = e.target.files?.[0]; if (f) setAvatar(URL.createObjectURL(f)) }} />
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { setAvatar(URL.createObjectURL(f)); setAvatarFile(f) } }} />
                 </div>
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", margin: 0 }}>Photo de profil</p>
@@ -391,7 +413,7 @@ function SecuritySection({ passwordApiPath }: { passwordApiPath: string }) {
     setSaving(true); setSaved(null); setErrorMsg("")
     const userId = getUserId()
     if (!userId) {
-      setErrorMsg("Session expirée."); setSaved("err"); setSaving(false); return
+      setErrorMsg("Connexion expirée."); setSaved("err"); setSaving(false); return
     }
     try {
       const res = await fetch(passwordApiPath, {

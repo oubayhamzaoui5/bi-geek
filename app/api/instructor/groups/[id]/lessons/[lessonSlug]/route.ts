@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
+import { authErrorResponse, requireUser, type AuthUser } from "@/lib/server-auth"
 import { readDefaultCourseLesson, resolveGroupResourceMode } from "@/lib/server-course-resources"
 
 export const dynamic = "force-dynamic"
@@ -42,8 +43,36 @@ async function getLessonBySlugOrId(pb: any, slugOrId: string) {
   }
 }
 
+function normalizeIds(value: any): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  return value ? [String(value)] : []
+}
+
+function groupInstructorIds(group: any): string[] {
+  const ids = normalizeIds(group?.instructor)
+  return group?.programType === "bootcamp" ? ids : ids.slice(0, 1)
+}
+
+function ownerId(record: any, group: any) {
+  return record?.instructor_id || groupInstructorIds(group)[0] || ""
+}
+
+function canEdit(user: AuthUser, group: any, record: any) {
+  return user.role === "admin" || user.role === "admin_agent" || ownerId(record, group) === user.id
+}
+
+async function requireGroupEditor(req: Request, pb: any, groupId: string) {
+  const user = await requireUser(req, ["instructor", "admin", "admin_agent"])
+  const group = await pb.collection("groups").getOne(groupId, { expand: "instructor" })
+  const ids = groupInstructorIds(group)
+  if (user.role === "instructor" && !ids.includes(user.id)) {
+    return { user, group: null as any, error: NextResponse.json({ error: "Permission refusee." }, { status: 403 }) }
+  }
+  return { user, group, error: null as NextResponse | null }
+}
+
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string; lessonSlug: string }> }
 ) {
   try {
@@ -52,10 +81,11 @@ export async function GET(
 
     let groupTitle = ""
     let instructor: { name: string; surname: string } | null = null
-    const g = await pb.collection("groups").getOne(groupId, { expand: "instructor" })
+    const { user, group: g, error } = await requireGroupEditor(req, pb, groupId)
+    if (error) return error
     groupTitle = g.title || ""
     if (g.expand?.instructor) {
-      const ins = g.expand.instructor
+      const ins = Array.isArray(g.expand.instructor) ? g.expand.instructor[0] : g.expand.instructor
       instructor = { name: ins.name || "", surname: ins.surname || "" }
     }
 
@@ -113,6 +143,8 @@ export async function GET(
         content: lesson.content || "",
         order: lesson.order ?? 0,
         moduleId: lesson.module_id || "",
+        instructorId: lesson.instructor_id || ownerId(lesson, g),
+        canEdit: canEdit(user, g, lesson),
       },
       module: module ? { id: module.id, title: module.title || "", order: module.order ?? 0 } : null,
       moduleIndex,
@@ -125,10 +157,14 @@ export async function GET(
       moduleLessons: modLessons.map((l: any) => ({ id: l.id, title: l.title || "", order: l.order ?? 0 })),
       videos: videos.map((v: any) => ({
         id: v.id, lessonId: v.lesson_id, title: v.title || "", driveUrl: v.drive_url || "", description: v.description || "",
+        order: v.order ?? 0, instructorId: v.instructor_id || ownerId(v, g), canEdit: canEdit(user, g, v),
       })),
       lessonAttachments: lessonAttachments.map((a: any) => ({
         id: a.id, lessonId: a.lesson_id, name: a.name || a.file || "",
         url: a.file ? `${PB_FILE_URL}/api/files/lesson_attachments/${a.id}/${a.file}` : null,
+        order: a.order ?? 0,
+        instructorId: a.instructor_id || ownerId(a, g),
+        canEdit: canEdit(user, g, a),
       })),
       videoAttachments: videoAttachments.map((a: any) => ({
         id: a.id, videoId: a.video_id, name: a.name || a.file || "",
@@ -136,6 +172,8 @@ export async function GET(
       })),
     })
   } catch (err: any) {
+    const auth = authErrorResponse(err)
+    if (auth) return auth
     console.error("LESSON GET ERROR:", err)
     return NextResponse.json({ error: err?.message || "Erreur serveur" }, { status: 500 })
   }
@@ -149,13 +187,17 @@ export async function PATCH(
     const { id: groupId, lessonSlug } = await params
     const body = await req.json()
     const pb = await getAdminPb()
-    const group = await pb.collection("groups").getOne(groupId)
+    const { user, group, error } = await requireGroupEditor(req, pb, groupId)
+    if (error) return error
     const modules = await safeGetList(pb, "group_modules", `group_id = "${groupId}"`, "order")
     if (resolveGroupResourceMode(group, modules) === "default") {
       return NextResponse.json({ error: "Passez en ressources personnalisees pour modifier cette lecon." }, { status: 409 })
     }
 
     const lesson = await getLessonBySlugOrId(pb, lessonSlug)
+    if (!canEdit(user, group, lesson)) {
+      return NextResponse.json({ error: "Vous ne pouvez modifier que vos ressources." }, { status: 403 })
+    }
 
     const updateData: any = {
       title: body.title,
@@ -187,9 +229,13 @@ export async function PATCH(
         content: record.content || "",
         order: record.order ?? 0,
         moduleId: record.module_id || "",
+        instructorId: record.instructor_id || ownerId(record, group),
+        canEdit: true,
       },
     })
   } catch (err: any) {
+    const auth = authErrorResponse(err)
+    if (auth) return auth
     return NextResponse.json({ error: err?.message || "Erreur serveur" }, { status: 500 })
   }
 }

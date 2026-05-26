@@ -12,8 +12,6 @@ type IncomingLesson = {
   durationLabel?: string
   order?: number
   locked?: boolean
-  attachmentsMeta?: { name: string; title?: string; description?: string; order?: number }[]
-  youtubeLinks?: { url: string; title?: string; description?: string; order?: number }[]
 }
 
 type IncomingModule = {
@@ -26,9 +24,11 @@ type IncomingModule = {
 }
 
 type CertificationItem = {
+  id?: string
   title: string
   issuer?: string
   description?: string
+  image?: string
 }
 
 type IncomingCourse = {
@@ -96,6 +96,86 @@ async function getAdminPb() {
   return pb
 }
 
+function getPocketBaseFileUrl(record: any, file: string | null | undefined) {
+  const pbUrl = process.env.NEXT_PUBLIC_PB_URL || process.env.POCKETBASE_URL
+  if (!pbUrl || !file) return null
+  return `${pbUrl}/api/files/${record.collectionId ?? "certifications"}/${record.id}/${file}`
+}
+
+function getCertificationItems(record: any) {
+  const expandedItems = record.expand?.certificationItems
+  const items = Array.isArray(expandedItems)
+    ? expandedItems
+    : expandedItems
+      ? [expandedItems]
+      : []
+
+  if (items.length > 0) {
+    return items.map((cert: any) => ({
+      id: cert.id,
+      title: cert.title ?? "",
+      issuer: cert.issuer ?? "",
+      image: cert.image || null,
+      imageUrl: getPocketBaseFileUrl(cert, cert.image),
+    }))
+  }
+
+  return Array.isArray(record.certifications)
+    ? record.certifications.map((cert: any) => ({
+        ...cert,
+        imageUrl: cert.imageUrl ?? getPocketBaseFileUrl({ id: cert.id, collectionId: "certifications" }, cert.image),
+      }))
+    : []
+}
+
+async function syncCertificationItems(
+  pb: PocketBase,
+  certifications: CertificationItem[],
+  formData: FormData,
+) {
+  const ids: string[] = []
+  const legacyItems: CertificationItem[] = []
+
+  for (let index = 0; index < certifications.length; index++) {
+    const cert = certifications[index]
+    const title = cert.title?.trim()
+    if (!title) continue
+
+    const payload: Record<string, unknown> = {
+      title,
+      issuer: cert.issuer?.trim() ?? "",
+    }
+
+    const image = formData.get(`certificationImage_${index}`)
+    if (image instanceof File && image.size > 0) {
+      payload.image = image
+    }
+
+    let record: any
+    if (cert.id) {
+      try {
+        record = await pb.collection("certifications").update(cert.id, payload)
+      } catch (err: any) {
+        if (err?.status !== 404) throw err
+      }
+    }
+
+    if (!record) {
+      record = await pb.collection("certifications").create(payload)
+    }
+
+    ids.push(record.id)
+    legacyItems.push({
+      id: record.id,
+      title: record.title ?? title,
+      issuer: record.issuer ?? "",
+      image: record.image || undefined,
+    })
+  }
+
+  return { ids, legacyItems }
+}
+
 
 /*
 export async function GET() {
@@ -139,6 +219,7 @@ export async function GET() {
 
       return {
         id: c.id,
+        slug: c.slug || "",
         title: c.title,
         shortDescription: c.shortDescription,
         longDescription: c.longDescription ?? "",
@@ -183,11 +264,15 @@ export async function GET(req: Request) {
       courseRecords = await pb.collection("courses").getFullList({
         sort: "title",
         filter: archived ? "archived=true" : "archived!=true",
+        expand: "certificationItems",
       })
-    } catch {
-      // archived field may not exist yet — fall back to fetching all (active view) or empty (archive view)
-      if (archived) return NextResponse.json({ ok: true, courses: [] })
-      courseRecords = await pb.collection("courses").getFullList({ sort: "title" })
+    } catch (filterErr: any) {
+      console.error("COURSES GET: filter failed, falling back:", filterErr?.message)
+      courseRecords = await pb.collection("courses").getFullList({ sort: "title", expand: "certificationItems" })
+      // Filter in JS when PB schema doesn't know about `archived` field yet
+      courseRecords = archived
+        ? courseRecords.filter((c: any) => c.archived === true)
+        : courseRecords.filter((c: any) => c.archived !== true)
     }
 
     // 2) Fix missing slugs (active courses only)
@@ -196,6 +281,7 @@ export async function GET(req: Request) {
         if (!course.slug || course.slug.trim() === "") {
           const slug = await generateUniqueSlug(pb, course.title)
           await pb.collection("courses").update(course.id, { slug })
+          course.slug = slug
           console.log(`Generated slug for course "${course.title}" → ${slug}`)
         }
       }
@@ -233,14 +319,12 @@ export async function GET(req: Request) {
           durationLabel: l.durationLabel ?? l.duration ?? "",
           order: l.order ?? 0,
           locked: !!l.locked,
-          attachmentsMeta: l.attachmentsMeta ?? [],
-          youtubeLinks: l.youtubeLinks ?? [],
-          attachments: toFileArray(l.attachments),
         })),
       }))
 
       return {
         id: c.id,
+        slug: c.slug || "",
         title: c.title,
         shortDescription: c.shortDescription,
         longDescription: c.longDescription ?? "",
@@ -248,7 +332,7 @@ export async function GET(req: Request) {
         prerequis: c.prerequis ?? "Aucun",
         coverImage: c.coverImage || null,
         certificate: !!c.certificate,
-        certifications: c.certifications ?? [],
+        certifications: getCertificationItems(c),
         rating: c.rating ?? 4.8,
         reviewsCount: c.reviewsCount ?? 0,
         whatYouWillLearn: c.whatYouWillLearn ?? [],
@@ -319,11 +403,15 @@ export async function POST(req: Request) {
         { status: 400 },
       )
 
-    if (certificate && certifications.length === 0)
+    if (certificate && !certifications.some((cert) => cert.title?.trim()))
       return NextResponse.json(
         { error: "Au moins une certification est requise si l'option certificat est activée." },
         { status: 400 },
       )
+
+    const certificationSync = certificate
+      ? await syncCertificationItems(pb, certifications, formData)
+      : { ids: [], legacyItems: [] as CertificationItem[] }
 
     // ---------------- COURSE PAYLOAD ----------------
     const payload: any = {
@@ -333,7 +421,8 @@ export async function POST(req: Request) {
       durationLabel,
       prerequis,
       certificate,
-      certifications,
+      certifications: certificationSync.legacyItems,
+      certificationItems: certificationSync.ids,
       rating,
       reviewsCount,
       whatYouWillLearn,
@@ -434,63 +523,24 @@ export async function POST(req: Request) {
 
       for (let j = 0; j < incomingLessons.length; j++) {
         const l = incomingLessons[j]
-        const lessonAttachments = formData.getAll(`lessonAttachments-${i}-${j}`)
-        const attachmentFiles = lessonAttachments.filter(
-          (f): f is File => f instanceof File && f.size > 0
-        )
-        const keepAttachments = formData.getAll(`lessonAttachmentsKeep-${i}-${j}`) as string[]
-
-        const pbUrl = process.env.POCKETBASE_URL!
-        const authHeader = { Authorization: pb.authStore.token ?? "" }
-
-        const pbFetch = async (method: "POST" | "PATCH", url: string, fd: FormData): Promise<any> => {
-          const res = await fetch(url, { method, headers: authHeader, body: fd })
-          const json = await res.json()
-          if (!res.ok) throw new Error(json?.message || `PocketBase error ${res.status}`)
-          return json
+        const lessonPayload = {
+          course: courseId,
+          module: moduleId!,
+          title: l.title || `Lecon ${j + 1}`,
+          durationLabel: l.durationLabel ?? "",
+          duration: l.durationLabel ?? "",
+          order: l.order ?? j + 1,
+          locked: !!l.locked,
         }
-
-        // Step 1: create/update lesson with metadata only (no file uploads yet)
-        const metaForm = new FormData()
-        metaForm.append("course", courseId)
-        metaForm.append("module", moduleId!)
-        metaForm.append("title", l.title || `Lecon ${j + 1}`)
-        metaForm.append("durationLabel", l.durationLabel ?? "")
-        metaForm.append("duration", l.durationLabel ?? "")
-        metaForm.append("order", String(l.order ?? j + 1))
-        metaForm.append("locked", String(l.locked ?? false))
-        metaForm.append("attachmentsMeta", JSON.stringify(l.attachmentsMeta ?? []))
-        metaForm.append("youtubeLinks", JSON.stringify((l.youtubeLinks ?? []).filter((y: any) => y.url?.trim())))
-
-        // Delete removed files in the same metadata step
         if (l.id && existingLessonsById.has(l.id)) {
-          const existingLesson = existingLessonsById.get(l.id)
-          const currentAttachments = toFileArray(existingLesson.attachments)
-          for (const fname of currentAttachments) {
-            if (!keepAttachments.includes(fname)) metaForm.append("attachments-", fname)
-          }
-        }
-
-        let lessonId: string
-        if (l.id && existingLessonsById.has(l.id)) {
-          await pbFetch("PATCH", `${pbUrl}/api/collections/course_lessons/records/${l.id}`, metaForm)
-          lessonId = l.id
+          await pb.collection("course_lessons").update(l.id, lessonPayload)
         } else {
-          const created = await pbFetch("POST", `${pbUrl}/api/collections/course_lessons/records`, metaForm)
-          lessonId = created.id
-        }
-
-        // Step 2: upload each new file using "attachments+" so PocketBase
-        // appends rather than replaces (PocketBase v0.22+ replace-by-default behavior).
-        for (const file of attachmentFiles) {
-          const fileForm = new FormData()
-          fileForm.append("attachments+", file)
-          await pbFetch("PATCH", `${pbUrl}/api/collections/course_lessons/records/${lessonId}`, fileForm)
+          await pb.collection("course_lessons").create(lessonPayload)
         }
       }
     }
     const [finalCourse, savedModules, savedLessons] = await Promise.all([
-      pb.collection("courses").getOne(courseId),
+      pb.collection("courses").getOne(courseId, { expand: "certificationItems" }),
       pb.collection("course_modules").getFullList({ filter: `course="${courseId}"`, sort: "order" }),
       pb.collection("course_lessons").getFullList({ filter: `course="${courseId}"`, sort: "module,order" }),
     ])
@@ -512,9 +562,6 @@ export async function POST(req: Request) {
         durationLabel: l.durationLabel ?? "",
         order: l.order ?? 0,
         locked: !!l.locked,
-        attachmentsMeta: l.attachmentsMeta ?? [],
-        youtubeLinks: l.youtubeLinks ?? [],
-        attachments: toFileArray(l.attachments),
       })),
     }))
 
@@ -523,6 +570,7 @@ export async function POST(req: Request) {
       course: {
         ...finalCourse,
         coverImage: Array.isArray(finalCourse.coverImage) ? (finalCourse.coverImage[0] ?? null) : (finalCourse.coverImage || null),
+        certifications: getCertificationItems(finalCourse),
         modules: finalModules,
       },
     })

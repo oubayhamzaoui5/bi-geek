@@ -17,6 +17,16 @@ function resolveAvatar(user: any) {
   return `${pbUrl}/api/files/${user.collectionId}/${user.id}/${user.avatar}`
 }
 
+function normalizeIds(value: any): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  return value ? [String(value)] : []
+}
+
+function groupInstructorIds(group: any): string[] {
+  const ids = normalizeIds(group?.instructor)
+  return group?.programType === "bootcamp" ? ids : ids.slice(0, 1)
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
@@ -27,39 +37,37 @@ export async function GET(req: Request) {
 
     // Robust fetch — tries multiple filter strategies then falls back to in-memory filter
     const fetchGroups = async () => {
-      // Strategy 1: exact match with sort
+      const byId = new Map<string, any>()
+
       try {
         const res = await pb.collection("groups").getFullList({
           filter: `instructor = "${instructorId}"`,
           expand: "instructor",
         })
-        if (res.length > 0) return res
+        res.forEach((g: any) => byId.set(g.id, g))
       } catch (e1) {
         console.warn("INSTRUCTOR GROUPS: strategy 1 failed", e1)
       }
 
-      // Strategy 2: contains match (for PocketBase versions that store single-relation as array)
       try {
         const res = await pb.collection("groups").getFullList({
           filter: `instructor ~ "${instructorId}"`,
           expand: "instructor",
         })
-        if (res.length > 0) return res
+        res.forEach((g: any) => byId.set(g.id, g))
       } catch (e2) {
         console.warn("INSTRUCTOR GROUPS: strategy 2 failed", e2)
       }
 
-      // Strategy 3: fetch all and filter in memory (handles both string and array storage)
       try {
         const all = await pb.collection("groups").getFullList({ expand: "instructor" })
-        return all.filter((g: any) => {
-          if (!g.instructor) return false
-          if (Array.isArray(g.instructor)) return g.instructor.includes(instructorId)
-          return g.instructor === instructorId
-        })
+        all
+          .filter((g: any) => groupInstructorIds(g).includes(instructorId))
+          .forEach((g: any) => byId.set(g.id, g))
+        return Array.from(byId.values())
       } catch (e3) {
-        console.error("INSTRUCTOR GROUPS: all strategies failed", e3)
-        return []
+        console.warn("INSTRUCTOR GROUPS: fallback failed", e3)
+        return Array.from(byId.values())
       }
     }
 
@@ -148,15 +156,22 @@ export async function GET(req: Request) {
         courseId: g.course || "",
         bootcampId: g.bootcamp || "",
         studentIds: Array.isArray(g.students) ? g.students : [],
-        instructorId: g.instructor || null,
-        instructor: g.expand?.instructor
-          ? {
-              id: g.expand.instructor.id,
-              name: g.expand.instructor.name || "",
-              surname: g.expand.instructor.surname || "",
-              avatar: resolveAvatar(g.expand.instructor),
-            }
-          : null,
+        instructorIds: groupInstructorIds(g),
+        instructorId: groupInstructorIds(g)[0] || null,
+        instructors: (() => {
+          const expanded = g.expand?.instructor
+          const expandedList = Array.isArray(expanded) ? expanded : expanded ? [expanded] : []
+          const map = new Map(expandedList.map((i: any) => [i.id, i]))
+          return groupInstructorIds(g)
+            .map(id => map.get(id))
+            .filter(Boolean)
+            .map((i: any) => ({ id: i.id, name: i.name || "", surname: i.surname || "", avatar: resolveAvatar(i) }))
+        })(),
+        instructor: (() => {
+          const expanded = g.expand?.instructor
+          const first = Array.isArray(expanded) ? expanded[0] : expanded
+          return first ? { id: first.id, name: first.name || "", surname: first.surname || "", avatar: resolveAvatar(first) } : null
+        })(),
         courseTitle: g.course ? (courseMap[g.course] || "") : "",
         bootcampTitle: g.bootcamp ? (bootcampMap[g.bootcamp] || "") : "",
         students: (Array.isArray(g.students) ? g.students : [])
@@ -189,13 +204,15 @@ export async function GET(req: Request) {
       }))).catch(() => [])
     }
 
-    // Pre-sort in_progress groups by next upcoming session
+    // Pre-sort in_progress groups by next upcoming session.
+    // A session becomes past only after its derived end time.
     const now = Date.now()
     const nextTimeByGroup = new Map<string, number>()
     for (const s of sessions) {
       if (s.is_cancelled) continue
       const t = new Date(`${s.date}T${s.start_time || "00:00"}:00`).getTime()
-      if (!Number.isFinite(t) || t < now) continue
+      const end = t + Math.max(s.duration || 120, 1) * 60_000
+      if (!Number.isFinite(t) || end < now) continue
       const existing = nextTimeByGroup.get(s.group)
       if (existing === undefined || t < existing) nextTimeByGroup.set(s.group, t)
     }

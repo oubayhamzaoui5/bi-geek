@@ -8,7 +8,6 @@ import { ArrowLeft, FileText } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { MessagesTab } from "@/components/messages-tab"
 
 import MuxPlayerClient from "@/components/MuxPlayerClient"
 import { InstructorSection } from "@/components/student/instructor-section"
@@ -120,7 +119,6 @@ function VideoViewerContent() {
           <Footer />
         </main>
 
-        <MessagesTab />
       </div>
     </SidebarProvider>
   )

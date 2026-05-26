@@ -10,6 +10,12 @@ const ROLE_RULES = [
   { prefix: "/api/student", roles: ["student", "admin", "admin_agent"] },
 ]
 
+const ADMIN_USER_MANAGEMENT_API_PREFIXES = [
+  "/api/admin/users",
+  "/api/admin/profile",
+  "/api/admin/change-password",
+]
+
 const NOINDEX_PREFIXES = [
   "/admin-dashboard",
   "/student-dashboard",
@@ -54,6 +60,13 @@ export async function proxy(req: NextRequest) {
     const data = await refresh.json()
     const role = data?.record?.role ?? "student"
     if (!rule.roles.includes(role)) {
+      return NextResponse.json({ error: "Permission refusee." }, { status: 403 })
+    }
+    if (
+      role === "admin" &&
+      pathname.startsWith("/api/admin") &&
+      !ADMIN_USER_MANAGEMENT_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+    ) {
       return NextResponse.json({ error: "Permission refusee." }, { status: 403 })
     }
 

@@ -17,6 +17,40 @@ function resolveAvatar(user: any) {
   return `${pbUrl}/api/files/${user.collectionId}/${user.id}/${user.avatar}`
 }
 
+function normalizeIds(value: any): string[] {
+  if (!value) return []
+  if (Array.isArray(value)) return value.filter(Boolean).map(String)
+  return [String(value)]
+}
+
+function groupInstructorIds(group: any): string[] {
+  const ids = normalizeIds(group?.instructor)
+  return group?.programType === "bootcamp" ? ids : ids.slice(0, 1)
+}
+
+async function fetchInstructorGroups(pb: PocketBase, instructorId: string) {
+  const byId = new Map<string, any>()
+  const attempts = [
+    () => pb.collection("groups").getFullList({ filter: `instructor = "${instructorId}"` }),
+    () => pb.collection("groups").getFullList({ filter: `instructor ~ "${instructorId}"` }),
+  ]
+
+  for (const attempt of attempts) {
+    try {
+      const groups = await attempt()
+      groups.forEach((g: any) => byId.set(g.id, g))
+    } catch {}
+  }
+
+  try {
+    const all = await pb.collection("groups").getFullList()
+    all
+      .filter((g: any) => groupInstructorIds(g).includes(instructorId))
+      .forEach((g: any) => byId.set(g.id, g))
+  } catch {}
+  return Array.from(byId.values())
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
@@ -26,9 +60,7 @@ export async function GET(req: Request) {
     const pb = await getAdminPb()
 
     // Get instructor's groups
-    const groups = await pb.collection("groups").getFullList({
-      filter: `instructor = "${instructorId}"`,
-    })
+    const groups = await fetchInstructorGroups(pb, instructorId)
 
     if (groups.length === 0) {
       return NextResponse.json({ ok: true, students: [] })

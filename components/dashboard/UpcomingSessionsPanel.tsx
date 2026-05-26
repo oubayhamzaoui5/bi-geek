@@ -25,11 +25,11 @@ export function UpcomingSessionsPanel({
   href: string
 }) {
   return (
-    <SectionCard title="Sessions à venir" icon={CalendarDays} href={href}>
+    <SectionCard title="Séances à venir" icon={CalendarDays} href={href}>
       {sessions.length === 0 ? (
         <div style={{ padding: "24px 18px", textAlign: "center" }}>
           <CalendarDays size={28} color="#e2e8f0" style={{ margin: "0 auto 8px" }} />
-          <p style={{ fontSize: 12, color: "#475569", margin: 0 }}>Aucune session planifiée</p>
+          <p style={{ fontSize: 12, color: "#475569", margin: 0 }}>Aucune séance planifiée</p>
         </div>
       ) : (
         <div style={{ padding: "8px 0" }}>
@@ -73,7 +73,7 @@ export function UpcomingSessionsPanel({
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {s.title || s.groupTitle || "Session"}
+                    {s.title || s.groupTitle || "Séance"}
                   </p>
                   <p style={{ fontSize: 11, color: "#475569", margin: "1px 0 0" }}>
                     {s.start_time ? s.start_time.slice(0, 5) : "—"} · {Math.round(s.duration / 60)}h

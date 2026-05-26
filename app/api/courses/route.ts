@@ -39,6 +39,32 @@ async function getPocketBase() {
   return pb
 }
 
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+}
+
+async function generateUniqueSlug(pb: PocketBase, title: string, currentId: string) {
+  const baseSlug = slugify(title)
+  let slug = baseSlug
+  let counter = 1
+
+  while (true) {
+    try {
+      const existing = await pb.collection("courses").getFirstListItem(`slug="${slug}"`)
+      if (existing.id === currentId) return slug
+      counter++
+      slug = `${baseSlug}-${counter}`
+    } catch {
+      return slug
+    }
+  }
+}
+
 export async function GET(req: Request) {
   try {
     const PB_URL = process.env.NEXT_PUBLIC_PB_URL ?? process.env.POCKETBASE_URL
@@ -77,9 +103,21 @@ export async function GET(req: Request) {
       ? records.filter((c: any) => courseIds?.has(c.id))
       : records
 
+    for (const course of filteredRecords as any[]) {
+      if (!course.slug || course.slug.trim() === "") {
+        try {
+          const slug = await generateUniqueSlug(pb, course.title, course.id)
+          await pb.collection("courses").update(course.id, { slug })
+          course.slug = slug
+        } catch {
+          course.slug = ""
+        }
+      }
+    }
+
     const courses = filteredRecords.map((c: any) => ({
       id: c.id,
-      slug: c.slug ?? c.id,
+      slug: c.slug || "",
       title: c.title,
       shortDescription: c.shortDescription,
       durationLabel: c.durationLabel,

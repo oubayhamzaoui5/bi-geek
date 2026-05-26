@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
-import { assertSelfOrRole, authErrorResponse, requireUser } from "@/lib/server-auth"
+import { AUTH_COOKIE, assertSelfOrRole, authErrorResponse, cookieOptions, requireUser } from "@/lib/server-auth"
 
 const getPB = () =>
   new PocketBase(process.env.POCKETBASE_URL ?? process.env.NEXT_PUBLIC_PB_URL ?? "http://127.0.0.1:8090")
+
+function resolveAvatar(user: any, pbUrl: string) {
+  if (!user?.avatar) return null
+  if (typeof user.avatar === "string" && user.avatar.startsWith("http")) return user.avatar
+  return `${pbUrl}/api/files/${user.collectionId}/${user.id}/${user.avatar}`
+}
 
 export async function POST(req: Request) {
   try {
@@ -69,7 +75,28 @@ export async function POST(req: Request) {
       await pb.collection("users").update(userId, updatePayload)
     }
 
-    return NextResponse.json({ ok: true })
+    const impersonatedPb = await pb.collection("users").impersonate(userId, 60 * 60 * 24 * 7)
+    const refreshedUser = impersonatedPb.authStore.record
+    if (!refreshedUser) {
+      return NextResponse.json({ error: "Connexion introuvable apres changement du mot de passe." }, { status: 500 })
+    }
+
+    const pbUrl = process.env.POCKETBASE_URL ?? process.env.NEXT_PUBLIC_PB_URL ?? "http://127.0.0.1:8090"
+    const res = NextResponse.json({
+      ok: true,
+      user: {
+        id: refreshedUser.id,
+        username: refreshedUser.username ?? "",
+        email: refreshedUser.email ?? "",
+        role: refreshedUser.role ?? "admin",
+        usePassword: refreshedUser.usePassword ?? true,
+        avatar: resolveAvatar(refreshedUser, pbUrl),
+      },
+    })
+    if (impersonatedPb.authStore.token) {
+      res.cookies.set(AUTH_COOKIE, impersonatedPb.authStore.token, cookieOptions())
+    }
+    return res
   } catch (err: any) {
     const auth = authErrorResponse(err)
     if (auth) return auth

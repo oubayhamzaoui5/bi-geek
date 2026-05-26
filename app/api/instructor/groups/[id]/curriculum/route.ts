@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
+import { authErrorResponse, requireUser, type AuthUser } from "@/lib/server-auth"
 import { readDefaultCourseResources, resolveGroupResourceMode } from "@/lib/server-course-resources"
 
 export const dynamic = "force-dynamic"
@@ -36,6 +37,59 @@ async function getAdminPb() {
   return pb
 }
 
+function normalizeIds(value: any): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  return value ? [String(value)] : []
+}
+
+function groupInstructorIds(group: any): string[] {
+  const ids = normalizeIds(group?.instructor)
+  return group?.programType === "bootcamp" ? ids : ids.slice(0, 1)
+}
+
+function instructorRank(group: any, instructorId: string) {
+  const ids = groupInstructorIds(group)
+  const index = ids.indexOf(instructorId)
+  return index === -1 ? ids.length : index
+}
+
+function ownerId(record: any, group: any) {
+  return record?.instructor_id || groupInstructorIds(group)[0] || ""
+}
+
+function canEdit(user: AuthUser, group: any, record: any) {
+  return user.role === "admin" || user.role === "admin_agent" || ownerId(record, group) === user.id
+}
+
+async function requireGroupEditor(req: Request, pb: any, groupId: string) {
+  const user = await requireUser(req, ["instructor", "admin", "admin_agent"])
+  const group = await pb.collection("groups").getOne(groupId)
+  const ids = groupInstructorIds(group)
+  if (user.role === "instructor" && !ids.includes(user.id)) {
+    return { user, group: null as any, error: NextResponse.json({ error: "Permission refusee." }, { status: 403 }) }
+  }
+  return { user, group, error: null as NextResponse | null }
+}
+
+async function nextRankedOrder(pb: any, group: any, user: AuthUser, collection: string, filter: string) {
+  const base = instructorRank(group, user.id) * 100000
+  const records = await safeGetList(pb, collection, filter)
+  const owned = records.filter((r: any) => ownerId(r, group) === user.id)
+  if (owned.length === 0) return base
+  return Math.max(base, ...owned.map((r: any) => Number(r.order ?? base))) + 1
+}
+
+async function nextModuleItemOrder(pb: any, group: any, user: AuthUser, moduleId: string) {
+  const base = instructorRank(group, user.id) * 100000
+  const [moduleVideos, moduleAttachments] = await Promise.all([
+    safeGetList(pb, "module_videos", `module_id = "${moduleId}"`),
+    safeGetList(pb, "module_attachments", `module_id = "${moduleId}"`),
+  ])
+  const owned = [...moduleVideos, ...moduleAttachments].filter((r: any) => ownerId(r, group) === user.id)
+  if (owned.length === 0) return base
+  return Math.max(base, ...owned.map((r: any) => Number(r.order ?? base))) + 1
+}
+
 function attachmentUrl(collection: string, recordId: string, filename: string) {
   return `${PB_FILE_URL}/api/files/${collection}/${recordId}/${filename}`
 }
@@ -61,43 +115,17 @@ async function safeGetList(pb: any, collection: string, filter: string, sort?: s
 async function cloneCourseDefaultsToGroup(pb: any, group: any, groupId: string) {
   const source = await readDefaultCourseResources(pb, group.course)
   const moduleIdMap = new Map<string, string>()
-  const lessonIdMap = new Map<string, string>()
+  const firstInstructorId = groupInstructorIds(group)[0] || ""
 
   for (const module of source.modules) {
     const created = await pb.collection("group_modules").create({
       group_id: groupId,
+      instructor_id: firstInstructorId,
       title: module.title || "Nouveau module",
       description: module.description || "",
       order: module.order ?? 0,
     })
     moduleIdMap.set(module.id, created.id)
-  }
-
-  for (const lesson of source.lessons) {
-    const moduleId = moduleIdMap.get(lesson.moduleId)
-    if (!moduleId) continue
-    const created = await pb.collection("group_lessons").create({
-      group_id: groupId,
-      module_id: moduleId,
-      title: lesson.title || "Nouvelle lecon",
-      slug: lesson.slug || lesson.id,
-      description: lesson.description || "",
-      content: lesson.content || "",
-      order: lesson.order ?? 0,
-    })
-    lessonIdMap.set(lesson.id, created.id)
-  }
-
-  for (const video of source.videos) {
-    const lessonId = lessonIdMap.get(video.lessonId)
-    if (!lessonId) continue
-    await pb.collection("lesson_videos").create({
-      lesson_id: lessonId,
-      title: video.title || "Nouvelle video",
-      drive_url: video.driveUrl || "",
-      description: video.description || "",
-      order: video.order ?? 0,
-    })
   }
 
   for (const video of source.moduleVideos || []) {
@@ -106,27 +134,12 @@ async function cloneCourseDefaultsToGroup(pb: any, group: any, groupId: string) 
     await pb.collection("module_videos").create({
       module_id: moduleId,
       group_id: groupId,
+      instructor_id: firstInstructorId,
       title: video.title || "Nouvelle video",
       drive_url: video.driveUrl || "",
       description: video.description || "",
       order: video.order ?? 0,
     })
-  }
-
-  for (const attachment of source.lessonAttachments) {
-    const lessonId = lessonIdMap.get(attachment.lessonId)
-    if (!lessonId || !attachment.url) continue
-    try {
-      const res = await fetch(attachment.url)
-      if (!res.ok) continue
-      const blob = await res.blob()
-      const form = new FormData()
-      form.append("lesson_id", lessonId)
-      form.append("name", attachment.title || attachment.name || "document")
-      form.append("order", String(attachment.order ?? 0))
-      form.append("file", blob, attachment.name || "document.pdf")
-      await pb.collection("lesson_attachments").create(form)
-    } catch {}
   }
 
   for (const attachment of source.moduleAttachments || []) {
@@ -139,6 +152,7 @@ async function cloneCourseDefaultsToGroup(pb: any, group: any, groupId: string) 
       const form = new FormData()
       form.append("module_id", moduleId)
       form.append("group_id", groupId)
+      form.append("instructor_id", firstInstructorId)
       form.append("name", attachment.title || attachment.name || "document")
       form.append("order", String(attachment.order ?? 0))
       form.append("file", blob, attachment.name || "document.pdf")
@@ -150,41 +164,42 @@ async function cloneCourseDefaultsToGroup(pb: any, group: any, groupId: string) 
 }
 
 // ── GET: full curriculum tree ──────────────────────────────────────────────────
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id: groupId } = await params
     const pb = await getAdminPb()
 
-    const group = await pb.collection("groups").getOne(groupId)
+    const { user, group, error } = await requireGroupEditor(req, pb, groupId)
+    if (error) return error
     const modules = await safeGetList(pb, "group_modules", `group_id = "${groupId}"`, "order")
     const resourceMode = resolveGroupResourceMode(group, modules)
     if (resourceMode === "default" && group.course) {
+      const source = await readDefaultCourseResources(pb, group.course)
       return NextResponse.json({
-        ...(await readDefaultCourseResources(pb, group.course)),
+        ok: true,
+        modules: (source.modules || []).map((m: any) => ({
+          ...m,
+          instructorId: m.instructorId || groupInstructorIds(group)[0] || "",
+          canEdit: true,
+        })),
+        moduleVideos: (source.moduleVideos || []).map((v: any) => ({
+          ...v,
+          instructorId: v.instructorId || groupInstructorIds(group)[0] || "",
+          canEdit: true,
+        })),
+        moduleAttachments: (source.moduleAttachments || []).map((a: any) => ({
+          ...a,
+          instructorId: a.instructorId || groupInstructorIds(group)[0] || "",
+          canEdit: true,
+        })),
         groupId,
         resourceMode: "default",
         sourceCourseId: group.course,
       })
     }
 
-    const lessons = await safeGetList(pb, "group_lessons", `group_id = "${groupId}"`, "order")
-
-    let videos: any[] = []
-    let lessonAttachments: any[] = []
-    let videoAttachments: any[] = []
     let moduleVideos: any[] = []
     let moduleAttachments: any[] = []
-
-    if (lessons.length > 0) {
-      const lessonFilter = lessons.map((l: any) => `lesson_id = "${l.id}"`).join(" || ")
-      videos = await safeGetList(pb, "lesson_videos", lessonFilter, "order")
-      lessonAttachments = await safeGetList(pb, "lesson_attachments", lessonFilter, "created")
-    }
-
-    if (videos.length > 0) {
-      const videoFilter = videos.map((v: any) => `video_id = "${v.id}"`).join(" || ")
-      videoAttachments = await safeGetList(pb, "video_attachments", videoFilter, "created")
-    }
 
     if (modules.length > 0) {
       const modFilter = modules.map((m: any) => `module_id = "${m.id}"`).join(" || ")
@@ -200,35 +215,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         title: m.title || "",
         order: m.order ?? 0,
         description: m.description || "",
-      })),
-      lessons: lessons.map((l: any) => ({
-        id: l.id,
-        slug: l.slug || l.id,
-        moduleId: l.module_id || "",
-        title: l.title || "",
-        order: l.order ?? 0,
-        description: l.description || "",
-        content: l.content || "",
-      })),
-      videos: videos.map((v: any) => ({
-        id: v.id,
-        lessonId: v.lesson_id || "",
-        title: v.title || "",
-        order: v.order ?? 0,
-        driveUrl: v.drive_url || "",
-        description: v.description || "",
-      })),
-      lessonAttachments: lessonAttachments.map((a: any) => ({
-        id: a.id,
-        lessonId: a.lesson_id || "",
-        name: a.name || a.file || "",
-        url: a.file ? attachmentUrl("lesson_attachments", a.id, a.file) : null,
-      })),
-      videoAttachments: videoAttachments.map((a: any) => ({
-        id: a.id,
-        videoId: a.video_id || "",
-        name: a.name || a.file || "",
-        url: a.file ? attachmentUrl("video_attachments", a.id, a.file) : null,
+        instructorId: m.instructor_id || ownerId(m, group),
+        canEdit: canEdit(user, group, m),
       })),
       moduleVideos: moduleVideos.map((v: any) => ({
         id: v.id,
@@ -237,6 +225,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         order: v.order ?? 0,
         driveUrl: v.drive_url || "",
         description: v.description || "",
+        instructorId: v.instructor_id || ownerId(v, group),
+        canEdit: canEdit(user, group, v),
       })),
       moduleAttachments: moduleAttachments.map((a: any) => ({
         id: a.id,
@@ -244,9 +234,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         name: a.name || a.file || "",
         url: a.file ? attachmentUrl("module_attachments", a.id, a.file) : null,
         order: a.order ?? 999,
+        instructorId: a.instructor_id || ownerId(a, group),
+        canEdit: canEdit(user, group, a),
       })),
     })
   } catch (err: any) {
+    const auth = authErrorResponse(err)
+    if (auth) return auth
     console.error("CURRICULUM GET ERROR:", err)
     return NextResponse.json({ error: err?.message || "Erreur serveur" }, { status: 500 })
   }
@@ -259,7 +253,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const body = await req.json()
     const pb = await getAdminPb()
     const { type, ...data } = body
-    const group = await pb.collection("groups").getOne(groupId)
+    const { user, group, error } = await requireGroupEditor(req, pb, groupId)
+    if (error) return error
     const modules = await safeGetList(pb, "group_modules", `group_id = "${groupId}"`, "order")
     if (type === "clone_course_defaults") {
       if (!group.course) return NextResponse.json({ error: "Ce groupe n'est pas lie a une formation." }, { status: 400 })
@@ -272,21 +267,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     if (type === "module") {
-      const existing = await safeGetList(pb, "group_modules", `group_id = "${groupId}"`)
       const record = await pb.collection("group_modules").create({
         group_id: groupId,
+        instructor_id: user.id,
         title: data.title || "Nouveau module",
         description: data.description || "",
-        order: existing.length,
+        order: await nextRankedOrder(pb, group, user, "group_modules", `group_id = "${groupId}"`),
       })
       return NextResponse.json({
         ok: true,
-        module: { id: record.id, title: record.title, order: record.order ?? 0, description: record.description || "" },
+        module: { id: record.id, title: record.title, order: record.order ?? 0, description: record.description || "", instructorId: record.instructor_id || user.id },
       })
     }
 
     if (type === "lesson") {
-      const existing = await safeGetList(pb, "group_lessons", `module_id = "${data.moduleId}"`)
       const baseSlug = toSlug(data.title || "nouvelle-lecon")
       // ensure slug is unique within this group
       const allLessons = await safeGetList(pb, "group_lessons", `group_id = "${groupId}"`)
@@ -297,11 +291,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const record = await pb.collection("group_lessons").create({
         group_id: groupId,
         module_id: data.moduleId,
+        instructor_id: user.id,
         title: data.title || "Nouvelle leçon",
         slug,
         description: data.description || "",
         content: data.content || "",
-        order: data.order ?? existing.length,
+        order: await nextModuleItemOrder(pb, group, user, data.moduleId),
       })
       return NextResponse.json({
         ok: true,
@@ -313,18 +308,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           order: record.order ?? 0,
           description: record.description || "",
           content: record.content || "",
+          instructorId: record.instructor_id || user.id,
         },
       })
     }
 
     if (type === "video") {
-      const existing = await safeGetList(pb, "lesson_videos", `lesson_id = "${data.lessonId}"`)
       const record = await pb.collection("lesson_videos").create({
         lesson_id: data.lessonId,
+        instructor_id: user.id,
         title: data.title || "Nouvelle vidéo",
         drive_url: data.driveUrl || "",
         description: data.description || "",
-        order: existing.length,
+        order: await nextRankedOrder(pb, group, user, "lesson_videos", `lesson_id = "${data.lessonId}"`),
       })
       return NextResponse.json({
         ok: true,
@@ -334,19 +330,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           title: record.title,
           driveUrl: record.drive_url || "",
           description: record.description || "",
+          order: record.order ?? 0,
+          instructorId: record.instructor_id || user.id,
         },
       })
     }
 
     if (type === "module_video") {
-      const existing = await safeGetList(pb, "module_videos", `module_id = "${data.moduleId}"`)
       const record = await pb.collection("module_videos").create({
         module_id: data.moduleId,
         group_id: groupId,
+        instructor_id: user.id,
         title: data.title || "Nouvelle vidéo",
         drive_url: data.driveUrl || "",
         description: data.description || "",
-        order: data.order ?? existing.length,
+        order: await nextModuleItemOrder(pb, group, user, data.moduleId),
       })
       return NextResponse.json({
         ok: true,
@@ -357,12 +355,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           driveUrl: record.drive_url || "",
           description: record.description || "",
           order: record.order ?? 0,
+          instructorId: record.instructor_id || user.id,
         },
       })
     }
 
     return NextResponse.json({ error: "Type invalide" }, { status: 400 })
   } catch (err: any) {
+    const auth = authErrorResponse(err)
+    if (auth) return auth
     console.error("CURRICULUM POST ERROR:", err)
     return NextResponse.json({ error: err?.message || "Erreur serveur" }, { status: 500 })
   }
@@ -375,25 +376,33 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const body = await req.json()
     const pb = await getAdminPb()
     const { type, id, ...data } = body
-    const group = await pb.collection("groups").getOne(groupId)
+    const { user, group, error } = await requireGroupEditor(req, pb, groupId)
+    if (error) return error
     const modules = await safeGetList(pb, "group_modules", `group_id = "${groupId}"`, "order")
     if (resolveGroupResourceMode(group, modules) === "default") {
       return NextResponse.json({ error: "Passez en ressources personnalisees pour modifier ce programme." }, { status: 409 })
     }
 
     if (type === "module") {
+      const moduleRecord = await pb.collection("group_modules").getOne(id)
+      if (!canEdit(user, group, moduleRecord)) return NextResponse.json({ error: "Vous ne pouvez supprimer que vos ressources." }, { status: 403 })
+      const existing = await pb.collection("group_modules").getOne(id)
+      if (!canEdit(user, group, existing)) return NextResponse.json({ error: "Vous ne pouvez modifier que vos ressources." }, { status: 403 })
       const record = await pb.collection("group_modules").update(id, {
         title: data.title,
         description: data.description,
       })
       return NextResponse.json({
         ok: true,
-        module: { id: record.id, title: record.title, order: record.order ?? 0, description: record.description || "" },
+        module: { id: record.id, title: record.title, order: record.order ?? 0, description: record.description || "", instructorId: record.instructor_id || ownerId(record, group) },
       })
     }
 
     if (type === "lesson") {
+      const lessonRecord = await pb.collection("group_lessons").getOne(id)
+      if (!canEdit(user, group, lessonRecord)) return NextResponse.json({ error: "Vous ne pouvez supprimer que vos ressources." }, { status: 403 })
       const existing = await pb.collection("group_lessons").getOne(id)
+      if (!canEdit(user, group, existing)) return NextResponse.json({ error: "Vous ne pouvez modifier que vos ressources." }, { status: 403 })
       const updateData: any = { title: data.title, description: data.description, content: data.content }
       if (data.title && data.title !== existing.title) {
         const baseSlug = toSlug(data.title)
@@ -415,11 +424,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           order: record.order ?? 0,
           description: record.description || "",
           content: record.content || "",
+          instructorId: record.instructor_id || ownerId(record, group),
         },
       })
     }
 
     if (type === "video") {
+      const videoRecord = await pb.collection("lesson_videos").getOne(id)
+      if (!canEdit(user, group, videoRecord)) return NextResponse.json({ error: "Vous ne pouvez supprimer que vos ressources." }, { status: 403 })
+      const existing = await pb.collection("lesson_videos").getOne(id)
+      if (!canEdit(user, group, existing)) return NextResponse.json({ error: "Vous ne pouvez modifier que vos ressources." }, { status: 403 })
       const record = await pb.collection("lesson_videos").update(id, {
         title: data.title,
         drive_url: data.driveUrl,
@@ -434,6 +448,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           order: record.order ?? 0,
           driveUrl: record.drive_url || "",
           description: record.description || "",
+          instructorId: record.instructor_id || ownerId(record, group),
         },
       })
     }
@@ -441,7 +456,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (type === "reorder_modules") {
       const order: string[] = data.order
       for (let i = 0; i < order.length; i++) {
-        await pb.collection("group_modules").update(order[i], { order: i })
+        const record = await pb.collection("group_modules").getOne(order[i])
+        if (!canEdit(user, group, record)) return NextResponse.json({ error: "Vous ne pouvez reordonner que vos ressources." }, { status: 403 })
+        await pb.collection("group_modules").update(order[i], { order: instructorRank(group, ownerId(record, group)) * 100000 + i })
       }
       return NextResponse.json({ ok: true })
     }
@@ -449,7 +466,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (type === "reorder_lessons") {
       const order: string[] = data.order
       for (let i = 0; i < order.length; i++) {
-        await pb.collection("group_lessons").update(order[i], { order: i })
+        const record = await pb.collection("group_lessons").getOne(order[i])
+        if (!canEdit(user, group, record)) return NextResponse.json({ error: "Vous ne pouvez reordonner que vos ressources." }, { status: 403 })
+        await pb.collection("group_lessons").update(order[i], { order: instructorRank(group, ownerId(record, group)) * 100000 + i })
       }
       return NextResponse.json({ ok: true })
     }
@@ -457,7 +476,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (type === "reorder_videos") {
       const order: string[] = data.order
       for (let i = 0; i < order.length; i++) {
-        await pb.collection("lesson_videos").update(order[i], { order: i })
+        const record = await pb.collection("lesson_videos").getOne(order[i])
+        if (!canEdit(user, group, record)) return NextResponse.json({ error: "Vous ne pouvez reordonner que vos ressources." }, { status: 403 })
+        await pb.collection("lesson_videos").update(order[i], { order: instructorRank(group, ownerId(record, group)) * 100000 + i })
       }
       return NextResponse.json({ ok: true })
     }
@@ -465,7 +486,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (type === "reorder_lesson_attachments") {
       const order: string[] = data.order
       for (let i = 0; i < order.length; i++) {
-        await pb.collection("lesson_attachments").update(order[i], { order: i })
+        const record = await pb.collection("lesson_attachments").getOne(order[i])
+        if (!canEdit(user, group, record)) return NextResponse.json({ error: "Vous ne pouvez reordonner que vos ressources." }, { status: 403 })
+        await pb.collection("lesson_attachments").update(order[i], { order: instructorRank(group, ownerId(record, group)) * 100000 + i })
       }
       return NextResponse.json({ ok: true })
     }
@@ -474,15 +497,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       const items: { type: string; id: string }[] = data.items
       for (let i = 0; i < items.length; i++) {
         const { type: itemType, id: itemId } = items[i]
-        if (itemType === "lesson") await pb.collection("group_lessons").update(itemId, { order: i })
-        else if (itemType === "module_video") await pb.collection("module_videos").update(itemId, { order: i })
-        else if (itemType === "module_attachment") await pb.collection("module_attachments").update(itemId, { order: i })
+        const collection = itemType === "lesson" ? "group_lessons" : itemType === "module_video" ? "module_videos" : itemType === "module_attachment" ? "module_attachments" : null
+        if (!collection) continue
+        const record = await pb.collection(collection).getOne(itemId)
+        if (!canEdit(user, group, record)) return NextResponse.json({ error: "Vous ne pouvez reordonner que vos ressources." }, { status: 403 })
+        await pb.collection(collection).update(itemId, { order: instructorRank(group, ownerId(record, group)) * 100000 + i })
       }
       return NextResponse.json({ ok: true })
     }
 
     return NextResponse.json({ error: "Type invalide" }, { status: 400 })
   } catch (err: any) {
+    const auth = authErrorResponse(err)
+    if (auth) return auth
     console.error("CURRICULUM PATCH ERROR:", err)
     return NextResponse.json({ error: err?.message || "Erreur serveur" }, { status: 500 })
   }
@@ -495,13 +522,16 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const body = await req.json()
     const pb = await getAdminPb()
     const { type, id } = body
-    const group = await pb.collection("groups").getOne(groupId)
+    const { user, group, error } = await requireGroupEditor(req, pb, groupId)
+    if (error) return error
     const modules = await safeGetList(pb, "group_modules", `group_id = "${groupId}"`, "order")
     if (resolveGroupResourceMode(group, modules) === "default") {
       return NextResponse.json({ error: "Passez en ressources personnalisees pour modifier ce programme." }, { status: 409 })
     }
 
     if (type === "module") {
+      const moduleRecord = await pb.collection("group_modules").getOne(id)
+      if (!canEdit(user, group, moduleRecord)) return NextResponse.json({ error: "Vous ne pouvez supprimer que vos ressources." }, { status: 403 })
       // Cascade: delete lessons → videos → attachments, plus module-level videos/attachments
       const lessons = await safeGetList(pb, "group_lessons", `module_id = "${id}"`, "created")
       for (const lesson of lessons) {
@@ -523,6 +553,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
 
     if (type === "lesson") {
+      const lessonRecord = await pb.collection("group_lessons").getOne(id)
+      if (!canEdit(user, group, lessonRecord)) return NextResponse.json({ error: "Vous ne pouvez supprimer que vos ressources." }, { status: 403 })
       const videos = await safeGetList(pb, "lesson_videos", `lesson_id = "${id}"`, "created")
       for (const video of videos) {
         const vatts = await safeGetList(pb, "video_attachments", `video_id = "${video.id}"`, "created")
@@ -535,29 +567,41 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
 
     if (type === "video") {
+      const videoRecord = await pb.collection("lesson_videos").getOne(id)
+      if (!canEdit(user, group, videoRecord)) return NextResponse.json({ error: "Vous ne pouvez supprimer que vos ressources." }, { status: 403 })
       const vatts = await safeGetList(pb, "video_attachments", `video_id = "${id}"`, "created")
       for (const a of vatts) try { await pb.collection("video_attachments").delete(a.id) } catch {}
       await pb.collection("lesson_videos").delete(id)
     }
 
     if (type === "lesson_attachment") {
+      const record = await pb.collection("lesson_attachments").getOne(id)
+      if (!canEdit(user, group, record)) return NextResponse.json({ error: "Vous ne pouvez supprimer que vos ressources." }, { status: 403 })
       await pb.collection("lesson_attachments").delete(id)
     }
 
     if (type === "video_attachment") {
+      const record = await pb.collection("video_attachments").getOne(id)
+      if (!canEdit(user, group, record)) return NextResponse.json({ error: "Vous ne pouvez supprimer que vos ressources." }, { status: 403 })
       await pb.collection("video_attachments").delete(id)
     }
 
     if (type === "module_video") {
+      const record = await pb.collection("module_videos").getOne(id)
+      if (!canEdit(user, group, record)) return NextResponse.json({ error: "Vous ne pouvez supprimer que vos ressources." }, { status: 403 })
       await pb.collection("module_videos").delete(id)
     }
 
     if (type === "module_attachment") {
+      const record = await pb.collection("module_attachments").getOne(id)
+      if (!canEdit(user, group, record)) return NextResponse.json({ error: "Vous ne pouvez supprimer que vos ressources." }, { status: 403 })
       await pb.collection("module_attachments").delete(id)
     }
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
+    const auth = authErrorResponse(err)
+    if (auth) return auth
     console.error("CURRICULUM DELETE ERROR:", err)
     return NextResponse.json({ error: err?.message || "Erreur serveur" }, { status: 500 })
   }

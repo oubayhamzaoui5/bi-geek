@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
+import { useRouter } from "next/navigation"
 import {
   Search, Plus, Edit, Trash2, ExternalLink,
   ChevronUp, ChevronDown, Save, X,
   BookOpen, Star, ChevronRight, Layers, ImagePlus,
   CheckCircle, AlertCircle, Loader2,
-  Archive, RotateCcw
+  Archive
 } from "lucide-react"
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 
@@ -31,6 +32,7 @@ type AdminCourse = {
 
 type AdminBootcamp = {
   id?: string
+  slug?: string
   title: string
   shortDescription: string
   longDescription: string
@@ -50,7 +52,7 @@ type BootcampsCrudProps = {
   initialCourses?: AdminCourse[]
   onSave?: (bootcamp: AdminBootcamp) => Promise<void>
   onDelete?: (id: string) => Promise<void>
-  onView?: (id: string) => void
+  onView?: (bootcamp: AdminBootcamp) => void
 }
 
 const PREREQUIS_OPTIONS = [
@@ -155,6 +157,7 @@ export default function BootcampsCrud({
   onDelete,
   onView
 }: BootcampsCrudProps) {
+  const router = useRouter()
   // 🔔 TOAST SYSTEM - State
   const [toasts, setToasts] = useState<Toast[]>([])
 
@@ -166,10 +169,6 @@ export default function BootcampsCrud({
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(false)
   
-  // Archive / tag state
-  const [viewMode, setViewMode] = useState<"active" | "archived">("active")
-  const [archivedBootcamps, setArchivedBootcamps] = useState<AdminBootcamp[]>([])
-  const [archivedLoading, setArchivedLoading] = useState(false)
   const [filterTag, setFilterTag] = useState<string>("all")
   const [hoveredTagsBootcampId, setHoveredTagsBootcampId] = useState<string | null>(null)
   const [tagsTooltipPos, setTagsTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
@@ -373,44 +372,6 @@ export default function BootcampsCrud({
     }
   }
 
-  const handleRestoreBootcamp = async (id: string) => {
-    try {
-      const res = await fetch(`/api/admin/bootcamps/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "restore" }) })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setArchivedBootcamps(prev => prev.filter(b => b.id !== id))
-      showToast("success", "Bootcamp restauré.")
-    } catch (err: any) {
-      showToast("error", err.message || "Erreur lors de la restauration")
-    }
-  }
-
-  const handlePermanentDeleteBootcamp = async (id: string) => {
-    if (!confirm("Supprimer définitivement ce bootcamp ? Cette action est irréversible.")) return
-    try {
-      const res = await fetch(`/api/admin/bootcamps/${id}?permanent=true`, { method: "DELETE" })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setArchivedBootcamps(prev => prev.filter(b => b.id !== id))
-      showToast("success", "Bootcamp supprimé définitivement.")
-    } catch (err: any) {
-      showToast("error", err.message || "Erreur lors de la suppression")
-    }
-  }
-
-  const loadArchivedBootcamps = async () => {
-    setArchivedLoading(true)
-    try {
-      const res = await fetch("/api/admin/bootcamps?archived=true")
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setArchivedBootcamps(data.bootcamps)
-    } catch (err: any) {
-      showToast("error", err.message || "Erreur lors du chargement des archives")
-    } finally {
-      setArchivedLoading(false)
-    }
-  }
 
   // Course assignment handlers
   const handleAddCourse = () => {
@@ -483,30 +444,27 @@ export default function BootcampsCrud({
     <div style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "'DM Sans','Inter',sans-serif" }}>
 
       <AdminPageHeader
-        title={viewMode === "active" ? "Bootcamps" : "Archives"}
+        title="Bootcamps"
         description="Gérez le catalogue de bootcamps"
         breadcrumbs={[{ label: "Bootcamps" }]}
         actions={
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button
-              onClick={() => {
-                if (viewMode === "active") { setViewMode("archived"); loadArchivedBootcamps() }
-                else setViewMode("active")
-              }}
-              style={{ padding: "9px 20px", background: viewMode === "archived" ? "rgba(99,102,241,0.08)" : "#f8fafc", color: viewMode === "archived" ? "var(--accent,#6366f1)" : "#475569", border: `1.5px solid ${viewMode === "archived" ? "var(--accent,#6366f1)" : "#e8ecf3"}`, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s" }}
+              onClick={() => router.push("/admin-dashboard/bootcamps/archive")}
+              style={{ padding: "9px 20px", background: "#f8fafc", color: "#475569", border: "1.5px solid #e8ecf3", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(99,102,241,0.06)"; e.currentTarget.style.color = "var(--accent,#6366f1)"; e.currentTarget.style.borderColor = "rgba(99,102,241,0.3)" }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#f8fafc"; e.currentTarget.style.color = "#475569"; e.currentTarget.style.borderColor = "#e8ecf3" }}
             >
               <Archive style={{ width: 15, height: 15 }} /> Archives
             </button>
-            {viewMode === "active" && (
-              <button
-                onClick={handleNewBootcamp}
-                style={{ padding: "9px 20px", background: "var(--accent,#6366f1)", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "opacity 0.15s" }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = "0.88")}
-                onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
-              >
-                <Plus style={{ width: 15, height: 15 }} /> Nouveau bootcamp
-              </button>
-            )}
+            <button
+              onClick={handleNewBootcamp}
+              style={{ padding: "9px 20px", background: "var(--accent,#6366f1)", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "opacity 0.15s" }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = "0.88")}
+              onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+            >
+              <Plus style={{ width: 15, height: 15 }} /> Nouveau bootcamp
+            </button>
           </div>
         }
       />
@@ -539,26 +497,16 @@ export default function BootcampsCrud({
 
       {/* ── Table ── */}
       {(() => {
-        const displayBootcamps = viewMode === "active"
-          ? filteredBootcamps
-          : archivedBootcamps.filter(b => b.title.toLowerCase().includes(searchTerm.toLowerCase()))
+        const displayBootcamps = filteredBootcamps
         const isEmpty = displayBootcamps.length === 0
 
         return (
           <div style={{ padding: "0px 0px" }}>
-            {archivedLoading ? (
-              <div style={{ background: "#fff", padding: "64px 24px", textAlign: "center" }}>
-                <Loader2 style={{ width: 32, height: 32, color: "#475569", margin: "0 auto", animation: "spin 1s linear infinite" }} />
-              </div>
-            ) : isEmpty ? (
+            {isEmpty ? (
               <div style={{ background: "#fff", padding: "64px 24px", textAlign: "center" }}>
                 <Layers style={{ width: 40, height: 40, color: "#e2e8f0", margin: "0 auto 12px" }} />
-                <p style={{ fontSize: 15, fontWeight: 600, color: "#475569", margin: "0 0 4px" }}>
-                  {viewMode === "archived" ? "Aucun bootcamp archivé" : "Aucun bootcamp trouvé"}
-                </p>
-                <p style={{ fontSize: 13, color: "#475569", margin: 0 }}>
-                  {viewMode === "active" ? "Créez votre premier bootcamp avec le bouton ci-dessus." : "Les bootcamps archivés apparaîtront ici."}
-                </p>
+                <p style={{ fontSize: 15, fontWeight: 600, color: "#475569", margin: "0 0 4px" }}>Aucun bootcamp trouvé</p>
+                <p style={{ fontSize: 13, color: "#475569", margin: 0 }}>Créez votre premier bootcamp avec le bouton ci-dessus.</p>
               </div>
             ) : (
               <div style={{ background: "#fff", overflow: "hidden" }}>
@@ -572,7 +520,7 @@ export default function BootcampsCrud({
                 {displayBootcamps.map((bootcamp, idx) => (
                   <div
                     key={bootcamp.id}
-                    style={{ display: "grid", gridTemplateColumns: "1fr 180px 150px", padding: "32px 36px", borderBottom: idx < displayBootcamps.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", transition: "background 0.15s", opacity: viewMode === "archived" ? 0.85 : 1 }}
+                    style={{ display: "grid", gridTemplateColumns: "1fr 180px 150px", padding: "32px 36px", borderBottom: idx < displayBootcamps.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", transition: "background 0.15s" }}
                     onMouseEnter={e => (e.currentTarget.style.background = "#fafbfd")}
                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                   >
@@ -582,21 +530,21 @@ export default function BootcampsCrud({
                         {bootcamp.coverPreview || (bootcamp.coverImage && typeof bootcamp.coverImage === "string") ? (
                           <img
                             src={bootcamp.coverPreview || `${process.env.NEXT_PUBLIC_PB_URL}/api/files/bootcamps/${bootcamp.id}/${bootcamp.coverImage}`}
-                            onClick={() => viewMode === "active" && handleSelectBootcamp(bootcamp)}
-                            style={{ width: 320, height: 180, borderRadius: 4, objectFit: "cover", flexShrink: 0, border: "1px solid #f1f5f9", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", cursor: viewMode === "active" ? "pointer" : "default" }}
+                            onClick={() => handleSelectBootcamp(bootcamp)}
+                            style={{ width: 320, height: 180, borderRadius: 4, objectFit: "cover", flexShrink: 0, border: "1px solid #f1f5f9", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", cursor: "pointer" }}
                             alt=""
                           />
                         ) : (
-                          <div onClick={() => viewMode === "active" && handleSelectBootcamp(bootcamp)} style={{ width: 320, height: 180, borderRadius: 4, background: "rgba(99,102,241,0.08)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: viewMode === "active" ? "pointer" : "default" }}>
+                          <div onClick={() => handleSelectBootcamp(bootcamp)} style={{ width: 320, height: 180, borderRadius: 4, background: "rgba(99,102,241,0.08)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}>
                             <Layers style={{ width: 30, height: 30, color: "var(--accent,#6366f1)" }} />
                           </div>
                         )}
                         <div style={{ minWidth: 0 }}>
                           <p
-                            onClick={() => viewMode === "active" && handleSelectBootcamp(bootcamp)}
-                            onMouseEnter={e => viewMode === "active" && (e.currentTarget.style.color = "var(--accent,#6366f1)")}
+                            onClick={() => handleSelectBootcamp(bootcamp)}
+                            onMouseEnter={e => (e.currentTarget.style.color = "var(--accent,#6366f1)")}
                             onMouseLeave={e => (e.currentTarget.style.color = "#0f172a")}
-                            style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", margin: "0 0 6px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", cursor: viewMode === "active" ? "pointer" : "default", transition: "color 0.15s" }}
+                            style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", margin: "0 0 6px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", cursor: "pointer", transition: "color 0.15s" }}
                           >{bootcamp.title || "Sans titre"}</p>
                           <p style={{ fontSize: 14, color: "#475569", margin: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical" }}>{bootcamp.longDescription || bootcamp.shortDescription}</p>
                         </div>
@@ -617,19 +565,9 @@ export default function BootcampsCrud({
                     </div>
                     {/* Actions */}
                     <div style={{ display: "flex", gap: 8 }}>
-                      {viewMode === "active" ? (
-                        <>
-                          {onView && <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && onView(bootcamp.id) }} color="#475569" title="Voir"><ExternalLink style={{ width: 22, height: 22 }} /></IconBtn>}
-                          <IconBtn onClick={e => { e.stopPropagation(); handleSelectBootcamp(bootcamp) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)" title="Modifier"><Edit style={{ width: 22, height: 22 }} /></IconBtn>
-                          <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && handleArchiveBootcamp(bootcamp.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Archiver"><Archive style={{ width: 22, height: 22 }} /></IconBtn>
-                        </>
-                      ) : (
-                        <>
-                          <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && handleRestoreBootcamp(bootcamp.id) }} color="#22c55e" hoverBg="rgba(34,197,94,0.08)" title="Restaurer"><RotateCcw style={{ width: 22, height: 22 }} /></IconBtn>
-                          <IconBtn onClick={e => { e.stopPropagation(); handleSelectBootcamp(bootcamp) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)" title="Modifier"><Edit style={{ width: 22, height: 22 }} /></IconBtn>
-                          <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && handlePermanentDeleteBootcamp(bootcamp.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Supprimer définitivement"><Trash2 style={{ width: 22, height: 22 }} /></IconBtn>
-                        </>
-                      )}
+                      {onView && <IconBtn onClick={e => { e.stopPropagation(); onView(bootcamp) }} color="#475569" title="Voir"><ExternalLink style={{ width: 22, height: 22 }} /></IconBtn>}
+                      <IconBtn onClick={e => { e.stopPropagation(); handleSelectBootcamp(bootcamp) }} color="var(--accent,#6366f1)" hoverBg="rgba(99,102,241,0.08)" title="Modifier"><Edit style={{ width: 22, height: 22 }} /></IconBtn>
+                      <IconBtn onClick={e => { e.stopPropagation(); bootcamp.id && handleArchiveBootcamp(bootcamp.id) }} color="#f43f5e" hoverBg="rgba(244,63,94,0.08)" title="Archiver"><Archive style={{ width: 22, height: 22 }} /></IconBtn>
                     </div>
                   </div>
                 ))}

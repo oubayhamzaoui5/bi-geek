@@ -68,9 +68,10 @@ export async function GET(req: Request) {
         filter: archived ? "archived=true" : "archived!=true",
       })
     } catch {
-      // archived field may not exist yet — return all (unarchived) records
       bootcampRecords = await pb.collection("bootcamps").getFullList({ sort: "title" })
-      if (archived) return NextResponse.json({ ok: true, bootcamps: [] })
+      bootcampRecords = archived
+        ? bootcampRecords.filter((b: any) => b.archived === true)
+        : bootcampRecords.filter((b: any) => b.archived !== true)
     }
 
     // 🔥 Fix missing slugs automatically
@@ -78,6 +79,7 @@ export async function GET(req: Request) {
       if (!b.slug || b.slug.trim() === "") {
         const slug = await generateUniqueSlug(pb, b.title)
         await pb.collection("bootcamps").update(b.id, { slug })
+        b.slug = slug
         console.log(`Generated slug for bootcamp "${b.title}" → ${slug}`)
       }
     }

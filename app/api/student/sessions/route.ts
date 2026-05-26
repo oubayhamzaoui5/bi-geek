@@ -28,6 +28,12 @@ function formatSession(s: any): any {
   }
 }
 
+function nextDate(date: string) {
+  const d = new Date(`${date}T12:00:00`)
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
@@ -65,11 +71,11 @@ export async function GET(req: Request) {
     const groupFilter = groups.map((g: any) => `group = "${g.id}"`).join(" || ")
     const dateFilter =
       from && to
-        ? ` && date >= "${from}" && date <= "${to}"`
+        ? ` && date >= "${from}" && date < "${nextDate(to)}"`
         : from
           ? ` && date >= "${from}"`
           : to
-            ? ` && date <= "${to}"`
+            ? ` && date < "${nextDate(to)}"`
             : ""
 
     const records = await pb.collection("sessions").getFullList({

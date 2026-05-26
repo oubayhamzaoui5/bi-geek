@@ -260,7 +260,7 @@ export default function InstructorHomeworkPage() {
                 </div>
                 <div>
                   <p style={{ fontSize: 10, fontWeight: 800, color: "#f59e0b", margin: 0, textTransform: "uppercase", letterSpacing: "0.1em" }}>Consignes</p>
-                  <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>Visibles par les étudiants</p>
+                  <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>Visibles par les apprenants</p>
                 </div>
               </div>
             </div>
@@ -376,7 +376,7 @@ export default function InstructorHomeworkPage() {
           <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e8ecf3", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", overflow: "hidden" }}>
             <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 8 }}>
               <ClipboardCheck size={14} color="#10b981" />
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>Rendus des étudiants</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>Rendus des apprenants</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: "#10b981", background: "#dcfce7", borderRadius: 99, padding: "2px 8px" }}>
                 {submissions.length}/{studentIds.length}
               </span>
@@ -385,7 +385,7 @@ export default function InstructorHomeworkPage() {
             {submissions.length === 0 && notSubmitted.length === 0 ? (
               <div style={{ padding: "32px 20px", textAlign: "center" }}>
                 <Users size={28} color="#e2e8f0" style={{ margin: "0 auto 10px" }} />
-                <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>Aucun étudiant dans ce groupe</p>
+                <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>Aucun apprenant dans ce groupe</p>
               </div>
             ) : (
               <div style={{ padding: "12px 0" }}>
@@ -466,7 +466,7 @@ export default function InstructorHomeworkPage() {
                     {dl.passed ? "Expirée" : "Deadline"}
                   </p>
                   <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>
-                    {dl.passed ? "Date limite dépassée" : "Temps restant aux étudiants"}
+                    {dl.passed ? "Date limite dépassée" : "Temps restant aux apprenants"}
                   </p>
                 </div>
               </div>
@@ -510,7 +510,7 @@ export default function InstructorHomeworkPage() {
             </div>
             <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
               <span style={{ fontWeight: 700, color: "#10b981" }}>{submissions.length}</span> sur{" "}
-              <span style={{ fontWeight: 700, color: "#111827" }}>{studentIds.length}</span> étudiants ont rendu
+              <span style={{ fontWeight: 700, color: "#111827" }}>{studentIds.length}</span> apprenants ont rendu
             </p>
           </div>
 

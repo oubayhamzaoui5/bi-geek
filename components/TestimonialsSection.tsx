@@ -46,7 +46,7 @@ export function TestimonialsSection() {
         <div className="max-w-2xl">
           <SectionLabel>Témoignages</SectionLabel>
           <h2 className="text-3xl font-semibold tracking-tight text-zinc-950 md:text-4xl">
-            Ce que disent nos apprenants
+            Ce que disent <span className="text-[#8b0f82]">nos apprenants</span>
           </h2>
         </div>
       </div>
