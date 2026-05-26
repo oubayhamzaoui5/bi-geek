@@ -17,7 +17,7 @@ export default function AdminGroupsPage() {
     const fetchAll = async () => {
       const start = Date.now()
       try {
-        await fetch("/api/admin/migrate", { cache: "no-store" }).catch(() => null)
+        await fetch("/api/admin/migrate", { method: "POST" }).catch(() => null)
         const res = await fetch("/api/admin/groups", { cache: "no-store" })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error)
