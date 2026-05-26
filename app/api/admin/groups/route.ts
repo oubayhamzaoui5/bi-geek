@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
-import PocketBase from "pocketbase"
-import { authErrorResponse, requireUser } from "@/lib/server-auth"
+import { authErrorResponse, requireUser, getAdminPb } from "@/lib/server-auth"
 
 type ScheduleSlot = {
   day: string
@@ -57,7 +56,7 @@ function pocketbaseOrFilter(field: string, ids: string[]) {
   return uniqueIds(ids).map(id => `${field}="${id.replace(/"/g, '\\"')}"`).join(" || ")
 }
 
-async function getUsersByRole(pb: PocketBase, role: string, options: { fields?: string; sort?: string } = {}) {
+async function getUsersByRole(pb: any, role: string, options: { fields?: string; sort?: string } = {}) {
   const sort = options.sort || "name"
   const fields = options.fields
   const filteredOptions = fields
@@ -78,7 +77,7 @@ async function getUsersByRole(pb: PocketBase, role: string, options: { fields?: 
   return records.filter((u: any) => u.role === role)
 }
 
-async function getAssignedUsersById(pb: PocketBase, ids: string[]) {
+async function getAssignedUsersById(pb: any, ids: string[]) {
   const unique = uniqueIds(ids)
   if (unique.length === 0) return []
 
@@ -93,19 +92,6 @@ async function getAssignedUsersById(pb: PocketBase, ids: string[]) {
   }
 }
 
-async function getAdminPb() {
-  const PB_URL = process.env.POCKETBASE_URL
-  const ADMIN_EMAIL = process.env.POCKETBASE_ADMIN_EMAIL
-  const ADMIN_PASSWORD = process.env.POCKETBASE_ADMIN_PASSWORD
-
-  if (!PB_URL || !ADMIN_EMAIL || !ADMIN_PASSWORD) {
-    throw new Error("Variables d'environnement PocketBase manquantes.")
-  }
-
-  const pb = new PocketBase(PB_URL)
-  await pb.admins.authWithPassword(ADMIN_EMAIL, ADMIN_PASSWORD)
-  return pb
-}
 
 export async function GET(req: Request) {
   try {
