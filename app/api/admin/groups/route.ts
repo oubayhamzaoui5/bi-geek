@@ -166,28 +166,20 @@ export async function GET(req: Request) {
     let studentRecords: any[] = []
     let instructorRecords: any[] = []
     try {
-      ;[studentRecords, instructorRecords] = await Promise.all([
-        getUsersByRole(pb, "student").catch(() => []),
+      const [allUsers, instructors] = await Promise.all([
+        pb.collection("users").getFullList({ sort: "name" }).catch(() => []),
         getUsersByRole(pb, "instructor", { fields: "id,collectionId,name,surname,avatar", sort: "name" }).catch(() => []),
       ])
+      instructorRecords = instructors
+      // Treat everyone who is not admin/admin_agent/instructor as a student
+      const nonStudentRoles = new Set(["admin", "admin_agent", "instructor"])
+      studentRecords = (allUsers as any[]).filter((u: any) => !nonStudentRoles.has(u.role))
     } catch {
       studentRecords = []
       instructorRecords = []
     }
 
     const instructorMap = new Map(instructorRecords.map((u: any) => [u.id, u]))
-    const assignedStudentIds = uniqueIds(
-      (groupRecords as any[]).flatMap((g) => Array.isArray(g.students) ? g.students : [])
-    )
-    const studentMap = new Map(studentRecords.map((u: any) => [u.id, u]))
-    const missingAssignedStudentIds = assignedStudentIds.filter(id => !studentMap.has(id))
-    if (missingAssignedStudentIds.length > 0) {
-      const assignedUsers = await getAssignedUsersById(pb, missingAssignedStudentIds)
-      for (const user of assignedUsers) {
-        if (!studentMap.has(user.id)) studentRecords.push(user)
-        studentMap.set(user.id, user)
-      }
-    }
 
     const resolveInstructors = (g: any) => {
       const ids = groupInstructorIds(g)

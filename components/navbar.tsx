@@ -30,8 +30,23 @@ export function Navbar() {
 
   useEffect(() => {
     const str = localStorage.getItem("user")
-    if (str) setUser(JSON.parse(str))
-    setAuthLoading(false)
+    if (str) {
+      try { setUser(JSON.parse(str)) } catch {}
+    }
+
+    fetch("/api/session", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.user?.id) {
+          localStorage.setItem("user", JSON.stringify(data.user))
+          setUser(data.user)
+        } else {
+          localStorage.removeItem("user")
+          setUser(null)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setAuthLoading(false))
   }, [])
 
   useEffect(() => {
@@ -116,7 +131,7 @@ export function Navbar() {
                 type="button"
                 className="min-w-[104px] flex items-center justify-center gap-2 h-8 px-3 rounded-none text-sm font-semibold bg-accent hover:bg-accent/90 text-white transition-colors cursor-pointer"
                 onClick={() => {
-                  if (user.role === "admin") router.push("/admin-dashboard")
+                  if (user.role === "admin" || user.role === "admin_agent") router.push("/admin-dashboard")
                   else if (user.role === "instructor") router.push("/instructor-dashboard")
                   else router.push("/student-dashboard")
                 }}
