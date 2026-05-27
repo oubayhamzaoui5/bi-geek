@@ -89,7 +89,7 @@ export function NotificationInstallCard() {
         await unregisterDashboardPushNotifications(userId)
         setSubscribed(false)
       } else {
-        let perm = permission
+        let perm: NotificationPermission = permission as NotificationPermission
         if (perm === "default") {
           perm = await Notification.requestPermission()
           setPermission(perm)

@@ -10,6 +10,7 @@ import {
 import Link from "next/link"
 import { MiniWeekAgenda } from "@/components/agenda/MiniWeekAgenda"
 import LoadingBI from "@/components/LoadingBI"
+import { NotificationInstallCard } from "@/components/dashboard/NotificationInstallCard"
 
 /* ─── Types ───────────────────────────────────────────────────── */
 type EnrollmentStatus = "pending" | "contacted" | "confirmed" | "cancelled"
@@ -430,6 +431,8 @@ export default function AdminOverviewPage() {
             badge="EN COURS" badgeBg="#e2e8f0" badgeColor="#475569"
           />
         </div>
+
+        <NotificationInstallCard />
 
         {/* ── Main 2-col layout ── */}
                 {/* Quick actions - full width */}

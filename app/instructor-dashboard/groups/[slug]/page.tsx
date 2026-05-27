@@ -717,7 +717,6 @@ if ((d.modules || []).length > 0) setExpandedModules(new Set([(d.modules[0] as M
                               const d = await res.json()
                               if (!res.ok) throw new Error(d.error)
                               setNextSession(p => p ? { ...p, joinUrl: d.joinUrl } : p)
-                              window.open(d.joinUrl, "_blank")
                             } catch (e: any) { push("err", e.message) }
                             finally { setCreatingMeet(false) }
                           }}
