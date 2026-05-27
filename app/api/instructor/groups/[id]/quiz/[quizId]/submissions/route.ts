@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server"
-import PocketBase from "pocketbase"
+import { getAdminPb } from "@/lib/server-auth"
 
 export const dynamic = "force-dynamic"
 
-async function getAdminPb() {
-  const pb = new PocketBase(process.env.POCKETBASE_URL)
-  await pb.admins.authWithPassword(
-    process.env.POCKETBASE_ADMIN_EMAIL!,
-    process.env.POCKETBASE_ADMIN_PASSWORD!
-  )
-  return pb
-}
-
 async function safeList(pb: any, col: string, filter: string, sort = "-created") {
-  try { return await pb.collection(col).getFullList({ filter, sort }) } catch { return [] }
+  try {
+    return await pb.collection(col).getFullList({ filter, sort })
+  } catch (e: any) {
+    console.error(`safeList ERROR col=${col} filter=${filter}:`, e.message, e.status)
+    try {
+      return await pb.collection(col).getFullList({ filter })
+    } catch (e2: any) {
+      console.error(`safeList FALLBACK ERROR col=${col}:`, e2.message)
+      return []
+    }
+  }
 }
 
 export async function GET(
@@ -24,9 +25,16 @@ export async function GET(
     const { quizId } = await params
     const pb = await getAdminPb()
 
-    const subs = await safeList(pb, "quiz_submissions", `quiz_id = "${quizId}"`)
+    // Fetch all then filter in JS — PocketBase = filter on this collection returns 0 due to SDK bug
+    const allSubs = await safeList(pb, "quiz_submissions", `quiz_id != ""`)
+    console.log("SUBS allSubs:", allSubs.length, allSubs.map((s:any)=>({id:s.id,quiz_id:s.quiz_id})))
+    console.log("SUBS quizId param:", quizId)
+    const subs = allSubs.filter((s: any) => s.quiz_id === quizId)
+    console.log("SUBS filtered:", subs.length)
 
-    const submissions = await Promise.all(subs.map(async (sub: any) => {
+    // Sequential — PocketBase JS SDK mutable authStore races under Promise.all
+    const submissions = []
+    for (const sub of subs) {
       let student = null
       try {
         const u = await pb.collection("users").getOne(sub.student_id)
@@ -42,7 +50,7 @@ export async function GET(
       let answersJson: Record<string, string[]> = {}
       try { answersJson = JSON.parse(sub.answers_json || "{}") } catch {}
 
-      return {
+      submissions.push({
         id: sub.id,
         studentId: sub.student_id,
         student,
@@ -50,8 +58,8 @@ export async function GET(
         total: sub.total ?? 0,
         answersJson,
         submittedAt: sub.submitted_at || sub.created,
-      }
-    }))
+      })
+    }
 
     return NextResponse.json({ ok: true, submissions })
   } catch (e: any) {

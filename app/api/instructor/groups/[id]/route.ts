@@ -1,14 +1,5 @@
 import { NextResponse } from "next/server"
-import PocketBase from "pocketbase"
-
-async function getAdminPb() {
-  const pb = new PocketBase(process.env.POCKETBASE_URL)
-  await pb.admins.authWithPassword(
-    process.env.POCKETBASE_ADMIN_EMAIL!,
-    process.env.POCKETBASE_ADMIN_PASSWORD!
-  )
-  return pb
-}
+import { getAdminPb } from "@/lib/server-auth"
 
 function resolveAvatar(user: any, pbUrl: string) {
   if (!user?.avatar) return null

@@ -1,20 +1,11 @@
 import { NextResponse } from "next/server"
-import PocketBase from "pocketbase"
-import { authErrorResponse, requireUser, type AuthUser } from "@/lib/server-auth"
+import { authErrorResponse, getAdminPb, requireUser, type AuthUser } from "@/lib/server-auth"
 import { readDefaultCourseLesson, resolveGroupResourceMode } from "@/lib/server-course-resources"
 
 export const dynamic = "force-dynamic"
 
 const PB_FILE_URL = process.env.NEXT_PUBLIC_PB_URL || process.env.POCKETBASE_URL!
 
-async function getAdminPb() {
-  const pb = new PocketBase(process.env.POCKETBASE_URL)
-  await pb.admins.authWithPassword(
-    process.env.POCKETBASE_ADMIN_EMAIL!,
-    process.env.POCKETBASE_ADMIN_PASSWORD!
-  )
-  return pb
-}
 
 async function safeGetList(pb: any, collection: string, filter: string, sort?: string) {
   try {

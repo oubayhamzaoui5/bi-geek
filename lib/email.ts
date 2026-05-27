@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer"
 
 type SessionEmailItem = {
+  id?: string | null
   title?: string | null
   groupTitle?: string | null
   date?: string | null
@@ -182,28 +183,83 @@ export async function sendDailySessionEmail({
   role: "student" | "instructor"
   sessions: SessionEmailItem[]
 }) {
-  const title = role === "instructor" ? "Vos seances d'aujourd'hui" : "Vos seances du jour"
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://bi-geek.net"
+  const title = role === "instructor" ? "Vos séances d'aujourd'hui" : "Vos séances du jour"
   const date = formatDateFr(sessions[0]?.date)
+
   const sessionLines = sessions.flatMap((session, index) => {
     const access = session.joinUrl
       ? "Lien Meet disponible dans votre espace BI Geek."
       : role === "instructor"
         ? "Merci de creer le lien Meet dans la plateforme."
         : "Lien Meet en attente."
-
+    const confirmLine =
+      role === "student" && session.id
+        ? `   Confirmer votre presence : ${baseUrl}/student-dashboard/seance/${session.id}`
+        : ""
     return [
       `${index + 1}. ${session.title || "Seance de formation"}`,
       `   Groupe : ${session.groupTitle || "Groupe"}`,
       `   Heure : ${session.startTime || "--:--"}${session.duration ? ` (${formatDuration(session.duration)})` : ""}`,
       `   Acces : ${access}`,
       session.notes ? `   Notes : ${session.notes}` : "",
+      confirmLine,
       "",
     ]
   })
 
+  const htmlSessions = sessions
+    .map((session) => {
+      const access = session.joinUrl
+        ? "Lien Meet disponible dans votre espace BI Geek."
+        : role === "instructor"
+          ? "Merci de créer le lien Meet dans la plateforme."
+          : "Lien Meet en attente."
+      const confirmUrl =
+        role === "student" && session.id
+          ? `${baseUrl}/student-dashboard/seance/${escapeHtml(session.id)}`
+          : null
+      const btn = confirmUrl
+        ? `<a href="${confirmUrl}" style="display:inline-block;margin-top:14px;background:#7c3aed;color:#fff;text-decoration:none;padding:11px 22px;border-radius:9px;font-size:13px;font-weight:700;">Confirmer ma présence →</a>`
+        : ""
+      return `
+        <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px;">
+          <p style="color:#7c3aed;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:0 0 3px;">${escapeHtml(session.groupTitle || "Groupe")}</p>
+          <p style="color:#111827;font-size:16px;font-weight:700;margin:0 0 10px;line-height:1.3;">${escapeHtml(session.title || "Séance de formation")}</p>
+          <p style="color:#6b7280;font-size:12px;margin:0 0 3px;">🗓 <span style="text-transform:capitalize;">${escapeHtml(formatDateFr(session.date))}</span></p>
+          <p style="color:#6b7280;font-size:12px;margin:0 0 3px;">🕐 ${escapeHtml(session.startTime || "--:--")}${session.duration ? ` · ${escapeHtml(formatDuration(session.duration))}` : ""}</p>
+          <p style="color:#6b7280;font-size:12px;margin:0;">${escapeHtml(access)}</p>
+          ${session.notes ? `<p style="color:#9ca3af;font-size:11px;margin:6px 0 0;font-style:italic;">${escapeHtml(session.notes)}</p>` : ""}
+          ${btn}
+        </div>`
+    })
+    .join("")
+
+  const instructorWarning =
+    role === "instructor"
+      ? `<p style="color:#b45309;font-size:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin:0 0 18px;">⚠️ Pensez à créer le lien Meet depuis la plateforme avant chaque séance.</p>`
+      : ""
+
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:16px;background:#f3f4f6;">
+      <div style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 2px 8px rgba(0,0,0,.07);">
+        <div style="background:linear-gradient(135deg,#7c3aed,#6d28d9);padding:22px 24px;">
+          <p style="color:#fff;font-size:20px;font-weight:800;margin:0;letter-spacing:-.4px;">BI Geek</p>
+          <p style="color:rgba(255,255,255,.75);font-size:13px;margin:4px 0 0;">${escapeHtml(title)}</p>
+        </div>
+        <div style="padding:22px 24px;">
+          <p style="color:#374151;font-size:14px;margin:0 0 4px;font-weight:600;">${escapeHtml(greeting(name))}</p>
+          <p style="color:#6b7280;font-size:13px;margin:0 0 20px;">Voici votre programme du <strong style="color:#374151;">${escapeHtml(date)}</strong>.</p>
+          ${instructorWarning}
+          ${htmlSessions}
+          <p style="color:#d1d5db;font-size:11px;margin:20px 0 0;text-align:center;">BI Geek · contact@bi-geek.net</p>
+        </div>
+      </div>
+    </div>`
+
   await sendMail({
     to,
-    subject: "Rappel de vos seances BI Geek aujourd'hui",
+    subject: "Rappel de vos séances BI Geek aujourd'hui",
     text: lines([
       title,
       "",
@@ -212,10 +268,10 @@ export async function sendDailySessionEmail({
       `Voici votre programme du ${date}.`,
       "",
       role === "instructor" ? "Important : creez le lien Meet directement depuis la plateforme avant le debut de chaque seance." : "",
-      role === "instructor" ? "" : "",
       ...sessionLines,
       "BI Geek",
     ]),
+    html,
   })
 }
 
@@ -282,5 +338,69 @@ export async function sendUsernameReminderEmail({
       ...accountLines,
       "BI Geek",
     ]),
+  })
+}
+
+export async function sendNewActivityEmail({
+  to,
+  name,
+  type,
+  title,
+  groupTitle,
+  url,
+}: {
+  to: string
+  name?: string
+  type: "quiz" | "devoir"
+  title: string
+  groupTitle: string
+  url?: string
+}) {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://bi-geek.net"
+  const link = url || `${baseUrl}/student-dashboard/groups`
+  const typeLabel = type === "quiz" ? "Quiz" : "Devoir"
+  const subject = type === "quiz"
+    ? `Nouveau quiz disponible — ${groupTitle}`
+    : `Nouveau devoir disponible — ${groupTitle}`
+
+  const btn = `<a href="${escapeHtml(link)}" style="display:inline-block;margin-top:14px;background:#7c3aed;color:#fff;text-decoration:none;padding:11px 22px;border-radius:9px;font-size:13px;font-weight:700;">Voir le ${typeLabel.toLowerCase()} →</a>`
+
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:16px;background:#f3f4f6;">
+      <div style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 2px 8px rgba(0,0,0,.07);">
+        <div style="background:linear-gradient(135deg,#7c3aed,#6d28d9);padding:22px 24px;">
+          <p style="color:#fff;font-size:20px;font-weight:800;margin:0;letter-spacing:-.4px;">BI Geek</p>
+          <p style="color:rgba(255,255,255,.75);font-size:13px;margin:4px 0 0;">Nouveau ${typeLabel.toLowerCase()} disponible</p>
+        </div>
+        <div style="padding:22px 24px;">
+          <p style="color:#374151;font-size:14px;margin:0 0 16px;font-weight:600;">${escapeHtml(greeting(name))}</p>
+          <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;">
+            <p style="color:#7c3aed;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:0 0 4px;">${escapeHtml(groupTitle)}</p>
+            <p style="color:#111827;font-size:16px;font-weight:700;margin:0 0 6px;">${escapeHtml(title)}</p>
+            <p style="color:#6b7280;font-size:12px;margin:0;">Votre formateur a ajouté un nouveau ${typeLabel.toLowerCase()}.</p>
+            ${btn}
+          </div>
+          <p style="color:#d1d5db;font-size:11px;margin:20px 0 0;text-align:center;">BI Geek · contact@bi-geek.net</p>
+        </div>
+      </div>
+    </div>`
+
+  await sendMail({
+    to,
+    subject,
+    text: lines([
+      subject,
+      "",
+      greeting(name),
+      "",
+      `Votre formateur a ajoute un nouveau ${typeLabel.toLowerCase()} dans le groupe "${groupTitle}".`,
+      "",
+      `Titre : ${title}`,
+      "",
+      `Consulter : ${link}`,
+      "",
+      "BI Geek",
+    ]),
+    html,
   })
 }

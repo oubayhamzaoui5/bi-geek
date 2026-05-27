@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
-import PocketBase from "pocketbase"
-import { authErrorResponse, requireUser, type AuthUser } from "@/lib/server-auth"
-import { readDefaultCourseResources, resolveGroupResourceMode } from "@/lib/server-course-resources"
+import { authErrorResponse, getAdminPb, requireUser, type AuthUser } from "@/lib/server-auth"
 
 export const dynamic = "force-dynamic"
 
@@ -28,14 +26,6 @@ function toSlug(title: string): string {
     .replace(/-+/g, "-") || "lecon"
 }
 
-async function getAdminPb() {
-  const pb = new PocketBase(process.env.POCKETBASE_URL)
-  await pb.admins.authWithPassword(
-    process.env.POCKETBASE_ADMIN_EMAIL!,
-    process.env.POCKETBASE_ADMIN_PASSWORD!
-  )
-  return pb
-}
 
 function normalizeIds(value: any): string[] {
   if (Array.isArray(value)) return value.filter(Boolean)
@@ -112,57 +102,6 @@ async function safeGetList(pb: any, collection: string, filter: string, sort?: s
   }
 }
 
-async function cloneCourseDefaultsToGroup(pb: any, group: any, groupId: string) {
-  const source = await readDefaultCourseResources(pb, group.course)
-  const moduleIdMap = new Map<string, string>()
-  const firstInstructorId = groupInstructorIds(group)[0] || ""
-
-  for (const module of source.modules) {
-    const created = await pb.collection("group_modules").create({
-      group_id: groupId,
-      instructor_id: firstInstructorId,
-      title: module.title || "Nouveau module",
-      description: module.description || "",
-      order: module.order ?? 0,
-    })
-    moduleIdMap.set(module.id, created.id)
-  }
-
-  for (const video of source.moduleVideos || []) {
-    const moduleId = moduleIdMap.get(video.moduleId)
-    if (!moduleId) continue
-    await pb.collection("module_videos").create({
-      module_id: moduleId,
-      group_id: groupId,
-      instructor_id: firstInstructorId,
-      title: video.title || "Nouvelle video",
-      drive_url: video.driveUrl || "",
-      description: video.description || "",
-      order: video.order ?? 0,
-    })
-  }
-
-  for (const attachment of source.moduleAttachments || []) {
-    const moduleId = moduleIdMap.get(attachment.moduleId)
-    if (!moduleId || !attachment.url) continue
-    try {
-      const res = await fetch(attachment.url)
-      if (!res.ok) continue
-      const blob = await res.blob()
-      const form = new FormData()
-      form.append("module_id", moduleId)
-      form.append("group_id", groupId)
-      form.append("instructor_id", firstInstructorId)
-      form.append("name", attachment.title || attachment.name || "document")
-      form.append("order", String(attachment.order ?? 0))
-      form.append("file", blob, attachment.name || "document.pdf")
-      await pb.collection("module_attachments").create(form)
-    } catch {}
-  }
-
-  await pb.collection("groups").update(groupId, { resourceMode: "custom" })
-}
-
 // ── GET: full curriculum tree ──────────────────────────────────────────────────
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -172,31 +111,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const { user, group, error } = await requireGroupEditor(req, pb, groupId)
     if (error) return error
     const modules = await safeGetList(pb, "group_modules", `group_id = "${groupId}"`, "order")
-    const resourceMode = resolveGroupResourceMode(group, modules)
-    if (resourceMode === "default" && group.course) {
-      const source = await readDefaultCourseResources(pb, group.course)
-      return NextResponse.json({
-        ok: true,
-        modules: (source.modules || []).map((m: any) => ({
-          ...m,
-          instructorId: m.instructorId || groupInstructorIds(group)[0] || "",
-          canEdit: true,
-        })),
-        moduleVideos: (source.moduleVideos || []).map((v: any) => ({
-          ...v,
-          instructorId: v.instructorId || groupInstructorIds(group)[0] || "",
-          canEdit: true,
-        })),
-        moduleAttachments: (source.moduleAttachments || []).map((a: any) => ({
-          ...a,
-          instructorId: a.instructorId || groupInstructorIds(group)[0] || "",
-          canEdit: true,
-        })),
-        groupId,
-        resourceMode: "default",
-        sourceCourseId: group.course,
-      })
-    }
 
     let moduleVideos: any[] = []
     let moduleAttachments: any[] = []
@@ -256,16 +170,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { user, group, error } = await requireGroupEditor(req, pb, groupId)
     if (error) return error
     const modules = await safeGetList(pb, "group_modules", `group_id = "${groupId}"`, "order")
-    if (type === "clone_course_defaults") {
-      if (!group.course) return NextResponse.json({ error: "Ce groupe n'est pas lie a une formation." }, { status: 400 })
-      if (modules.length === 0) await cloneCourseDefaultsToGroup(pb, group, groupId)
-      else await pb.collection("groups").update(groupId, { resourceMode: "custom" })
-      return NextResponse.json({ ok: true, resourceMode: "custom" })
-    }
-    if (resolveGroupResourceMode(group, modules) === "default") {
-      return NextResponse.json({ error: "Passez en ressources personnalisees pour modifier ce programme." }, { status: 409 })
-    }
-
     if (type === "module") {
       const record = await pb.collection("group_modules").create({
         group_id: groupId,
@@ -379,9 +283,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { user, group, error } = await requireGroupEditor(req, pb, groupId)
     if (error) return error
     const modules = await safeGetList(pb, "group_modules", `group_id = "${groupId}"`, "order")
-    if (resolveGroupResourceMode(group, modules) === "default") {
-      return NextResponse.json({ error: "Passez en ressources personnalisees pour modifier ce programme." }, { status: 409 })
-    }
 
     if (type === "module") {
       const moduleRecord = await pb.collection("group_modules").getOne(id)
@@ -525,9 +426,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const { user, group, error } = await requireGroupEditor(req, pb, groupId)
     if (error) return error
     const modules = await safeGetList(pb, "group_modules", `group_id = "${groupId}"`, "order")
-    if (resolveGroupResourceMode(group, modules) === "default") {
-      return NextResponse.json({ error: "Passez en ressources personnalisees pour modifier ce programme." }, { status: 409 })
-    }
 
     if (type === "module") {
       const moduleRecord = await pb.collection("group_modules").getOne(id)

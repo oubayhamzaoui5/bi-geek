@@ -7,11 +7,14 @@ export const dynamic = "force-dynamic"
 const PB_FILE_URL = process.env.NEXT_PUBLIC_PB_URL || process.env.POCKETBASE_URL!
 
 async function getAdminPb() {
-  const pb = new PocketBase(process.env.POCKETBASE_URL)
-  await pb.admins.authWithPassword(
-    process.env.POCKETBASE_ADMIN_EMAIL!,
-    process.env.POCKETBASE_ADMIN_PASSWORD!,
-  )
+  const pb = new PocketBase(process.env.POCKETBASE_URL ?? "http://127.0.0.1:8090")
+  const email = process.env.POCKETBASE_ADMIN_EMAIL!
+  const password = process.env.POCKETBASE_ADMIN_PASSWORD!
+  try {
+    await pb.collection("_superusers").authWithPassword(email, password)
+  } catch {
+    await (pb as any).admins.authWithPassword(email, password)
+  }
   return pb
 }
 
@@ -53,9 +56,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       const quiz = await pb.collection("quizzes").getOne(quizId)
       if (quiz.group_id !== groupId) return NextResponse.json({ error: "Quiz introuvable" }, { status: 404 })
       const questions = await safeList(pb, "quiz_questions", `quiz_id = "${quizId}"`)
-      const questionsFull = await Promise.all(questions.map(async (q: any) => {
+      const questionsFull = []
+      for (const q of questions) {
         const answers = await safeList(pb, "quiz_answers", `question_id = "${q.id}"`, "+order")
-        return {
+        questionsFull.push({
           id: q.id,
           text: q.text || "",
           imageUrl: q.image ? fileUrl("quiz_questions", q.id, q.image) : null,
@@ -66,8 +70,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             isCorrect: a.is_correct || false,
             order: a.order || 0,
           })),
-        }
-      }))
+        })
+      }
       return NextResponse.json({
         ok: true,
         quiz: {

@@ -1,16 +1,7 @@
 import { NextResponse } from "next/server"
-import PocketBase from "pocketbase"
+import { getAdminPb } from "@/lib/server-auth"
 
 const PB_FILE_URL = process.env.NEXT_PUBLIC_PB_URL || process.env.POCKETBASE_URL!
-
-async function getAdminPb() {
-  const pb = new PocketBase(process.env.POCKETBASE_URL)
-  await pb.admins.authWithPassword(
-    process.env.POCKETBASE_ADMIN_EMAIL!,
-    process.env.POCKETBASE_ADMIN_PASSWORD!
-  )
-  return pb
-}
 
 export async function POST(req: Request) {
   try {

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import PocketBase from "pocketbase"
 import { authErrorResponse, requireUser } from "@/lib/server-auth"
+import { sendDailySessionEmail } from "@/lib/email"
+import { sendPushToUsers } from "@/lib/server-push"
 
 async function getAdminPb() {
   const pb = new PocketBase(process.env.POCKETBASE_URL)
@@ -55,6 +57,18 @@ export async function POST(req: Request) {
     }
 
     const record = await pb.collection("sessions").create(data, { expand: "group" })
+
+    // Fire-and-forget: notify students if session is today
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: process.env.APP_TIMEZONE || "Europe/Paris",
+      year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date())
+    if (record.date?.slice(0, 10) === today) {
+      notifyNewTodaySession(pb, record, record.expand?.group).catch((err) =>
+        console.error("SESSION NOTIFY ERROR:", err)
+      )
+    }
+
     return NextResponse.json({ ok: true, session: formatSession(record) })
   } catch (err: any) {
     const auth = authErrorResponse(err)
@@ -62,6 +76,54 @@ export async function POST(req: Request) {
     console.error("ADMIN SESSIONS POST ERROR:", err)
     return NextResponse.json({ error: err?.message || "Erreur serveur" }, { status: 500 })
   }
+}
+
+async function notifyNewTodaySession(pb: PocketBase, session: any, expandedGroup?: any) {
+  const group = expandedGroup ?? await pb.collection("groups").getOne(session.group, {
+    fields: "id,title,students",
+  }).catch(() => null)
+  if (!group) return
+
+  const studentIds: string[] = Array.isArray(group.students) ? group.students : []
+  if (studentIds.length === 0) return
+
+  const users = await pb.collection("users").getFullList({
+    filter: studentIds.map((id: string) => `id = "${id}"`).join(" || "),
+    fields: "id,email,name,surname",
+  }).catch(() => [])
+
+  const sessionItem = {
+    id: session.id,
+    title: session.title || "Séance de formation",
+    groupTitle: group.title || "",
+    date: session.date?.slice(0, 10),
+    startTime: session.start_time || "",
+    duration: session.duration || 120,
+    notes: session.notes || "",
+    joinUrl: session.joinUrl || null,
+  }
+
+  for (const user of users as any[]) {
+    if (!user.email) continue
+    await sendDailySessionEmail({
+      to: user.email,
+      name: [user.name, user.surname].filter(Boolean).join(" ") || undefined,
+      role: "student",
+      sessions: [sessionItem],
+    }).catch((err) => console.error("NEW SESSION EMAIL ERROR:", err))
+  }
+
+  await sendPushToUsers(pb, studentIds, {
+    title: `Nouvelle séance aujourd'hui · ${group.title || ""}`,
+    body: `${session.start_time || ""} — Confirmez votre présence`,
+    url: `/student-dashboard/seance/${session.id}`,
+    tag: `seance-${session.id}`,
+    requireInteraction: true,
+    actions: [
+      { action: "confirm", title: "Confirmer présence" },
+      { action: "dismiss", title: "Plus tard" },
+    ],
+  }).catch((err) => console.error("NEW SESSION PUSH ERROR:", err))
 }
 
 // GET — fetch sessions; pass from+to for a date range, or omit to fetch all

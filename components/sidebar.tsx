@@ -10,6 +10,7 @@ import {
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSidebar } from "@/components/ui/sidebar-context"
+import { unregisterDashboardPushNotifications } from "@/components/PushNotificationPrompt"
 
 export function Sidebar({ variant = "student", compact = false }: { variant?: "student" | "admin" | "instructor"; compact?: boolean }) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -50,6 +51,10 @@ export function Sidebar({ variant = "student", compact = false }: { variant?: "s
   } as const
 
   const logout = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem("user") || "null")
+      if (user?.id) await unregisterDashboardPushNotifications(user.id)
+    } catch {}
     localStorage.removeItem("user")
     await fetch("/api/logout", { method: "POST" }).catch(() => {})
     window.location.assign("/")

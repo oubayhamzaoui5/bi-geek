@@ -40,6 +40,25 @@ export async function registerDashboardPushNotifications(userId: string) {
   return true
 }
 
+export async function unregisterDashboardPushNotifications(userId: string) {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return
+
+  const reg = await navigator.serviceWorker.getRegistration("/sw.js")
+  if (!reg) return
+
+  const subscription = await reg.pushManager.getSubscription()
+  if (!subscription) return
+
+  const endpoint = subscription.endpoint
+  await subscription.unsubscribe().catch(() => {})
+
+  await fetch("/api/dashboard/push-subscribe", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", "x-bi-geek-user-id": userId },
+    body: JSON.stringify({ endpoint }),
+  }).catch(() => {})
+}
+
 export function PushNotificationPrompt({ userId, onEnabled }: PushNotificationPromptProps) {
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default")
   const [busy, setBusy] = useState(false)

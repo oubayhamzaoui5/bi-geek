@@ -6,7 +6,7 @@ import { Sidebar } from "@/components/sidebar"
 import { useRouter } from "next/navigation"
 import { DashboardLoadingProvider } from "@/components/dashboard-loading-context"
 import LoadingBI from "@/components/LoadingBI"
-import { PushNotificationPrompt, registerDashboardPushNotifications } from "@/components/PushNotificationPrompt"
+import { registerDashboardPushNotifications } from "@/components/PushNotificationPrompt"
 
 async function checkTodaySessionNotifications(studentId: string) {
   if (!("Notification" in window) || !("serviceWorker" in navigator)) return
@@ -87,12 +87,6 @@ export default function StudentDashboardLayout({
         <div className="h-screen bg-[#fafafa]">
           <Sidebar compact />
           <main className="dashboard-responsive-main md:ml-[60px] h-screen overflow-auto">{children}</main>
-          {userId && (
-            <PushNotificationPrompt
-              userId={userId}
-              onEnabled={() => checkTodaySessionNotifications(userId)}
-            />
-          )}
         </div>
       </SidebarProvider>
     </DashboardLoadingProvider>

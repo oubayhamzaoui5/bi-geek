@@ -10,7 +10,6 @@ import {
 import Link from "next/link"
 import { MiniWeekAgenda } from "@/components/agenda/MiniWeekAgenda"
 import LoadingBI from "@/components/LoadingBI"
-import { MobileAppInstallAction } from "@/components/dashboard/MobileAppInstallAction"
 
 /* ─── Types ───────────────────────────────────────────────────── */
 type EnrollmentStatus = "pending" | "contacted" | "confirmed" | "cancelled"
@@ -40,6 +39,8 @@ type Session = {
 
 type Stats = {
   totalUsers: number
+  studentCount: number
+  instructorCount: number
   newEnrollmentsThisWeek: number
   pendingEnrollments: number
   todaySessions: number
@@ -140,11 +141,11 @@ function SectionCard({ title, icon: Icon, href, hrefLabel, children }: {
   )
 }
 
-function KpiCard({ icon: Icon, label, value, href, iconBg, iconColor, badge, badgeColor, badgeBg, sublabel, dot }: {
+function KpiCard({ icon: Icon, label, value, href, iconBg, iconColor, badge, badgeColor, badgeBg, sublabel, dot, detail }: {
   icon: React.ElementType; label: string; value: number | string | null | undefined; href: string
   iconBg: string; iconColor: string
   badge?: string; badgeColor?: string; badgeBg?: string
-  sublabel?: string; dot?: string
+  sublabel?: string; dot?: string; detail?: string
 }) {
   const [hover, setHover] = useState(false)
   const displayValue = value ?? 0
@@ -183,6 +184,9 @@ function KpiCard({ icon: Icon, label, value, href, iconBg, iconColor, badge, bad
           <p style={{ fontSize: 26, fontWeight: 700, color: "#0f172a", margin: 0, lineHeight: 1, fontFamily: "var(--ff-display,'DM Sans')" }}>{displayValue}</p>
           {sublabel && <span style={{ fontSize: 12, color: "#475569", fontWeight: 500 }}>{sublabel}</span>}
         </div>
+        {detail && (
+          <p style={{ fontSize: 10, color: "#94a3b8", margin: "6px 0 0", fontWeight: 600 }}>{detail}</p>
+        )}
       </div>
     </Link>
   )
@@ -210,7 +214,8 @@ function StatusBadge({ status, onClick, disabled }: { status: string; onClick?: 
 /* ─── Page ────────────────────────────────────────────────────── */
 export default function AdminOverviewPage() {
   const [stats, setStats] = useState<Stats>({
-    totalUsers: 0, newEnrollmentsThisWeek: 0, pendingEnrollments: 0,
+    totalUsers: 0, studentCount: 0, instructorCount: 0,
+    newEnrollmentsThisWeek: 0, pendingEnrollments: 0,
     todaySessions: 0, totalGroups: 0,
     totalEnrollments: 0, contactedEnrollments: 0, confirmedEnrollments: 0,
   })
@@ -279,8 +284,13 @@ export default function AdminOverviewPage() {
         setUpcomingSessions(allSessions.filter(s => !s.is_cancelled).slice(0, 5))
         setNotifications(Array.isArray(notificationsData?.notifications) ? notificationsData.notifications : [])
 
+        const studentCount    = allUsers.filter((u: any) => u.role === "student").length
+        const instructorCount = allUsers.filter((u: any) => u.role === "instructor").length
+
         setStats({
-          totalUsers:             allUsers.length,
+          totalUsers:             studentCount + instructorCount,
+          studentCount,
+          instructorCount,
           newEnrollmentsThisWeek: newThisWeek,
           pendingEnrollments:     allEnrollments.filter(e => e.status === "pending").length,
           todaySessions:          todayCount,
@@ -371,8 +381,6 @@ export default function AdminOverviewPage() {
   return (
     <>
       <div style={{ padding: "24px 32px", background: "#fafafa", minHeight: "100vh", fontFamily: "'DM Sans','Inter',sans-serif" }}>
-        <MobileAppInstallAction />
-
         {/* ── Header ── */}
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0, fontFamily: "var(--ff-display,'DM Sans')" }}>
@@ -391,6 +399,7 @@ export default function AdminOverviewPage() {
             href="/admin-dashboard/users"
             iconBg="rgba(37,99,235,0.08)" iconColor="#2563eb"
             badge="TOTAL" badgeBg="#e2e8f0" badgeColor="#475569"
+            detail={`${stats.studentCount} étudiants · ${stats.instructorCount} formateurs`}
           />
           <KpiCard
             icon={ClipboardList} label="Nouvelles inscriptions" value={stats.newEnrollmentsThisWeek}

@@ -9,11 +9,14 @@ export const dynamic = "force-dynamic"
 */
 
 async function getAdminPb() {
-  const pb = new PocketBase(process.env.POCKETBASE_URL)
-  await pb.admins.authWithPassword(
-    process.env.POCKETBASE_ADMIN_EMAIL!,
-    process.env.POCKETBASE_ADMIN_PASSWORD!
-  )
+  const pb = new PocketBase(process.env.POCKETBASE_URL ?? "http://127.0.0.1:8090")
+  const email = process.env.POCKETBASE_ADMIN_EMAIL!
+  const password = process.env.POCKETBASE_ADMIN_PASSWORD!
+  try {
+    await pb.collection("_superusers").authWithPassword(email, password)
+  } catch {
+    await (pb as any).admins.authWithPassword(email, password)
+  }
   return pb
 }
 
@@ -29,7 +32,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     if (!studentId) return NextResponse.json({ ok: true, submission: null })
 
     const pb = await getAdminPb()
-    const subs = await safeList(pb, "quiz_submissions", `quiz_id = "${quizId}" && student_id = "${studentId}"`)
+    const allSubs = await safeList(pb, "quiz_submissions", `quiz_id != ""`)
+    const subs = allSubs.filter((s: any) => s.quiz_id === quizId && s.student_id === studentId)
     if (subs.length === 0) return NextResponse.json({ ok: true, submission: null })
     const sub = subs[0]
     let answersJson: Record<string, string[]> = {}
@@ -57,8 +61,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     if (!studentId) return NextResponse.json({ ok: false, error: "studentId requis" }, { status: 400 })
 
-    // Prevent duplicate submission
-    const existing = await safeList(pb, "quiz_submissions", `quiz_id = "${quizId}" && student_id = "${studentId}"`)
+    // Prevent duplicate submission — filter in JS due to PocketBase = filter SDK bug
+    const allExisting = await safeList(pb, "quiz_submissions", `quiz_id != ""`)
+    const existing = allExisting.filter((s: any) => s.quiz_id === quizId && s.student_id === studentId)
     if (existing.length > 0) {
       return NextResponse.json({
         ok: true,
@@ -75,7 +80,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       answers_json: JSON.stringify(answersJson || {}),
       submitted_at: new Date().toISOString(),
     })
-
     return NextResponse.json({
       ok: true,
       submission: { id: sub.id, score: sub.score, total: sub.total, submittedAt: sub.submitted_at },

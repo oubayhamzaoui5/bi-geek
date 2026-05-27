@@ -9,7 +9,7 @@ import { MiniWeekAgenda } from "@/components/agenda/MiniWeekAgenda"
 import { OverviewSession, UpcomingSessionsPanel } from "@/components/dashboard/UpcomingSessionsPanel"
 import LoadingBI from "@/components/LoadingBI"
 import { useSetDashboardLoading } from "@/components/dashboard-loading-context"
-import { MobileAppInstallAction } from "@/components/dashboard/MobileAppInstallAction"
+import { NotificationInstallCard } from "@/components/dashboard/NotificationInstallCard"
 
 type CoursesApiItem = {
   id: string
@@ -203,7 +203,6 @@ export default function StudentOverviewPage() {
   return (
           <div style={{ padding: "24px 32px", background: "#fafafa", minHeight: "100vh", fontFamily: "'DM Sans','Inter',sans-serif" }}>
             <style>{`@keyframes livepulse{0%,100%{opacity:1}50%{opacity:0.35}}`}</style>
-            <MobileAppInstallAction />
             <div style={{ marginBottom: 20 }}>
               <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0, fontFamily: "var(--ff-display,'DM Sans')" }}>
                 {greeting},{" "}
@@ -214,11 +213,13 @@ export default function StudentOverviewPage() {
               </p>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
               {kpiCards.map((card) => (
                 <KpiCard key={card.label} {...card} />
               ))}
             </div>
+
+            <NotificationInstallCard />
 
             <div style={{ marginBottom: 16 }}>
               <SectionCard title="Acces rapide" icon={Star}>

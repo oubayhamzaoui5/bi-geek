@@ -6,8 +6,6 @@ import {
   ArrowLeft, BrainCircuit, AlertCircle, Users, Check, X,
   ChevronDown, ChevronRight, Trophy, TrendingUp, Clock,
 } from "lucide-react"
-import { SidebarProvider } from "@/components/ui/sidebar-context"
-import { Sidebar } from "@/components/sidebar"
 import LoadingBI from "@/components/LoadingBI"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -106,9 +104,7 @@ export default function QuizSubmissionsPage() {
   if (loading) return <LoadingBI />
 
   return (
-    <SidebarProvider>
-      <div style={{ display: "flex", height: "100vh", background: "#f8fafc", fontFamily: "'Geist', 'Inter', sans-serif" }}>
-        <Sidebar />
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#f8fafc", fontFamily: "'Geist', 'Inter', sans-serif" }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
           {/* Header */}
@@ -278,7 +274,6 @@ export default function QuizSubmissionsPage() {
             </div>
           </div>
         </div>
-      </div>
-    </SidebarProvider>
+    </div>
   )
 }

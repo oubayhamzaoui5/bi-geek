@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import PocketBase from "pocketbase"
+import { getAdminPb } from "@/lib/server-auth"
+import { notifyGroupStudents } from "@/lib/notify-group-activity"
 
 export const dynamic = "force-dynamic"
 
@@ -11,15 +12,6 @@ export const dynamic = "force-dynamic"
 */
 
 const PB_FILE_URL = process.env.NEXT_PUBLIC_PB_URL || process.env.POCKETBASE_URL!
-
-async function getAdminPb() {
-  const pb = new PocketBase(process.env.POCKETBASE_URL)
-  await pb.admins.authWithPassword(
-    process.env.POCKETBASE_ADMIN_EMAIL!,
-    process.env.POCKETBASE_ADMIN_PASSWORD!
-  )
-  return pb
-}
 
 function fileUrl(collection: string, recordId: string, filename: string) {
   return `${PB_FILE_URL}/api/files/${collection}/${recordId}/${filename}`
@@ -34,6 +26,21 @@ async function safeList(pb: any, col: string, filter: string, sort = "+order") {
     } catch {
       return []
     }
+  }
+}
+
+async function pbPatchFile(pb: any, collection: string, recordId: string, fileField: string, file: File) {
+  const form = new FormData()
+  form.append(fileField, file)
+  const pbUrl = process.env.POCKETBASE_URL ?? "http://127.0.0.1:8090"
+  const res = await fetch(`${pbUrl}/api/collections/${collection}/records/${recordId}`, {
+    method: "PATCH",
+    headers: { Authorization: pb.authStore.token },
+    body: form,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err?.message || `PocketBase file upload error ${res.status}`)
   }
 }
 
@@ -57,9 +64,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       // Single quiz with full questions/answers
       const quiz = await pb.collection("quizzes").getOne(quizId)
       const questions = await safeList(pb, "quiz_questions", `quiz_id = "${quizId}"`)
-      const questionsFull = await Promise.all(questions.map(async (q: any) => {
+      // Sequential (not Promise.all) — PocketBase JS SDK has mutable authStore;
+      // concurrent getFullList calls race on it and all but the last silently return [].
+      const questionsFull = []
+      for (const q of questions) {
         const answers = await safeList(pb, "quiz_answers", `question_id = "${q.id}"`, "+order")
-        return {
+        questionsFull.push({
           id: q.id,
           text: q.text || "",
           imageUrl: q.image ? fileUrl("quiz_questions", q.id, q.image) : null,
@@ -70,8 +80,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
             isCorrect: a.is_correct || false,
             order: a.order || 0,
           })),
-        }
-      }))
+        })
+      }
       return NextResponse.json({
         ok: true,
         quiz: {
@@ -99,6 +109,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     return NextResponse.json({ ok: true, quizzes: result })
   } catch (e: any) {
+    console.error("QUIZ ERROR:", e)
     return NextResponse.json({ ok: false, error: e.message }, { status: 500 })
   }
 }
@@ -127,26 +138,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     })
 
     // Create questions and answers
-    await Promise.all(questionsMeta.map(async (qMeta) => {
+    for (const qMeta of questionsMeta) {
       const imageFile = fd.get(`img_${qMeta.id}`) as File | null
-
-      const qFormData = new FormData()
-      qFormData.append("quiz_id", quiz.id)
-      qFormData.append("text", qMeta.text)
-      qFormData.append("order", String(qMeta.order))
-      if (imageFile) qFormData.append("image", imageFile)
-
-      const question = await pb.collection("quiz_questions").create(qFormData)
-
-      await Promise.all(qMeta.answers.map(a =>
-        pb.collection("quiz_answers").create({
-          question_id: question.id,
-          text: a.text,
-          is_correct: a.isCorrect,
-          order: a.order,
+      const questionRecord = await pb.collection("quiz_questions").create({
+        quiz_id: quiz.id, text: qMeta.text, order: qMeta.order,
+      })
+      const questionId = String(questionRecord.id)
+      if (imageFile) await pbPatchFile(pb, "quiz_questions", questionId, "image", imageFile)
+      for (const a of qMeta.answers) {
+        await pb.collection("quiz_answers").create({
+          question_id: questionId, text: a.text, is_correct: a.isCorrect, order: a.order,
         })
-      ))
-    }))
+      }
+    }
+
+    notifyGroupStudents(pb, groupId, { type: "quiz", title }).catch(() => {})
 
     return NextResponse.json({
       ok: true,
@@ -158,6 +164,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       },
     })
   } catch (e: any) {
+    console.error("QUIZ ERROR:", e)
     return NextResponse.json({ ok: false, error: e.message }, { status: 500 })
   }
 }
@@ -195,25 +202,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       await pb.collection("quiz_questions").delete(q.id).catch(() => {})
     }
 
-    await Promise.all(questionsMeta.map(async (qMeta) => {
+    for (const qMeta of questionsMeta) {
       const imageFile = fd.get(`img_${qMeta.id}`) as File | null
-      const qFormData = new FormData()
-      qFormData.append("quiz_id", quizId)
-      qFormData.append("text", qMeta.text)
-      qFormData.append("order", String(qMeta.order))
-      if (imageFile) qFormData.append("image", imageFile)
-      else {
-        const existingImage = existingImageFiles.get(qMeta.id)
-        if (existingImage) qFormData.append("image", existingImage)
+      const fileToUpload = imageFile || existingImageFiles.get(qMeta.id) || null
+      const questionRecord = await pb.collection("quiz_questions").create({
+        quiz_id: quizId, text: qMeta.text, order: qMeta.order,
+      })
+      const questionId = String(questionRecord.id)
+      if (fileToUpload) await pbPatchFile(pb, "quiz_questions", questionId, "image", fileToUpload)
+      for (const a of qMeta.answers) {
+        await pb.collection("quiz_answers").create({ question_id: questionId, text: a.text, is_correct: a.isCorrect, order: a.order })
       }
-      const question = await pb.collection("quiz_questions").create(qFormData)
-      await Promise.all(qMeta.answers.map(a =>
-        pb.collection("quiz_answers").create({ question_id: question.id, text: a.text, is_correct: a.isCorrect, order: a.order })
-      ))
-    }))
+    }
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {
+    console.error("QUIZ ERROR:", e)
     return NextResponse.json({ ok: false, error: e.message }, { status: 500 })
   }
 }
@@ -237,6 +241,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {
+    console.error("QUIZ ERROR:", e)
     return NextResponse.json({ ok: false, error: e.message }, { status: 500 })
   }
 }

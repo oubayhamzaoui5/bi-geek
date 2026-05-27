@@ -192,6 +192,7 @@ function displayName(user: any) {
 
 function toSessionEmailItem(session: any) {
   return {
+    id: session.id,
     title: session.title || "Seance de formation",
     groupTitle: session.expand?.group?.title || "",
     date: session.date?.slice(0, 10),

@@ -1,18 +1,9 @@
 import { NextResponse } from "next/server"
-import PocketBase from "pocketbase"
+import { getAdminPb } from "@/lib/server-auth"
 
 export const dynamic = "force-dynamic"
 
 const PB_FILE_URL = process.env.NEXT_PUBLIC_PB_URL || process.env.POCKETBASE_URL!
-
-async function getAdminPb() {
-  const pb = new PocketBase(process.env.POCKETBASE_URL)
-  await pb.admins.authWithPassword(
-    process.env.POCKETBASE_ADMIN_EMAIL!,
-    process.env.POCKETBASE_ADMIN_PASSWORD!
-  )
-  return pb
-}
 
 function fileUrl(collection: string, recordId: string, filename: string) {
   return `${PB_FILE_URL}/api/files/${collection}/${recordId}/${filename}`

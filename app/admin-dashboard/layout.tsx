@@ -6,7 +6,7 @@ import { Sidebar } from "@/components/sidebar"
 import { usePathname, useRouter } from "next/navigation"
 import LoadingBI from "@/components/LoadingBI"
 import { DashboardLoadingProvider } from "@/components/dashboard-loading-context"
-import { PushNotificationPrompt, registerDashboardPushNotifications } from "@/components/PushNotificationPrompt"
+import { registerDashboardPushNotifications } from "@/components/PushNotificationPrompt"
 
 export default function AdminDashboardLayout({
   children,
@@ -55,7 +55,6 @@ export default function AdminDashboardLayout({
         <div className="h-screen bg-[#fafafa]">
           <Sidebar variant="admin" />
           <main className="dashboard-responsive-main md:ml-[60px] h-screen overflow-auto">{children}</main>
-          {userId && <PushNotificationPrompt userId={userId} />}
         </div>
       </SidebarProvider>
     </DashboardLoadingProvider>
