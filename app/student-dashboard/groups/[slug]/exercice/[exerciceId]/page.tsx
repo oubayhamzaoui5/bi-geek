@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
-  ArrowLeft, Dumbbell, AlertCircle, ExternalLink,
+  ArrowLeft, ClipboardCheck, AlertCircle, ExternalLink,
   FileText, FileSpreadsheet, Archive, Film, ImageIcon, Paperclip,
   Upload, X, Check, Lock, Clock, Loader2, Send,
 } from "lucide-react"
@@ -155,7 +155,7 @@ export default function StudentExercicePage() {
               <ArrowLeft size={16} />
             </button>
             <div style={{ width: 32, height: 32, borderRadius: 9, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Dumbbell size={16} color="#fff" strokeWidth={2.5} />
+              <ClipboardCheck size={16} color="#fff" strokeWidth={2.5} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exercise.title}</div>

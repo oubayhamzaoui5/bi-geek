@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import {
   ArrowLeft, Check, Loader2, AlertCircle, Upload, X, Save,
   FileText, FileSpreadsheet, Archive, Film, ImageIcon,
-  Paperclip, Dumbbell, ExternalLink,
+  Paperclip, ClipboardCheck, ExternalLink,
 } from "lucide-react"
 import LoadingBI from "@/components/LoadingBI"
 
@@ -156,7 +156,7 @@ export default function EditExercicePage() {
               </button>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 9, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Dumbbell size={16} color="#fff" strokeWidth={2.5} />
+                  <ClipboardCheck size={16} color="#fff" strokeWidth={2.5} />
                 </div>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{title || "Exercice"}</div>

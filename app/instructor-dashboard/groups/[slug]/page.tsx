@@ -9,9 +9,9 @@ import {
   BookOpen, Layers, Users, GraduationCap, Video,
   Paperclip, FileText, X, Check, Loader2,
   ExternalLink, Pencil, AlertCircle,
-  LayoutList,
-  GripVertical,
+  LayoutList, GripVertical,
   BrainCircuit, ClipboardCheck,
+  Calendar, Clock, Link2,
 } from "lucide-react"
 import GroupKpiCard from "@/components/groups/GroupKpiCard"
 import LoadingBI from "@/components/LoadingBI"
@@ -70,6 +70,15 @@ type ExerciseItem = {
   attachmentsCount: number
 }
 
+type SessionInfo = {
+  id: string
+  date: string
+  start_time: string
+  duration: number
+  title: string | null
+  joinUrl: string | null
+}
+
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<GroupStatus, { label: string; dot: string; text: string; bg: string; border: string }> = {
@@ -92,6 +101,26 @@ function avatarColor(id: string) {
 
 function fmtDeadline(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })
+}
+
+function fmtSessionDate(date: string) {
+  return new Date(`${date}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
+}
+
+function sessionStartDate(date: string, time: string): Date {
+  return new Date(`${date}T${time || "00:00"}:00`)
+}
+
+function sessionDiffMins(date: string, time: string): number {
+  return (sessionStartDate(date, time).getTime() - Date.now()) / 60000
+}
+
+function getInstructorId(): string {
+  try {
+    const u = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("user") || "{}") : {}
+    const id = u?.id ?? u?.record?.id ?? u?.user?.id ?? ""
+    return typeof id === "string" ? id.trim() : ""
+  } catch { return "" }
 }
 
 const moduleExpandVariants = {
@@ -140,11 +169,9 @@ export default function GroupDetailPage() {
   const [modules,            setModules]            = useState<Module[]>([])
   const [moduleVideos,       setModuleVideos]       = useState<ModuleVideo[]>([])
   const [moduleAttachments,  setModuleAttachments]  = useState<ModuleAttachment[]>([])
-  const [resourceMode,       setResourceMode]       = useState<"default" | "custom">("custom")
 
   // UI
   const [loading,              setLoading]              = useState(true)
-  const [switchingResources,   setSwitchingResources]   = useState(false)
   const [expandedModules,      setExpandedModules]      = useState<Set<string>>(new Set())
   const [activeTab,            setActiveTab]            = useState<Tab>("overview")
 
@@ -175,6 +202,10 @@ export default function GroupDetailPage() {
   const [quizzes,    setQuizzes]    = useState<QuizItem[]>([])
   const [exercises,  setExercises]  = useState<ExerciseItem[]>([])
 
+  // Next session
+  const [nextSession,   setNextSession]   = useState<SessionInfo | null>(null)
+  const [creatingMeet,  setCreatingMeet]  = useState(false)
+
   useEffect(() => {
     const tabFromQuery = parseTab(searchParams.get("view")) ?? "overview"
     setActiveTab(prev => (prev === tabFromQuery ? prev : tabFromQuery))
@@ -198,11 +229,12 @@ export default function GroupDetailPage() {
     const load = async () => {
       setLoading(true)
       try {
-        const [gRes, cRes, qRes, exRes] = await Promise.all([
+        const [gRes, cRes, qRes, exRes, nsRes] = await Promise.all([
           fetch(`/api/instructor/groups/${groupId}`),
           fetch(`/api/instructor/groups/${groupId}/curriculum`),
           fetch(`/api/instructor/groups/${groupId}/quiz`),
           fetch(`/api/instructor/groups/${groupId}/exercice`),
+          fetch(`/api/instructor/groups/${groupId}/next-session`),
         ])
         if (gRes.ok) {
           const d = await gRes.json()
@@ -216,8 +248,7 @@ export default function GroupDetailPage() {
             setModules(d.modules || [])
             setModuleVideos(d.moduleVideos || [])
             setModuleAttachments(d.moduleAttachments || [])
-            setResourceMode(d.resourceMode === "default" ? "default" : "custom")
-            if ((d.modules || []).length > 0) setExpandedModules(new Set([(d.modules[0] as Module).id]))
+if ((d.modules || []).length > 0) setExpandedModules(new Set([(d.modules[0] as Module).id]))
           }
         }
         if (qRes.ok) {
@@ -227,6 +258,10 @@ export default function GroupDetailPage() {
         if (exRes.ok) {
           const d = await exRes.json()
           if (d.ok) setExercises(d.exercises || [])
+        }
+        if (nsRes.ok) {
+          const d = await nsRes.json()
+          if (d.ok) setNextSession(d.session || null)
         }
       } catch { push("err", "Impossible de charger le groupe") }
       finally  { setLoading(false) }
@@ -245,27 +280,6 @@ export default function GroupDetailPage() {
     try { d = JSON.parse(text) } catch { throw new Error(`Erreur serveur (${res.status})`) }
     if (!res.ok) throw new Error(d.error || "Erreur")
     return d
-  }
-
-  async function useCustomResources() {
-    if (switchingResources) return
-    setSwitchingResources(true)
-    try {
-      await callCurriculum("POST", { type: "clone_course_defaults" })
-      const res = await fetch(`/api/instructor/groups/${groupId}/curriculum`)
-      const d = await res.json()
-      if (!res.ok || !d.ok) throw new Error(d.error || "Erreur")
-      setModules(d.modules || [])
-      setModuleVideos(d.moduleVideos || [])
-      setModuleAttachments(d.moduleAttachments || [])
-      setResourceMode("custom")
-      if ((d.modules || []).length > 0) setExpandedModules(new Set([(d.modules[0] as Module).id]))
-      push("ok", "Ressources personnalisees activees")
-    } catch (e: any) {
-      push("err", e.message)
-    } finally {
-      setSwitchingResources(false)
-    }
   }
 
   async function createModule() {
@@ -430,7 +444,7 @@ export default function GroupDetailPage() {
       })
       if (!res.ok) throw new Error((await res.json()).error)
       setExercises(p => p.filter(ex => ex.id !== id))
-      push("ok", "Travail pratique supprimé")
+      push("ok", "Devoir supprimé")
     } catch (e: any) { push("err", e.message) }
   }
 
@@ -653,6 +667,86 @@ export default function GroupDetailPage() {
                 </div>
               )}
 
+              {/* ── Next Session card ── */}
+              {nextSession && (() => {
+                const diffMins = sessionDiffMins(nextSession.date, nextSession.start_time)
+                const sessionEnd = new Date(sessionStartDate(nextSession.date, nextSession.start_time).getTime() + nextSession.duration * 60000)
+                const isEnded = Date.now() > sessionEnd.getTime()
+                if (isEnded) return null
+                const canCreate = diffMins <= 60
+                const canJoin = diffMins <= 10 && !!nextSession.joinUrl
+                const timeLabel = diffMins > 1440
+                  ? `Dans ${Math.round(diffMins / 1440)} j`
+                  : diffMins > 60
+                  ? `Dans ${Math.round(diffMins / 60)} h`
+                  : diffMins > 0
+                  ? `Dans ${Math.round(diffMins)} min`
+                  : "En cours"
+                return (
+                  <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf3", padding: "16px 18px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", margin: 0, textTransform: "uppercase", letterSpacing: "0.06em" }}>Prochaine Séance</p>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: diffMins <= 10 ? "#16a34a" : diffMins <= 60 ? "#d97706" : "#6b7280", background: diffMins <= 10 ? "#f0fdf4" : diffMins <= 60 ? "#fffbeb" : "#f8fafc", padding: "2px 8px", borderRadius: 6 }}>{timeLabel}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                      <Calendar size={13} style={{ color: "#6b7280", flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#111827", textTransform: "capitalize" }}>{fmtSessionDate(nextSession.date)}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                      <Clock size={13} style={{ color: "#6b7280", flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: "#6b7280" }}>
+                        {nextSession.start_time || "–"}
+                        {nextSession.duration ? ` · ${nextSession.duration} min` : ""}
+                      </span>
+                    </div>
+                    {nextSession.title && (
+                      <p style={{ fontSize: 13, fontWeight: 500, color: "#374151", margin: "0 0 14px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nextSession.title}</p>
+                    )}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {!nextSession.joinUrl && (
+                        <button
+                          disabled={!canCreate || creatingMeet}
+                          onClick={async () => {
+                            setCreatingMeet(true)
+                            try {
+                              const res = await fetch("/api/instructor/sessions/live", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ sessionId: nextSession.id, instructorId: getInstructorId() }),
+                              })
+                              const d = await res.json()
+                              if (!res.ok) throw new Error(d.error)
+                              setNextSession(p => p ? { ...p, joinUrl: d.joinUrl } : p)
+                              window.open(d.joinUrl, "_blank")
+                            } catch (e: any) { push("err", e.message) }
+                            finally { setCreatingMeet(false) }
+                          }}
+                          style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 10px", background: canCreate ? "var(--accent)" : "#e5e7eb", border: "none", borderRadius: 9, fontSize: 12, fontWeight: 700, color: canCreate ? "#fff" : "#9ca3af", cursor: canCreate ? "pointer" : "not-allowed", transition: "all 0.15s", boxShadow: canCreate ? "0 2px 8px color-mix(in oklch, var(--accent) 30%, transparent)" : "none" }}
+                        >
+                          {creatingMeet ? <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> : <Link2 size={13} />}
+                          {creatingMeet ? "Création…" : "Créer Meet"}
+                        </button>
+                      )}
+                      {nextSession.joinUrl && (
+                        <button
+                          disabled={!canJoin}
+                          onClick={() => window.open(nextSession.joinUrl!, "_blank")}
+                          style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 10px", background: canJoin ? "#16a34a" : "#e5e7eb", border: "none", borderRadius: 9, fontSize: 12, fontWeight: 700, color: canJoin ? "#fff" : "#9ca3af", cursor: canJoin ? "pointer" : "not-allowed", transition: "all 0.15s", boxShadow: canJoin ? "0 2px 8px rgba(22,163,74,0.3)" : "none" }}
+                        >
+                          <Video size={13} /> Rejoindre
+                        </button>
+                      )}
+                    </div>
+                    {!canCreate && !nextSession.joinUrl && (
+                      <p style={{ fontSize: 11, color: "#9ca3af", margin: "8px 0 0", textAlign: "center" }}>Disponible 1h avant la séance</p>
+                    )}
+                    {nextSession.joinUrl && !canJoin && (
+                      <p style={{ fontSize: 11, color: "#9ca3af", margin: "8px 0 0", textAlign: "center" }}>Rejoindre disponible 10 min avant</p>
+                    )}
+                  </div>
+                )
+              })()}
+
 
             </div>
 
@@ -677,36 +771,17 @@ export default function GroupDetailPage() {
                 <span style={{ fontSize: 13, color: "#6b7280", fontWeight: 500 }}>{modules.length} module{modules.length !== 1 ? "s" : ""}</span>
                 <span style={{ color: "#d1d5db", fontSize: 13 }}>·</span>
                 <span style={{ fontSize: 13, color: "#6b7280", fontWeight: 500 }}>{moduleVideos.length + moduleAttachments.length} ressource{moduleVideos.length + moduleAttachments.length !== 1 ? "s" : ""}</span>
-                <span style={{ fontSize: 11, fontWeight: 800, color: resourceMode === "default" ? "#0f766e" : "var(--accent)", background: resourceMode === "default" ? "rgba(15,118,110,0.08)" : "color-mix(in oklch, var(--accent) 8%, transparent)", border: resourceMode === "default" ? "1px solid rgba(15,118,110,0.16)" : "1px solid color-mix(in oklch, var(--accent) 18%, transparent)", padding: "3px 8px", borderRadius: 999 }}>
-                  {resourceMode === "default" ? "Ressources du cours" : "Ressources personnalisees"}
-                </span>
               </div>
-              {resourceMode === "default" ? (
-                <button
-                  onClick={useCustomResources}
-                  disabled={switchingResources}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#0f766e", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: switchingResources ? "not-allowed" : "pointer", opacity: switchingResources ? 0.7 : 1, boxShadow: "0 2px 8px rgba(15,118,110,0.25)", flexShrink: 0 }}
-                >
-                  {switchingResources ? <Loader2 size={13} className="animate-spin" /> : <Pencil size={13} />} Utiliser mes ressources
-                </button>
-              ) : (
-                <button
-                  onClick={() => setAddingModule(true)}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--accent)", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", boxShadow: "0 2px 8px color-mix(in oklch, var(--accent) 35%, transparent)", flexShrink: 0 }}
-                >
-                  <Plus size={13} /> Module
-                </button>
-              )}
+              <button
+                onClick={() => setAddingModule(true)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "var(--accent)", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", boxShadow: "0 2px 8px color-mix(in oklch, var(--accent) 35%, transparent)", flexShrink: 0 }}
+              >
+                <Plus size={13} /> Module
+              </button>
             </div>
 
-            {resourceMode === "default" && (
-              <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(15,118,110,0.16)", background: "rgba(15,118,110,0.06)", color: "#0f766e", fontSize: 12, fontWeight: 600 }}>
-                Ce groupe utilise les ressources par defaut de la formation. Passez en ressources personnalisees pour modifier les modules, videos ou fichiers seulement pour ce groupe.
-              </div>
-            )}
-
             {/* Inline new module */}
-            {resourceMode === "custom" && addingModule && (
+            {addingModule && (
               <div style={{ marginBottom: 12, padding: "14px 16px", background: "#fff", borderRadius: 14, border: "1.5px dashed color-mix(in oklch, var(--accent) 40%, white)", display: "flex", gap: 8, alignItems: "center" }}>
                 <input
                   autoFocus
@@ -890,13 +965,6 @@ export default function GroupDetailPage() {
                                     <span style={{ fontSize: 14, fontWeight: 500, color: "#1f2937", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{vid.title}</span>
                                   </div>
                                   <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                                    {vid.driveUrl && (
-                                      <a href={vid.driveUrl} target="_blank" rel="noopener noreferrer"
-                                        style={{ padding: "3px 5px", color: "#9ca3af", borderRadius: 5, display: "flex", alignItems: "center", textDecoration: "none", transition: "color 0.12s" }}
-                                        onMouseEnter={e => (e.currentTarget.style.color = "#374151")}
-                                        onMouseLeave={e => (e.currentTarget.style.color = "#9ca3af")}
-                                      ><ExternalLink size={12} /></a>
-                                    )}
                                     {item.canEdit && <button onClick={async () => {
                                       try { await callCurriculum("DELETE", { type: "module_video", id: vid.id }); setModuleVideos(p => p.filter(x => x.id !== vid.id)) }
                                       catch (e: any) { push("err", e.message) }
@@ -921,8 +989,8 @@ export default function GroupDetailPage() {
                                 ref={el => { if (el) moduleContentRefs.current.set(itemKey, el); else moduleContentRefs.current.delete(itemKey) }}
                                 onDragOver={e => handleModuleContentDragOver(e, mod.id, itemKey)}
                                 onDrop={e => e.preventDefault()}
-                                onClick={() => { if (pdfUrl) router.push(pdfUrl) }}
-                                style={{ ...baseRow, cursor: pdfUrl ? "pointer" : "default" }}
+                                onClick={() => { if (pdfUrl) { router.push(pdfUrl) } else if (att.url) { const a = document.createElement("a"); a.href = att.url; a.download = att.name; a.target = "_blank"; document.body.appendChild(a); a.click(); document.body.removeChild(a) } }}
+                                style={{ ...baseRow, cursor: att.url ? "pointer" : "default" }}
                                 onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = isAttPdf ? "rgba(225,29,72,0.05)" : "rgba(20,184,166,0.05)"}
                                 onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
                               >
@@ -934,14 +1002,6 @@ export default function GroupDetailPage() {
                                   <span style={{ fontSize: 14, fontWeight: 500, color: "#1f2937", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{att.name}</span>
                                 </div>
                                 <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                                  {att.url && !pdfUrl && (
-                                    <a href={att.url} target="_blank" rel="noopener noreferrer"
-                                      onClick={e => e.stopPropagation()}
-                                      style={{ padding: "3px 5px", color: "#9ca3af", borderRadius: 5, display: "flex", alignItems: "center", textDecoration: "none", transition: "color 0.12s" }}
-                                      onMouseEnter={e => (e.currentTarget.style.color = "#374151")}
-                                      onMouseLeave={e => (e.currentTarget.style.color = "#9ca3af")}
-                                    ><ExternalLink size={12} /></a>
-                                  )}
                                   {item.canEdit && <button onClick={async () => {
                                     try { await callCurriculum("DELETE", { type: "module_attachment", id: att.id }); setModuleAttachments(p => p.filter(x => x.id !== att.id)) }
                                     catch (e: any) { push("err", e.message) }
@@ -1008,6 +1068,12 @@ export default function GroupDetailPage() {
                                   </div>
                                 </div>
                                 <div style={{ display: "flex", gap: 4, alignItems: "center" }} onClick={e => e.stopPropagation()}>
+                                  <button
+                                    onClick={() => router.push(`/instructor-dashboard/groups/${groupId}/quiz/${quiz.id}/submissions`)}
+                                    style={{ padding: "4px 8px", background: "color-mix(in oklch, var(--accent) 7%, white)", border: "1px solid color-mix(in oklch, var(--accent) 22%, white)", borderRadius: 6, cursor: "pointer", color: "var(--accent)", fontSize: 11, fontWeight: 700, transition: "all 0.12s", display: "flex", alignItems: "center", gap: 4 }}
+                                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "color-mix(in oklch, var(--accent) 14%, white)" }}
+                                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "color-mix(in oklch, var(--accent) 7%, white)" }}
+                                  ><Users size={11} /> Soumissions</button>
                                   <button onClick={() => deleteQuiz(quiz.id)}
                                     style={{ padding: "4px 6px", background: "transparent", border: "none", borderRadius: 6, cursor: "pointer", color: "#e5e7eb", transition: "all 0.12s" }}
                                     onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; (e.currentTarget as HTMLButtonElement).style.background = "rgba(239,68,68,0.07)" }}
@@ -1020,64 +1086,78 @@ export default function GroupDetailPage() {
                           ))}
 
                           {/* Exercise items for this module */}
-                          {exercises.filter(ex => ex.moduleId === mod.id).map(ex => (
-                            <div key={ex.id} style={{ borderTop: "1px solid #f0f1f5" }}>
-                              <div
-                                style={{ display: "flex", alignItems: "center", gap: 14, padding: "11px 20px", cursor: "pointer", transition: "background 0.12s" }}
-                                onClick={() => router.push(`/instructor-dashboard/groups/${groupId}/exercice/${ex.id}`)}
-                                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = "#ecfeff"}
-                                onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
-                              >
-                                <div style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg,#06b6d4,#0891b2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                  <ClipboardCheck size={16} strokeWidth={2.5} color="#fff" />
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 10, fontWeight: 700, color: "#0e7490", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 1 }}>Travail pratique</div>
-                                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                                    <span style={{ fontSize: 14, fontWeight: 600, color: "#1f2937", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{ex.title}</span>
-                                    {ex.deadline && (
-                                      <span style={{ fontSize: 11, color: "#dc2626", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>Deadline: {fmtDeadline(ex.deadline)}</span>
-                                    )}
+                          {exercises.filter(ex => ex.moduleId === mod.id).map(ex => {
+                            const isOverdue = ex.deadline ? new Date(ex.deadline) < new Date() : false
+                            return (
+                              <div key={ex.id} style={{ borderTop: "1px solid #f0f1f5" }}>
+                                <div
+                                  style={{ display: "flex", alignItems: "center", gap: 0, cursor: "pointer", transition: "background 0.15s", background: "transparent" }}
+                                  onClick={() => router.push(`/instructor-dashboard/groups/${groupId}/exercice/${ex.id}`)}
+                                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = "rgba(6,182,212,0.04)"}
+                                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
+                                >
+                                  <div style={{ width: 4, minWidth: 4, alignSelf: "stretch", background: "linear-gradient(to bottom, #06b6d4, #0891b2)", borderRadius: "0 2px 2px 0" }} />
+                                  <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 16px 13px 16px", flex: 1, minWidth: 0 }}>
+                                    <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg,#0891b2,#06b6d4)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 2px 10px rgba(6,182,212,0.32)" }}>
+                                      <ClipboardCheck size={17} strokeWidth={2.3} color="#fff" />
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                                        <span style={{ fontSize: 10, fontWeight: 700, color: "#0891b2", background: "rgba(6,182,212,0.1)", padding: "1px 7px", borderRadius: 4, letterSpacing: "0.05em", textTransform: "uppercase" }}>Devoir</span>
+                                        {ex.deadline && (
+                                          <span style={{ fontSize: 11, fontWeight: 500, color: isOverdue ? "#dc2626" : "#9ca3af", whiteSpace: "nowrap" }}>
+                                            · {isOverdue ? "Délai dépassé —" : "À rendre le"} {fmtDeadline(ex.deadline)}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span style={{ fontSize: 14, fontWeight: 600, color: "#111827", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ex.title}</span>
+                                    </div>
+                                    <div style={{ display: "flex", gap: 6, alignItems: "center" }} onClick={e => e.stopPropagation()}>
+                                      <button
+                                        onClick={() => router.push(`/instructor-dashboard/groups/${groupId}/exercice/${ex.id}/submissions`)}
+                                        style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 10px", background: "rgba(6,182,212,0.08)", border: "1.5px solid rgba(6,182,212,0.22)", borderRadius: 7, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#0891b2", transition: "all 0.12s" }}
+                                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(6,182,212,0.16)" }}
+                                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(6,182,212,0.08)" }}
+                                      ><Users size={11} /> Copies</button>
+                                      <button onClick={() => deleteExercise(ex.id)}
+                                        style={{ padding: "5px 7px", background: "transparent", border: "none", borderRadius: 6, cursor: "pointer", color: "#e5e7eb", transition: "all 0.12s" }}
+                                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; (e.currentTarget as HTMLButtonElement).style.background = "rgba(239,68,68,0.07)" }}
+                                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#e5e7eb"; (e.currentTarget as HTMLButtonElement).style.background = "transparent" }}
+                                      ><Trash2 size={13} /></button>
+                                      <ChevronRight size={14} style={{ color: "#d1d5db" }} />
+                                    </div>
                                   </div>
                                 </div>
-                                <div style={{ display: "flex", gap: 4, alignItems: "center" }} onClick={e => e.stopPropagation()}>
-                                  <button onClick={() => deleteExercise(ex.id)}
-                                    style={{ padding: "4px 6px", background: "transparent", border: "none", borderRadius: 6, cursor: "pointer", color: "#e5e7eb", transition: "all 0.12s" }}
-                                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; (e.currentTarget as HTMLButtonElement).style.background = "rgba(239,68,68,0.07)" }}
-                                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#e5e7eb"; (e.currentTarget as HTMLButtonElement).style.background = "transparent" }}
-                                  ><Trash2 size={13} /></button>
-                                  <ChevronRight size={14} style={{ color: "#d1d5db" }} />
-                                </div>
                               </div>
-                            </div>
-                          ))}
+                            )
+                          })}
 
                           {/* Action buttons */}
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "10px 20px", borderTop: "1px solid #f0f1f5" }}>
                             <button
                               onClick={() => { setAddingModuleVideoFor(mod.id) }}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#f5f3ff", border: "1.5px solid #ede9fe", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#7c3aed", transition: "all 0.15s" }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#ede9fe" }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#f5f3ff" }}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#f59e0b", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#fff", boxShadow: "0 2px 8px rgba(245,158,11,0.35)", transition: "all 0.15s" }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#d97706" }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#f59e0b" }}
                             ><Video size={12} /> Vidéo</button>
                             <button
                               onClick={() => { setUploadingModuleFor(mod.id); moduleFileInputRef.current?.click() }}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#475569", transition: "all 0.15s" }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#f1f5f9" }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#f8fafc" }}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#14b8a6", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#fff", boxShadow: "0 2px 8px rgba(20,184,166,0.35)", transition: "all 0.15s" }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#0d9488" }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#14b8a6" }}
                             ><Paperclip size={12} /> Fichier</button>
                             <button
                               onClick={() => router.push(`/instructor-dashboard/groups/${groupId}/quiz/new?moduleId=${mod.id}`)}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "color-mix(in oklch, var(--accent) 7%, white)", border: "1.5px solid color-mix(in oklch, var(--accent) 28%, white)", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "color-mix(in oklch, var(--accent) 85%, black)", transition: "all 0.15s" }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "color-mix(in oklch, var(--accent) 12%, white)" }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "color-mix(in oklch, var(--accent) 7%, white)" }}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "var(--accent)", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#fff", boxShadow: "0 2px 8px color-mix(in oklch, var(--accent) 35%, transparent)", transition: "all 0.15s" }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.88" }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1" }}
                             ><BrainCircuit size={12} /> Quiz</button>
                             <button
                               onClick={() => router.push(`/instructor-dashboard/groups/${groupId}/exercice/new?moduleId=${mod.id}`)}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "#ecfeff", border: "1.5px solid #a5f3fc", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#0e7490", transition: "all 0.15s" }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#cffafe" }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#ecfeff" }}
-                            ><ClipboardCheck size={12} /> Travail pratique</button>
+                              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 13px", background: "linear-gradient(135deg,#0891b2,#06b6d4)", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#fff", boxShadow: "0 2px 8px rgba(6,182,212,0.35)", transition: "all 0.15s" }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.88" }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1" }}
+                            ><ClipboardCheck size={12} /> Devoir</button>
                           </div>
                         </div>
                       )

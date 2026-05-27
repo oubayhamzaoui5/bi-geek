@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
-  ArrowLeft, Dumbbell, AlertCircle, Users, ExternalLink,
+  ArrowLeft, ClipboardCheck, AlertCircle, Users, ExternalLink,
   FileText, FileSpreadsheet, Archive, Film, ImageIcon, Paperclip,
   Clock, ChevronDown, ChevronRight,
 } from "lucide-react"
@@ -89,7 +89,7 @@ export default function SubmissionsPage() {
               <ArrowLeft size={16} />
             </button>
             <div style={{ width: 32, height: 32, borderRadius: 9, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Dumbbell size={16} color="#fff" strokeWidth={2.5} />
+              <ClipboardCheck size={16} color="#fff" strokeWidth={2.5} />
             </div>
             <div>
               <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Soumissions</div>

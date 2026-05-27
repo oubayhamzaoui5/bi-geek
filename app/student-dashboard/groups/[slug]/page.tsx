@@ -9,6 +9,7 @@ import {
   FileText, AlertCircle, LayoutList,
   ExternalLink,
   ChevronDown, Paperclip, BrainCircuit, ClipboardCheck,
+  Calendar, Clock,
 } from "lucide-react"
 import GroupKpiCard from "@/components/groups/GroupKpiCard"
 import LoadingBI from "@/components/LoadingBI"
@@ -51,6 +52,7 @@ type ModuleAttachment = { id: string; moduleId: string; name: string; url: strin
 
 type QuizItem     = { id: string; moduleId: string; title: string; deadline: string | null; questionsCount: number }
 type ExerciseItem = { id: string; moduleId: string; title: string; description: string; deadline: string | null; attachmentsCount: number }
+type SessionInfo  = { id: string; date: string; start_time: string; duration: number; title: string | null; joinUrl: string | null }
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
@@ -58,6 +60,14 @@ function isPdf(name: string) { return name.split(".").pop()?.toLowerCase() === "
 
 function fmtDeadline(d: string) {
   return new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })
+}
+
+function fmtSessionDate(date: string) {
+  return new Date(`${date}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
+}
+
+function sessionDiffMins(date: string, time: string): number {
+  return (new Date(`${date}T${time || "00:00"}:00`).getTime() - Date.now()) / 60000
 }
 
 const moduleExpandVariants = {
@@ -88,11 +98,13 @@ export default function StudentGroupDetailPage() {
   const [moduleAttachments,  setModuleAttachments]  = useState<ModuleAttachment[]>([])
   const [quizzes,   setQuizzes]   = useState<QuizItem[]>([])
   const [exercises, setExercises] = useState<ExerciseItem[]>([])
+  const [completedQuizIds, setCompletedQuizIds] = useState<Set<string>>(new Set())
   const [loading,   setLoading]   = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>("overview")
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set())
   const [formateurIndex, setFormateurIndex] = useState(0)
   const [loadError, setLoadError] = useState("")
+  const [nextSession, setNextSession] = useState<SessionInfo | null>(null)
 
   useEffect(() => {
     const tabFromQuery = parseTab(searchParams.get("view")) ?? "overview"
@@ -114,11 +126,12 @@ export default function StudentGroupDetailPage() {
       setLoading(true)
       setLoadError("")
       try {
-        const [gRes, cRes, qRes, exRes] = await Promise.all([
+        const [gRes, cRes, qRes, exRes, nsRes] = await Promise.all([
           fetch(`/api/student/groups/${groupId}`),
           fetch(`/api/student/groups/${groupId}/curriculum`),
           fetch(`/api/student/groups/${groupId}/quiz`),
           fetch(`/api/student/groups/${groupId}/exercice`),
+          fetch(`/api/student/groups/${groupId}/next-session`),
         ])
         if (gRes.status === 401 || cRes.status === 401) {
           localStorage.removeItem("user")
@@ -149,11 +162,31 @@ export default function StudentGroupDetailPage() {
         }
         if (qRes.ok) {
           const d = await qRes.json()
-          if (d.ok) setQuizzes(d.quizzes || [])
+          if (d.ok) {
+            const quizList: QuizItem[] = d.quizzes || []
+            setQuizzes(quizList)
+            // Check which quizzes the student already completed
+            const sid = getStudentId()
+            if (sid && quizList.length > 0) {
+              const results = await Promise.all(
+                quizList.map(q =>
+                  fetch(`/api/student/groups/${groupId}/quiz/${q.id}/submit?studentId=${sid}`)
+                    .then(r => r.json()).catch(() => ({ ok: false }))
+                )
+              )
+              const done = new Set<string>()
+              quizList.forEach((q, i) => { if (results[i]?.ok && results[i]?.submission) done.add(q.id) })
+              setCompletedQuizIds(done)
+            }
+          }
         }
         if (exRes.ok) {
           const d = await exRes.json()
           if (d.ok) setExercises(d.exercises || [])
+        }
+        if (nsRes.ok) {
+          const d = await nsRes.json()
+          if (d.ok) setNextSession(d.session || null)
         }
       } catch {
         setLoadError("Erreur lors du chargement du groupe.")
@@ -327,6 +360,60 @@ export default function StudentGroupDetailPage() {
                 </div>
               )}
 
+              {/* ── Next Session card ── */}
+              {nextSession && (() => {
+                const diffMins = sessionDiffMins(nextSession.date, nextSession.start_time)
+                const sessionEnd = new Date(new Date(`${nextSession.date}T${nextSession.start_time || "00:00"}:00`).getTime() + nextSession.duration * 60000)
+                const isEnded = Date.now() > sessionEnd.getTime()
+                if (isEnded) return null
+                const canJoin = diffMins <= 10 && !!nextSession.joinUrl
+                const timeLabel = diffMins > 1440
+                  ? `Dans ${Math.round(diffMins / 1440)} j`
+                  : diffMins > 60
+                  ? `Dans ${Math.round(diffMins / 60)} h`
+                  : diffMins > 0
+                  ? `Dans ${Math.round(diffMins)} min`
+                  : "En cours"
+                return (
+                  <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf3", padding: "16px 18px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", margin: 0, textTransform: "uppercase", letterSpacing: "0.06em" }}>Prochaine Séance</p>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: diffMins <= 10 ? "#16a34a" : diffMins <= 60 ? "#d97706" : "#6b7280", background: diffMins <= 10 ? "#f0fdf4" : diffMins <= 60 ? "#fffbeb" : "#f8fafc", padding: "2px 8px", borderRadius: 6 }}>{timeLabel}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                      <Calendar size={13} style={{ color: "#6b7280", flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#111827", textTransform: "capitalize" }}>{fmtSessionDate(nextSession.date)}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                      <Clock size={13} style={{ color: "#6b7280", flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: "#6b7280" }}>
+                        {nextSession.start_time || "–"}
+                        {nextSession.duration ? ` · ${nextSession.duration} min` : ""}
+                      </span>
+                    </div>
+                    {nextSession.title && (
+                      <p style={{ fontSize: 13, fontWeight: 500, color: "#374151", margin: "0 0 14px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nextSession.title}</p>
+                    )}
+                    {nextSession.joinUrl ? (
+                      <button
+                        disabled={!canJoin}
+                        onClick={() => window.open(nextSession.joinUrl!, "_blank")}
+                        style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 12px", background: canJoin ? "#16a34a" : "#e5e7eb", border: "none", borderRadius: 9, fontSize: 12, fontWeight: 700, color: canJoin ? "#fff" : "#9ca3af", cursor: canJoin ? "pointer" : "not-allowed", transition: "all 0.15s", boxShadow: canJoin ? "0 2px 8px rgba(22,163,74,0.3)" : "none" }}
+                      >
+                        <Video size={13} /> Rejoindre la séance
+                      </button>
+                    ) : (
+                      <div style={{ padding: "10px 12px", background: "#f8fafc", borderRadius: 9, textAlign: "center" }}>
+                        <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>En attente du lien par le formateur</p>
+                      </div>
+                    )}
+                    {nextSession.joinUrl && !canJoin && (
+                      <p style={{ fontSize: 11, color: "#9ca3af", margin: "8px 0 0", textAlign: "center" }}>Rejoindre disponible 10 min avant</p>
+                    )}
+                  </div>
+                )
+              })()}
+
 
             </div>
 
@@ -415,12 +502,6 @@ export default function StudentGroupDetailPage() {
                                     <div style={{ fontSize: 10, fontWeight: 700, color: "#d97706", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 1 }}>Vidéo</div>
                                     <span style={{ fontSize: 14, fontWeight: 500, color: "#1f2937", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{vid.title}</span>
                                   </div>
-                                  {vid.driveUrl && (
-                                    <a href={vid.driveUrl} target="_blank" rel="noopener noreferrer" style={{ padding: "3px 5px", color: "#9ca3af", borderRadius: 5, display: "flex", alignItems: "center", textDecoration: "none", transition: "color 0.12s" }}
-                                      onMouseEnter={e => (e.currentTarget.style.color = "#374151")}
-                                      onMouseLeave={e => (e.currentTarget.style.color = "#9ca3af")}
-                                    ><ExternalLink size={12} /></a>
-                                  )}
                                 </div>
                               )
                             }
@@ -432,8 +513,8 @@ export default function StudentGroupDetailPage() {
                             const isAttPdf = !!pdfUrl
                             return (
                               <div key={item.key}
-                                onClick={() => { if (pdfUrl) router.push(pdfUrl) }}
-                                style={{ ...baseRow, cursor: pdfUrl ? "pointer" : "default" }}
+                                onClick={() => { if (pdfUrl) { router.push(pdfUrl) } else if (att.url) { const a = document.createElement("a"); a.href = att.url; a.download = att.name; a.target = "_blank"; document.body.appendChild(a); a.click(); document.body.removeChild(a) } }}
+                                style={{ ...baseRow, cursor: att.url ? "pointer" : "default" }}
                                 onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = isAttPdf ? "rgba(225,29,72,0.05)" : "rgba(20,184,166,0.05)"}
                                 onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
                               >
@@ -444,14 +525,6 @@ export default function StudentGroupDetailPage() {
                                   <div style={{ fontSize: 10, fontWeight: 700, color: isAttPdf ? "#e11d48" : "#0d9488", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 1 }}>{isAttPdf ? "PDF" : "Fichier"}</div>
                                   <span style={{ fontSize: 14, fontWeight: 500, color: "#1f2937", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{att.name}</span>
                                 </div>
-                                {att.url && !pdfUrl && (
-                                  <a href={att.url} target="_blank" rel="noopener noreferrer"
-                                    onClick={e => e.stopPropagation()}
-                                    style={{ padding: "3px 5px", color: "#9ca3af", borderRadius: 5, display: "flex", alignItems: "center", textDecoration: "none", transition: "color 0.12s" }}
-                                    onMouseEnter={e => (e.currentTarget.style.color = "#374151")}
-                                    onMouseLeave={e => (e.currentTarget.style.color = "#9ca3af")}
-                                  ><ExternalLink size={12} /></a>
-                                )}
                               </div>
                             )
                           })}
@@ -484,36 +557,51 @@ export default function StudentGroupDetailPage() {
                                 )}
                               </div>
                             </div>
-                            <ChevronRight size={14} style={{ color: "#d1d5db", flexShrink: 0 }} />
+                            {completedQuizIds.has(quiz.id) ? (
+                              <span style={{ fontSize: 10, fontWeight: 800, color: "#10b981", background: "#f0fdf4", padding: "3px 10px", borderRadius: 99, border: "1px solid #86efac", flexShrink: 0, letterSpacing: "0.04em" }}>Complété</span>
+                            ) : (
+                              <ChevronRight size={14} style={{ color: "#d1d5db", flexShrink: 0 }} />
+                            )}
                           </div>
                         </div>
                       ))}
 
                       {/* ── Exercise items ── */}
-                      {exercises.filter(ex => ex.moduleId === mod.id).map(ex => (
-                        <div key={ex.id} style={{ borderTop: "1px solid #f0f1f5" }}>
-                          <div
-                            style={{ display: "flex", alignItems: "center", gap: 14, padding: "11px 20px", cursor: "pointer", transition: "background 0.12s" }}
-                            onClick={() => router.push(`/student-dashboard/groups/${groupId}/exercice/${ex.id}`)}
-                            onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = "#ecfeff"}
-                            onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
-                          >
-                            <div style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg,#06b6d4,#0891b2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 2px 8px rgba(6,182,212,0.28)" }}>
-                              <ClipboardCheck size={16} strokeWidth={2.5} color="#fff" />
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: "#0e7490", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 1 }}>Travail pratique</div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                                <span style={{ fontSize: 14, fontWeight: 600, color: "#1f2937", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{ex.title}</span>
-                                {ex.deadline && (
-                                  <span style={{ fontSize: 11, color: "#dc2626", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>Deadline: {fmtDeadline(ex.deadline)}</span>
-                                )}
+                      {exercises.filter(ex => ex.moduleId === mod.id).map(ex => {
+                        const isOverdue = ex.deadline ? new Date(ex.deadline) < new Date() : false
+                        return (
+                          <div key={ex.id} style={{ borderTop: "1px solid #f0f1f5" }}>
+                            <div
+                              style={{ display: "flex", alignItems: "center", gap: 0, cursor: "pointer", transition: "background 0.15s", background: "transparent" }}
+                              onClick={() => router.push(`/student-dashboard/groups/${groupId}/exercice/${ex.id}`)}
+                              onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = "rgba(6,182,212,0.04)"}
+                              onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
+                            >
+                              <div style={{ width: 4, minWidth: 4, alignSelf: "stretch", background: "linear-gradient(to bottom, #06b6d4, #0891b2)", borderRadius: "0 2px 2px 0" }} />
+                              <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 20px 13px 16px", flex: 1, minWidth: 0 }}>
+                                <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg,#0891b2,#06b6d4)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 2px 10px rgba(6,182,212,0.32)" }}>
+                                  <ClipboardCheck size={17} strokeWidth={2.3} color="#fff" />
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                                    <span style={{ fontSize: 10, fontWeight: 700, color: "#0891b2", background: "rgba(6,182,212,0.1)", padding: "1px 7px", borderRadius: 4, letterSpacing: "0.05em", textTransform: "uppercase" }}>Devoir</span>
+                                    {ex.deadline && (
+                                      <span style={{ fontSize: 11, fontWeight: 500, color: isOverdue ? "#dc2626" : "#9ca3af", whiteSpace: "nowrap" }}>
+                                        · {isOverdue ? "En retard —" : "À rendre le"} {fmtDeadline(ex.deadline)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span style={{ fontSize: 14, fontWeight: 600, color: "#111827", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ex.title}</span>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                                  <span style={{ fontSize: 12, fontWeight: 600, color: "#0891b2", background: "rgba(6,182,212,0.08)", padding: "5px 12px", borderRadius: 7, border: "1.5px solid rgba(6,182,212,0.22)" }}>Ouvrir</span>
+                                  <ChevronRight size={14} style={{ color: "#cbd5e1" }} />
+                                </div>
                               </div>
                             </div>
-                            <ChevronRight size={14} style={{ color: "#d1d5db", flexShrink: 0 }} />
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </motion.div>
                     </div>
                   )
