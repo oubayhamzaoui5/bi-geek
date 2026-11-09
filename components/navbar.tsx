@@ -10,6 +10,7 @@ const navLinks = [
   { href: "/",            label: "Accueil",            type: "page",         accent: false },
   { href: "/a-propos",    label: "À propos",          type: "page",         accent: false },
   { href: "/formations",   label: "Formations",         type: "page",         accent: false },
+  { href: "/formateurs",   label: "Formateurs",         type: "page",         accent: false },
   { href: "/#contact",    label: "Contact",            type: "home-section", accent: false },
   { href: "/entreprises", label: "Offres entreprise",  type: "page",         accent: true  },
 ]
@@ -20,13 +21,25 @@ function Spinner() {
   )
 }
 
-export function Navbar() {
+export function Navbar({ showInstructors }: { showInstructors?: boolean }) {
   const [isScrolled, setIsScrolled]         = useState(false)
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [user, setUser]                     = useState<{ username: string; role: string } | null>(null)
   const [authLoading, setAuthLoading]       = useState(true)
+  const [hasInstructors, setHasInstructors] = useState(false)
   const pathname = usePathname()
   const router   = useRouter()
+  const visibleNavLinks = navLinks.filter((link) => link.href !== "/formateurs" || (showInstructors ?? hasInstructors))
+
+  useEffect(() => {
+    if (showInstructors !== undefined) return
+    const controller = new AbortController()
+    fetch("/api/formateurs", { cache: "no-store", signal: controller.signal })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => setHasInstructors(data?.available === true))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [showInstructors])
 
   useEffect(() => {
     const str = localStorage.getItem("user")
@@ -80,8 +93,8 @@ export function Navbar() {
           </Link>
 
           {/* Desktop nav — centred */}
-          <div className="hidden lg:flex items-center gap-1 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            {navLinks.map((link) => {
+          <div className="hidden w-max items-center gap-1 whitespace-nowrap absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:flex">
+            {visibleNavLinks.map((link) => {
               const accentCls = link.accent
                 ? "text-[#8b0f82] font-semibold hover:text-[#710c6a]"
                 : "text-muted-foreground hover:text-foreground"
@@ -150,6 +163,8 @@ export function Navbar() {
 
             <button
               type="button"
+              aria-label={isMobileMenuOpen ? "Fermer le menu" : "Ouvrir le menu"}
+              aria-expanded={isMobileMenuOpen}
               className="lg:hidden flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent/10 transition-colors"
               onClick={() => setMobileMenuOpen((v) => !v)}
             >
@@ -162,7 +177,7 @@ export function Navbar() {
         {isMobileMenuOpen && (
           <div className="lg:hidden border-t border-border py-4 bg-background">
             <div className="flex flex-col">
-              {navLinks.map((link) => {
+              {visibleNavLinks.map((link) => {
                 const accentCls = link.accent
                   ? "text-[#8b0f82] font-semibold"
                   : "text-muted-foreground"

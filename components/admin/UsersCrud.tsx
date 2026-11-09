@@ -8,13 +8,14 @@ import {
   Mail, Phone, Loader2
 } from "lucide-react"
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
+import type { InstructorProfile } from "@/lib/instructor-profile"
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
 type ToastType = "success" | "error"
 type Toast = { id: string; type: ToastType; message: string; duration: number; createdAt: number }
 
-export type AdminUser = {
+export type AdminUser = InstructorProfile & {
   id?: string
   avatar: string | null
   username: string
@@ -58,20 +59,22 @@ function avatarColor(name: string): { from: string; to: string } {
 
 // ─── UI primitives (matching CoursesCrud / GroupsCrud) ───────────────────────────
 
-function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+function FieldLabel({ children, required, htmlFor }: { children: React.ReactNode; required?: boolean; htmlFor?: string }) {
   return (
-    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 6, letterSpacing: "0.02em" }}>
+    <label htmlFor={htmlFor} style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 6, letterSpacing: "0.02em" }}>
       {children}{required && <span style={{ color: "#f43f5e", marginLeft: 3 }}>*</span>}
     </label>
   )
 }
 
-function Input({ value, onChange, placeholder, type = "text", readOnly, disabled, style }: {
-  value: string; onChange?: (v: string) => void; placeholder?: string; type?: string; readOnly?: boolean; disabled?: boolean; style?: React.CSSProperties
+function Input({ id, value, onChange, placeholder, type = "text", maxLength, readOnly, disabled, style }: {
+  id?: string; value: string; onChange?: (v: string) => void; placeholder?: string; type?: string; maxLength?: number; readOnly?: boolean; disabled?: boolean; style?: React.CSSProperties
 }) {
   return (
     <input
+      id={id}
       type={type}
+      maxLength={maxLength}
       value={value}
       onChange={e => onChange?.(e.target.value)}
       placeholder={placeholder}
@@ -388,7 +391,7 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
       const savedUser = onSave ? await onSave(userToSave, avatarFile || undefined) : undefined
       const savedUsername = savedUser?.username || username
       if (editingUser.id) {
-        const updated = avatarPreview ? { ...editingUser, avatar: avatarPreview, username: savedUsername } : { ...editingUser, username: savedUsername }
+        const updated = savedUser || { ...editingUser, avatar: avatarPreview || editingUser.avatar, username: savedUsername }
         setUsers(prev => prev.map(u => u.id === editingUser.id ? updated : u))
         showToast("success", "Utilisateur mis à jour avec succès !")
       } else {
@@ -707,6 +710,53 @@ export default function UsersCrud({ initialUsers = [], onSave, onDelete, onView,
                     </div>
                   </div>
                 </FormCard>
+
+                {editingUser.role === "instructor" && (
+                  <FormCard title="Profil public du formateur" icon={<User size={16} />}>
+                    <p className="mb-4 text-xs leading-5 text-slate-600">Tous les champs sont facultatifs. Le nom et la photo de profil seront également affichés si le profil est publié.</p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <FieldLabel htmlFor="instructor-title">Titre professionnel</FieldLabel>
+                        <Input id="instructor-title" maxLength={120} value={editingUser.instructorTitle ?? ""} onChange={v => setEditingUser({ ...editingUser, instructorTitle: v })} />
+                      </div>
+                      <div>
+                        <FieldLabel htmlFor="instructor-specialty">Spécialité</FieldLabel>
+                        <Input id="instructor-specialty" maxLength={120} value={editingUser.instructorSpecialty ?? ""} onChange={v => setEditingUser({ ...editingUser, instructorSpecialty: v })} />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <FieldLabel htmlFor="instructor-description">Description</FieldLabel>
+                        <textarea
+                          id="instructor-description"
+                          rows={3}
+                          maxLength={1200}
+                          value={editingUser.instructorDescription ?? ""}
+                          onChange={e => setEditingUser({ ...editingUser, instructorDescription: e.target.value })}
+                          className="w-full resize-y rounded-[10px] border-[1.5px] border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-accent focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent/15"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <FieldLabel htmlFor="instructor-linkedin">Lien LinkedIn</FieldLabel>
+                        <Input id="instructor-linkedin" type="url" maxLength={500} placeholder="https://www.linkedin.com/in/…" value={editingUser.instructorLinkedIn ?? ""} onChange={v => setEditingUser({ ...editingUser, instructorLinkedIn: v })} />
+                      </div>
+                      <div className="flex items-start gap-2.5 border-t border-slate-100 pt-4 sm:col-span-2">
+                        <input
+                          id="instructor-visibility"
+                          type="checkbox"
+                          checked={editingUser.showOnGuestPages ?? false}
+                          onChange={e => setEditingUser({ ...editingUser, showOnGuestPages: e.target.checked })}
+                          className="mt-0.5 size-4 shrink-0 cursor-pointer accent-accent"
+                          aria-describedby="instructor-visibility-hint"
+                        />
+                        <div>
+                          <label htmlFor="instructor-visibility" className="cursor-pointer text-sm font-semibold text-slate-900">Afficher sur le site public</label>
+                          <p id="instructor-visibility-hint" className="mt-1 text-xs leading-5 text-slate-600">
+                            La page Formateurs apparaît dès que deux profils sont visibles.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </FormCard>
+                )}
 
                 {/* Login info */}
                 <FormCard title="Informations de connexion" icon={<Key style={{ width: 16, height: 16 }} />}>

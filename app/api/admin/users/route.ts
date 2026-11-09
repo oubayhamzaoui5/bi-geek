@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sendWelcomeEmail } from "@/lib/email";
 import { authErrorResponse, getAdminPb, requireUser } from "@/lib/server-auth";
+import { instructorProfileSchema } from "@/lib/instructor-profile";
 
 async function getAdminPB() {
   return getAdminPb();
@@ -107,6 +108,10 @@ export async function POST(req: Request) {
     if (!canAssignRole(caller.role, role)) {
       return NextResponse.json({ error: "Permission refusée : vous ne pouvez pas créer ce type de compte." }, { status: 403 });
     }
+    const profile = instructorProfileSchema.safeParse(role === "instructor" ? data : {});
+    if (!profile.success) {
+      return NextResponse.json({ error: profile.error.issues[0].message }, { status: 400 });
+    }
 
     const pwd = data.password || data.plainPassword;
     if (!pwd) throw new Error("Mot de passe requis.");
@@ -124,6 +129,7 @@ export async function POST(req: Request) {
       plainPassword: pwd,
       password: pwd,
       passwordConfirm: pwd,
+      ...profile.data,
     });
 
     if (data.email) {
@@ -160,6 +166,11 @@ export async function PATCH(req: Request) {
     if (!canManageTarget(caller.role, target.role) || !canAssignRole(caller.role, data.role)) {
       return NextResponse.json({ error: "Permission refusée : vous ne pouvez pas modifier ce type de compte." }, { status: 403 });
     }
+    const role = data.role ?? target.role;
+    const profile = instructorProfileSchema.safeParse(role === "instructor" ? data : {});
+    if (!profile.success) {
+      return NextResponse.json({ error: profile.error.issues[0].message }, { status: 400 });
+    }
 
     const username = await generateUniqueUsername(pb, data, data.id);
     const payload: Record<string, unknown> = {
@@ -170,7 +181,11 @@ export async function PATCH(req: Request) {
       emailVisibility: true,
       phone: data.phone ?? "",
       role: data.role,
+      ...profile.data,
     };
+    if (role !== "instructor" && target.showOnGuestPages === true) {
+      payload.showOnGuestPages = false;
+    }
 
     if (typeof data.usePassword === "boolean") {
       payload.usePassword = data.usePassword;
